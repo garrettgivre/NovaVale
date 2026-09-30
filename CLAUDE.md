@@ -52,6 +52,13 @@ people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper,
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
 
+## Figure shape (visual hull)
+Each row of the front outline is split into pieces (torso/head, arms, legs). Every piece gets a rounded-box cross-section
+(`boxy` exponent 2.6): the torso/head piece's depth is the side outline at that height (so the side profile matches the
+side painting), limbs are round. The depth estimate only adds high-passed detail (±2 cm). The old method (front/back depth
+surfaces meeting at the front outline) made lens-shaped blobs from the side. Next step if needed: a better head/face
+profile at 90° (the face is still mostly front-textured).
+
 ## Walking and facing
 Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
 thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist

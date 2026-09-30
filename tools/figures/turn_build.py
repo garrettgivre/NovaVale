@@ -157,6 +157,32 @@ w = np.clip(dt / 0.018, 0, 1); w = w * w * (3 - 2 * w)
 zm = (zf + zb) / 2
 zf = zm + (zf - zm) * np.maximum(w, 0.15); zb = zm + (zb - zm) * np.maximum(w, 0.15)
 bad = zf - zb < 0.004; zf[bad] = zm[bad] + 0.002; zb[bad] = zm[bad] - 0.002
+# ---- visual-hull cross-sections: the shape must match the side painting too. Each row's piece of the front outline
+# (torso/head, or an arm or leg) gets a rounded-box cross-section: the torso's depth comes from the side outline (so the
+# profile, nose to chest to belly, is the side painting's), limbs are round. The depth estimate only adds fine detail.
+Mfr = M['front']; cu2 = int(round(cxf)); segRow = {}
+for r in np.unique(V.astype(int)):
+    rr = min(max(int(r), 0), SH - 1); segRow[r] = segs(Mfr[rr]) if Mfr[rr].any() else []
+hullF = np.empty(n); hullB = np.empty(n)
+NEXP = cfg.get('boxy', 2.6)
+for i in range(n):
+    r = int(V[i]); u = U[i]; ss = segRow.get(r, [])
+    sg = min(ss, key=lambda q: 0 if q[0] <= u <= q[1] else min(abs(u - q[0]), abs(u - q[1]))) if ss else (u - 1, u + 1)
+    a_, b_ = sg; hw = max((b_ - a_) / 2, 1.0); t = min(abs(u - (a_ + b_) / 2) / hw, 1.0)
+    sh = (1 - t ** NEXP) ** (1 / NEXP)
+    if a_ <= cu2 <= b_:                      # the torso / head piece: depth from the side outline
+        c_, h_ = (zF[i] + zB[i]) / 2, (zF[i] - zB[i]) / 2
+    else:                                    # a limb: round, centred in the body's depth
+        c_ = (zF[i] + zB[i]) / 2; h_ = min(hw * px['front'], (zF[i] - zB[i]) / 2)
+    hullF[i] = c_ + h_ * sh; hullB[i] = c_ - h_ * sh
+# fine detail from the depth estimate (high-passed, a couple of centimetres at most)
+def hp(z):
+    g = np.zeros(inside.shape, np.float32); g[inside] = z; w_ = inside.astype(np.float32)
+    lo = cv2.GaussianBlur(g, (0, 0), 6) / np.maximum(cv2.GaussianBlur(w_, (0, 0), 6), 1e-6)
+    return np.clip(z - lo[inside], -0.02, 0.02)
+detF, detB = hp(zf), hp(zb)
+zf = np.minimum(hullF + detF, zF); zb = np.maximum(hullB + detB, zB)
+bad = zf - zb < 0.003; zm = (hullF + hullB) / 2; zf[bad] = zm[bad] + 0.0015; zb[bad] = zm[bad] - 0.0015
 # smooth along the grid (depth noise)
 def smooth(z):
     g = np.zeros(inside.shape, np.float32); g[inside] = z; wgt = inside.astype(np.float32)
