@@ -58,8 +58,10 @@ thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves 
 and eye height against the current room, needs floor underfoot, keeps 0.55 m from people, and slides along walls. `go()`
 glides from wherever you are. People keep their own facing (`userData.base`: towards the room's middle, offset per
 person), turn fully to you when talking and partly when you're within 2.8 m; heads only track you when you're near.
-Figures: the stance is narrowed in `turn_build.py` (feet slide in to `stance` 0.1 m from the centre, arm-owned vertices
-excluded); legs are owned by the hips through a geodesic line down each leg; below the hips only the hand region
+Figures: the stance is narrowed in `turn_build.py`, legs only: from the crotch down each leg shifts as a whole towards
+`stance` (default 0.55 of the drawn foot spread, at least 0.09 m); the pelvis and waist stay as painted, gowns with no gap
+between the legs are left alone, arm-owned vertices excluded. Body shape comes from the art: on rows where an arm hangs
+clear of the body, the torso segment never binds to the arms (relaxing the arms used to pull every waist in); legs are owned by the hips through a geodesic line down each leg; below the hips only the hand region
 (near the forearm/hand line, or further out than it) may follow the arms. `auto_joints.py` ends an arm run when it jumps
 sideways (it used to run on down a trouser leg: Gus, Rashad, Priya had fingertips on their thighs).
 

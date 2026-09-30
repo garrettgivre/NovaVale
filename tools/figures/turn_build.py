@@ -233,6 +233,16 @@ for _, _, h, t in BONES:
     geo, _ = MCP_Geometric(cost).find_costs(seeds)
     dist.append(ndimage.map_coordinates(geo, [Vall, Uall], order=1) * px['front'])
 dist = np.stack(dist, 1)
+# the torso is the torso: on rows where an arm hangs clear of the body in the front view, everything inside the
+# central (torso) segment belongs to the body, not the arm (otherwise relaxing the arms pulled the waist in)
+Mf = M['front']; cu_ = int(round(cxf)); torsoRow = {}
+for r in range(int(top['front']), int(bot['front'])):
+    rs = segs(Mf[r]); c_ = [q for q in rs if q[0] <= cu_ <= q[1]]
+    if c_ and any(q[1] < c_[0][0] for q in rs) and any(q[0] > c_[0][1] for q in rs): torsoRow[r] = c_[0]
+vi = np.clip(np.round(Vall).astype(int), 0, SH - 1); ui_ = np.round(Uall)
+inT = np.array([(r in torsoRow) and (torsoRow[r][0] + 2 <= u <= torsoRow[r][1] - 2) for r, u in zip(vi, ui_)])
+for j in (6, 7, 8, 10, 11, 12): dist[inT, j] = 9.0
+print('torso vertices kept off the arms', int(inT.sum()))
 # below the hips only the hands themselves may follow the arms (a hand hanging against a pocket or a jacket hem
 # otherwise drags the thigh along when the arms relax)
 lowV = P[:, 1] < J['hips'][1] + 0.03
@@ -288,17 +298,23 @@ k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))
 UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float32)
 
-# ---- a narrower stance: the sheets are drawn with feet wide apart. Below the hips each leg slides towards the centre,
-# growing linearly to the full amount at the feet (as if the leg swung in at the hip); tanh keeps the middle of a
-# skirt still so a gown compresses instead of folding over itself
+# ---- a narrower stance: the sheets are drawn with feet wide apart. Only the legs move, from the crotch down (the
+# pelvis and waist stay exactly as painted), each leg shifted as a whole so it keeps its width, growing linearly to the
+# full amount at the feet. Gowns with no gap between the legs are left alone.
+cu = int(round(cxf)); crotch = None
+for r in range(int(bot['front']) - 5, int(top['front']), -1):
+    if M['front'][r, cu - 2:cu + 3].any(): crotch = r; break
 fx = (np.array([footL_u, footR_u]) - cxf) * px['front']; F_ = float(np.abs(fx).mean())
-T_ = cfg.get('stance', 0.1)
-if F_ > T_:
-    yh, yf = J['hips'][1], 0.0
-    k_ = np.clip((yh - P[:, 1]) / (yh - yf), 0, 1)
+T_ = cfg.get('stance', max(0.09, 0.55 * F_))
+if crotch is not None and crotch < bot['front'] - 0.12 * (bot['front'] - top['front']) and F_ > T_ + 0.01:
+    yc = Yf(crotch)
+    k_ = np.clip((yc - P[:, 1]) / yc, 0, 1)
+    side = np.tanh(P[:, 0] / 0.02)                      # which leg (a hard switch, smoothed over 2 cm at the middle)
     armW = (Wt * np.isin(top4, [6, 7, 8, 10, 11, 12])).sum(1)     # hands hanging by the legs stay with their arms
-    P[:, 0] -= (F_ - T_) * k_ * np.tanh(P[:, 0] / 0.07) * (1 - armW)
-    print('stance', round(F_, 3), '->', T_)
+    P[:, 0] -= (F_ - T_) * k_ * side * (1 - armW)
+    print('stance', round(F_, 3), '->', round(T_, 3), 'from crotch at', round(yc, 2))
+else:
+    print('stance kept (gown or already narrow)')
 np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
