@@ -10,6 +10,14 @@ m = (a > 128).astype(np.uint8)
 n, lab, st, _ = cv2.connectedComponentsWithStats(m)
 comps = sorted([i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 20000], key=lambda i: st[i, cv2.CC_STAT_LEFT])
 VIEWS = sys.argv[3].split(',') if len(sys.argv) > 3 else ['front', 'side', 'back']
+# views that touch (a cape, a train) come out as one blob: cut the widest blob at its thinnest column until the count matches
+while len(comps) < len(VIEWS):
+    i = max(comps, key=lambda i: st[i, cv2.CC_STAT_WIDTH]); x, y, w, h, _ = st[i]
+    col = (lab[:, x:x + w] == i).sum(0).astype(float)
+    lo, hi = int(w * .3), int(w * .7); c = x + lo + int(np.argmin(col[lo:hi]))
+    lab[:, c] = 0; m[:, c] = 0
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m)
+    comps = sorted([i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 20000], key=lambda i: st[i, cv2.CC_STAT_LEFT])
 assert len(comps) == len(VIEWS), [st[i] for i in range(1, n)]
 out = {}
 for view, i in zip(VIEWS, comps):
@@ -27,4 +35,4 @@ for view, i in zip(VIEWS, comps):
     crop = np.dstack([im, al])[max(0, y0 - pad):y1 + pad + 1, max(0, x0 - pad):x1 + pad + 1]
     cv2.imwrite(os.path.join(D, f'{name}_{view}.png'), crop)
     out[view] = (int(x0), int(y0), int(x1), int(y1))
-print({k: (v[0] - 16, max(0, v[1] - 16)) for k, v in out.items()})
+print({k: (max(0, v[0] - 16), max(0, v[1] - 16)) for k, v in out.items()})

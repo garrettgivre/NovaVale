@@ -17,6 +17,15 @@ def placed(view):
 VIEWS = cfg.get('views', ['front', 'side', 'back'])
 A = {v: placed(v) for v in VIEWS}
 M = {v: (A[v] > 0.5) for v in A}
+for v, k_ in cfg.get('open', {}).items():   # break thin bridges to a neighbouring view
+    M[v] = cv2.morphologyEx(M[v].astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_, k_))) > 0
+for v in M:   # keep each view's main body (drops slivers of a neighbouring view's cape or train)
+    lab_, nl = ndimage.label(M[v])
+    if nl > 1:
+        sizes = ndimage.sum(M[v], lab_, range(1, nl + 1)); keep = 1 + int(np.argmax(sizes))
+        small = (sizes < sizes.max() * 0.002)
+        M[v] = (lab_ == keep) | np.isin(lab_, 1 + np.nonzero(small)[0])
+        A[v] = A[v] * M[v]
 def span(m):
     ys, xs = np.nonzero(m); return ys.min(), ys.max(), xs.min(), xs.max()
 top, bot = {}, {}

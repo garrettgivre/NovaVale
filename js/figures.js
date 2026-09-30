@@ -13,6 +13,11 @@ export const FIG = {
   cherry: { head: 1.714, talk: 'R', relax: 0.3 },
   opal: { head: 1.553, talk: 'R', relax: 0.42 },
   juniper: { head: 1.51, talk: 'R', relax: 0.36 },
+  dex: { head: 1.633, talk: 'R', relax: 0.3 },
+  harper: { head: 1.54, talk: 'R', relax: 0.3 },
+  celeste: { head: 1.577, talk: 'R', relax: 0.32 },
+  regent: { head: 1.72, talk: 'L', relax: 0.2 },
+  gus: { head: 1.614, talk: 'R', relax: 0.24 },
 };
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];

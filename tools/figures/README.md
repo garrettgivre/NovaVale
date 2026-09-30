@@ -22,5 +22,10 @@ don't bind to the thighs they hang beside and a gown doesn't follow the arms; ar
 Silhouette vertices are snapped to the cutout's smooth contour (no stair-step outline); the side view is only used where
 its colour agrees with the front or back view. `posetest.py <who>` renders the arms lowered, to check the weights.
 
+Batch: `python batch.py '[["name","<upload id>",height], ...]'` cuts four-view sheets (front, side facing right, side facing
+left, back), places joints automatically (`auto_joints.py`: torso centre, neck between the widest head row and the shoulders,
+shoulders from the torso width, arm runs for elbows/wrists/finger tips) and writes each config plus `joints_sheet.jpg` to check.
+Touching views (capes, trains) are split at the thinnest column; each view keeps only its main connected body.
+
 Python: a venv with `rembg[cpu]`, `onnxruntime==1.19.2` (newer builds fail to load on this PC), `opencv-python-headless`,
 `scipy`, `huggingface_hub`, `scikit-image`. Blender 4.5. Add the character to `FIG` in `js/figures.js` (head height, talking arm).

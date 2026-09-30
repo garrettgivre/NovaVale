@@ -40,7 +40,7 @@ Characters with turnaround art are real 3D models built from that art (`tools/fi
 back views fitted to the side silhouette, textured from the three paintings, rigged in Blender, `assets/figures/<who>.glb`.
 `js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally (arms relaxed out of the
 A-pose, breathing, sway, head follows the camera, talking arm gestures); world.js uses a figure instead of the sculpted
-people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
+people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper, Dex, Harper, Velvet Regent, Gus; Celeste has a model (`assets/figures/celeste.glb`) but is only a phone contact, not placed in the world (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
 
