@@ -18,6 +18,10 @@ export const FIG = {
   celeste: { head: 1.577, talk: 'R', relax: 0.32 },
   regent: { head: 1.72, talk: 'L', relax: 0.2 },
   gus: { head: 1.614, talk: 'R', relax: 0.24 },
+  nate: { head: 1.67, talk: 'R', relax: 0.3 },
+  rashad: { head: 1.647, talk: 'R', relax: 0.3 },
+  kenji: { head: 1.618, talk: 'R', relax: 0.32 },
+  priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];

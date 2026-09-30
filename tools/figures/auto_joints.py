@@ -31,7 +31,7 @@ def joints(alpha, ox, oy):
     J = {}
     for side, sgn in (('R', -1), ('L', 1)):
         arm = []
-        for y in range(int(neck), bot):
+        for y in range(int(neck + .05 * H), bot):
             rs = runs(m[y]); t = seg_at(y, cx)
             if not t: continue
             outer = [r for r in rs if (r[1] < t[0] if sgn < 0 else r[0] > t[1])]
@@ -41,10 +41,13 @@ def joints(alpha, ox, oy):
         if len(arm) < 10:
             raise RuntimeError('arm not separated on side ' + side)
         # keep the first contiguous run of rows
-        run = [arm[0]]
+        # the longest contiguous run of rows (earrings, glasses chains and hair make short ones)
+        runs_, cur = [], [arm[0]]
         for a in arm[1:]:
-            if a[0] - run[-1][0] <= 3: run.append(a)
-            else: break
+            if a[0] - cur[-1][0] <= 3: cur.append(a)
+            else: runs_.append(cur); cur = [a]
+        runs_.append(cur)
+        run = max(runs_, key=len)
         pit, tipY = run[0][0], run[-1][0]
         tipX = run[-1][1]
         # shoulder: above the armpit, extrapolating the arm's line back up
