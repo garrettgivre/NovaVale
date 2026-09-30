@@ -312,6 +312,7 @@ async function doTopic(who, t) {
 
 export async function onTalk(who) {
   if (who === 'opal' && S.phase === 'n2') return finale();
+  E.focus(who);
   openTalk(who);
   const firstNight = who === 'cherry' && S.phase === 'n1' && !has('cherry_night');
   if (!has('met_' + who)) {
@@ -334,22 +335,24 @@ export async function onTalk(who) {
     if (who === 'opal' && has('opal_left')) { sync(); break; }
   }
   closeTalk();
+  E.unfocus();
   E.refresh();
 }
 
 // ---------- The finale ----------
 async function finale() {
   checkpoint();
+  E.focus('opal');
   openTalk('opal');
   await say('opal', ['*Opal sits beside the crown under a small painted sky, as if she\'s been waiting.', 'I wondered who would find this room first. I hoped it would be someone who deserved to.', 'We built it for ourselves, the four of us. A secret Star Room at the end of the tunnel. We toasted opening night right here.']);
   let i = await choose([{ text: 'You took the crown to stop the relaunch.' }, { text: 'I\'m calling the police. Right now.' }, { text: 'Why is the crown down here, Opal?' }]);
-  if (i === 1) { closeTalk(); return badEnding('locked'); }
+  if (i === 1) { closeTalk(); E.unfocus(); return badEnding('locked'); }
   await say('opal', ['...Yes.', 'I opened the case with the old code at 11:52 and carried the crown down here in my coat pocket. I lost my pin on the way. Sloppy.', 'If there\'s no crown, there\'s no gala. If there\'s no gala, maybe Celeste reconsiders. Maybe my stars stay.', 'It was a foolish plan. But it was the only one I had.']);
   i = await choose([{ text: 'You\'ll never work on another building again.' }, { text: 'The planetarium matters. Help me save it instead.' }]);
-  if (i === 0) { closeTalk(); return badEnding('locked'); }
+  if (i === 0) { closeTalk(); E.unfocus(); return badEnding('locked'); }
   await say('opal', ['*Opal is quiet for a long moment. Then she laughs, softly.', 'You sound like me, twenty-three years ago.', 'All right, Miss Vale. Take it back up. Tell Celeste everything. I won\'t make you drag me.']);
   set('finale_done'); set('crown_back'); sync(); sfx('solve');
-  closeTalk();
+  closeTalk(); E.unfocus();
   await think(['*You lift the Prism Crown off its cushion. The meteorite star glints violet in the lamplight.', 'Case closed. Almost.']);
   await call('celeste', ['Nova? It\'s nearly one in the morning, is everything...', 'N: I found the crown. And I think you should hear Opal out about the planetarium.', '*Celeste listens for a long time.', '...A VIP lounge can go anywhere. The old laundry is bigger anyway.', 'Tell Opal her stars stay. And tell her she\'s running the planetarium show at the gala.']);
   ending();
@@ -399,7 +402,7 @@ const CALLS = {
 };
 
 async function call(who, lines) {
-  openTalk(who);
+  openTalk(who, { pt: true });
   await say(who, lines);
   closeTalk();
 }
@@ -411,15 +414,16 @@ function ring(who) {
 }
 
 export function openPhone() {
-  const body = panel(`<div class="phone"><div class="ph-top"><span>▮▮▮▯</span><b>${PHASE_NAME[S.phase] || ''}</b><span>▮▮▯</span></div>
-    <div class="ph-scr" id="phs"></div><div class="ph-keys">${'123456789*0#'.split('').map(k => `<i>${k}</i>`).join('')}</div></div>`, { cls: 'phone-p', title: '' });
+  const body = panel(`<div class="phone"><div class="ph-ear"></div><div class="ph-scr"><div class="ph-top"><span>Yl</span><b>${PHASE_NAME[S.phase] || ''}</b><span>[===]</span></div>
+    <div class="ph-h">CONTACTS</div><div id="phs"></div></div><div class="ph-brand">CELLTONE</div>
+    <div class="ph-keys">${'123456789*0#'.split('').map(k => `<i>${k}</i>`).join('')}</div></div>`, { cls: 'phone-p', title: '' });
   const scr = body.querySelector('#phs');
-  scr.innerHTML = CONTACTS.map(c => `<button class="ph-c" data-c="${c}">${portrait(c)}<span><b>${PEOPLE[c].n}</b><small>${{ dot: 'Best friend · hints', remy: 'Cousin · research', celeste: 'Client' }[c]}</small></span></button>`).join('');
+  scr.innerHTML = CONTACTS.map(c => `<button class="ph-c" data-c="${c}"><b>${PEOPLE[c].n.toUpperCase()}</b><small>${{ dot: 'best friend', remy: 'cousin', celeste: 'client' }[c]}</small></button>`).join('');
   scr.querySelectorAll('.ph-c').forEach(b => b.onclick = async () => {
     const who = b.dataset.c; closePanel(true);
     const list = CALLS[who]().filter(t => !t.when || t.when());
     if (list.length === 1) { await call(who, typeof list[0].lines === 'function' ? list[0].lines() : list[0].lines); return; }
-    openTalk(who);
+    openTalk(who, { pt: true });
     await say(who, ['Hey, cuz. What do you need?']);
     while (true) {
       const i = await choose([...list.map(t => ({ text: t.q, dim: S.calls[who + ':' + t.id] })), { text: 'Hang up', bye: true }]);

@@ -6,11 +6,11 @@ The game runs without any of these. Each one replaces a code-drawn placeholder a
 
 - Save as `assets/portraits/<id>.webp`, 400 × 480 px (5:6, portrait), subject centred from the chest up.
 - Ids: `vesper`, `cherry`, `dex`, `juniper`, `opal`, `dot`, `remy`, `celeste`.
-- Keep the same style for all eight: a stylised early-2000s adventure-game portrait with soft glossy shading, a bright Frutiger Aero background (sky blue, aqua, bubbles, soft light), clean edges and no text.
+- Keep the same style for all eight: a realistic early-2000s adventure-game character render (like the classic Nancy Drew PC games), warm soft lighting, a muted studio backdrop, no text.
 
 Base prompt (add the character line):
 
-> A character portrait for a cozy early-2000s mystery adventure game. Chest-up, facing the viewer, friendly stylised 3D-render look with soft glossy shading, like a 2003 PC game. Background: bright Frutiger Aero sky gradient with soft bubbles and lens glow. No text. 5:6 portrait.
+> A character portrait for a classic early-2000s point-and-click mystery game, in the style of the old Nancy Drew PC games. Chest-up, facing the viewer, a realistic pre-rendered 3D look with soft warm lighting and slight film grain. Muted brown studio backdrop. No text. 5:6 portrait.
 
 - **vesper**: Vesper Vox, a glamorous pop diva in her 40s. Huge platinum-blonde voluminous hair, dark wraparound sunglasses worn indoors, a chrome-silver gown with sculpted shoulders, chunky silver earrings. Theatrical, a little mysterious, holding a hand to her throat.
 - **cherry**: Miss Cherry Pop, a Black drag queen in her 30s. Towering cherry-red beehive with a gold five-point star pin, dramatic lashes, glossy hot-pink mini dress, big warm grin. Camp, funny, fashion-forward.
@@ -25,4 +25,4 @@ Base prompt (add the character line):
 
 - `assets/title.webp`, 1600 × 900. Not wired in yet: the title screen is drawn in CSS for now.
 
-> Key art for a cozy mystery adventure game called "The Secret of the Aquadome". A glass-domed lakeside spa and planetarium from 2003 at dusk, glowing aqua windows, bubbles rising, a chrome crown with a violet meteorite star floating in the sky. Frutiger Aero style: glossy, bright sky gradients, lush green grass, water reflections. The silhouette of a teenage girl detective with a flip phone in the foreground. No text.
+> Key art for a classic early-2000s mystery adventure game. A faded glass-domed lakeside resort and planetarium at dusk, warm lamplight in the windows, mist on the lake, a silver crown with a violet meteorite star glinting inside. Realistic painted, moody, in the style of the old Nancy Drew game covers. The silhouette of a teenage girl detective with a flip phone in the foreground. No text.

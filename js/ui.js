@@ -18,14 +18,14 @@ export const PEOPLE = {
 
 // ---------- Portraits (SVG placeholders; a matching assets/portraits/<id>.webp replaces them) ----------
 const P = {
-  vesper: { skin: '#f2d0bd', top: '#cfd8e6', bg: ['#dfe8ff', '#8a9ab8'] },
-  cherry: { skin: '#8a5a3c', top: '#ff4fa3', bg: ['#ffd6ec', '#ff3d9a'] },
-  dex: { skin: '#e0b08e', top: '#19b4b8', bg: ['#d6fbf3', '#19a37a'] },
-  juniper: { skin: '#5e3b27', top: '#fbfbf5', bg: ['#e6fbd6', '#6dc04b'] },
-  opal: { skin: '#f0d6c8', top: '#b9a6e6', bg: ['#efe6ff', '#9b7fe0'] },
-  dot: { skin: '#c68a62', top: '#ffb020', bg: ['#fff1cc', '#ffb020'] },
-  remy: { skin: '#f1c9a5', top: '#3e7bf2', bg: ['#dbe8ff', '#3e7bf2'] },
-  celeste: { skin: '#e8b996', top: '#c85fd6', bg: ['#f8e0ff', '#c85fd6'] },
+  vesper: { skin: '#f2d0bd', top: '#cfd8e6', bg: ['#8f8574', '#2e2820'] },
+  cherry: { skin: '#8a5a3c', top: '#ff4fa3', bg: ['#8f8574', '#2e2820'] },
+  dex: { skin: '#e0b08e', top: '#19b4b8', bg: ['#8f8574', '#2e2820'] },
+  juniper: { skin: '#5e3b27', top: '#fbfbf5', bg: ['#8f8574', '#2e2820'] },
+  opal: { skin: '#f0d6c8', top: '#b9a6e6', bg: ['#8f8574', '#2e2820'] },
+  dot: { skin: '#c68a62', top: '#ffb020', bg: ['#8f8574', '#2e2820'] },
+  remy: { skin: '#f1c9a5', top: '#3e7bf2', bg: ['#8f8574', '#2e2820'] },
+  celeste: { skin: '#e8b996', top: '#c85fd6', bg: ['#8f8574', '#2e2820'] },
 };
 function portraitSVG(who) {
   const p = P[who]; if (!p) return '';
@@ -42,14 +42,13 @@ function portraitSVG(who) {
   return `<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg">
   <defs><radialGradient id="bg${who}" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="${p.bg[0]}"/><stop offset="1" stop-color="${p.bg[1]}"/></radialGradient>
   <linearGradient id="gl${who}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
-  <rect width="200" height="240" rx="28" fill="url(#bg${who})"/>
+  <rect width="200" height="240" fill="url(#bg${who})"/>
   <path d="M20 240 q0 -62 80 -62 q80 0 80 62z" fill="${p.top}"/>
   <rect x="86" y="150" width="28" height="36" rx="12" fill="${p.skin}"/>
   <ellipse cx="100" cy="112" rx="46" ry="52" fill="${p.skin}"/>
   ${who === 'vesper' ? '' : `<ellipse cx="82" cy="112" rx="6" ry="8" fill="#1c1430"/><ellipse cx="118" cy="112" rx="6" ry="8" fill="#1c1430"/><circle cx="84" cy="109" r="2" fill="#fff"/><circle cx="120" cy="109" r="2" fill="#fff"/>`}
   <path d="M86 138 q14 10 28 0" fill="none" stroke="#9a2a44" stroke-width="4" stroke-linecap="round"/>
   ${hair}
-  <rect x="10" y="8" width="180" height="90" rx="26" fill="url(#gl${who})"/>
 </svg>`;
 }
 export function portrait(who) {
@@ -85,11 +84,17 @@ export function toast(text) {
 let busy = false;
 export const talking = () => busy;
 
-export function openTalk(who) {
+export function openTalk(who, { pt = false } = {}) {
   busy = true;
   const T = $('#talk');
-  T.className = 'on' + (who ? '' : ' solo');
-  $('#talkPt').innerHTML = who ? portrait(who) : '';
+  T.className = 'on' + (who && pt ? '' : ' solo');
+  $('#talkPt').innerHTML = who && pt ? portrait(who) : '';
+  // in person, show a painted portrait only if real art exists (the 3D close-up is the default)
+  if (who && !pt) {
+    const img = new Image();
+    img.onload = () => { if (busy) { $('#talkPt').innerHTML = `<div class="pt">${''}</div>`; $('#talkPt .pt').appendChild(img); T.classList.remove('solo'); } };
+    img.src = `assets/portraits/${who}.webp`;
+  }
   $('#talkName').textContent = who ? PEOPLE[who].n : '';
   $('#talkName').style.setProperty('--c', who ? PEOPLE[who].c : '#1aa6d9');
   $('#talkOpts').innerHTML = '';
