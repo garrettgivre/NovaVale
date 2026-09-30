@@ -272,7 +272,7 @@ nrm = np.cross(p1 - p0, p2 - p0); nrm /= np.linalg.norm(nrm, axis=1, keepdims=Tr
 armV = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12])
 # side views only colour faces near the outline; steep steps inside the body (a coat edge over trousers) keep the front/back
 dtv = np.concatenate([dt, dt])
-useSide = (np.abs(nrm[:, 0]) > cfg.get('sideAt', 0.93)) & ~armV[F].any(1) & (dtv[F].max(1) < cfg.get('sideBand', 0.035))
+useSide = (np.abs(nrm[:, 0]) > cfg.get('sideAt', 0.8)) & ~armV[F].any(1) & (dtv[F].max(1) < cfg.get('sideBand', 0.08))
 useBack = (~useSide) & (nrm[:, 2] < 0)
 Pc = P[F.ravel()]
 uvF = np.stack([(Pc[:, 0] / px['front'] + cxf), bot['front'] - Pc[:, 1] / px['front']], 1)
