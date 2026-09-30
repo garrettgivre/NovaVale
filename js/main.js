@@ -360,13 +360,16 @@ try { if (localStorage.getItem('novavale.mute')) setMuted(true); } catch (e) { }
 setMusic(pref('music', true)); musicUI();
 if (RETRO) setRetro(true);
 resize();
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast((i, n) => {
+// sculpt the people in the saved room (or the lobby) first; everyone else follows in the background
+const ROOMCAST = { lobby: ['cherry', 'kenji', 'harper', 'silas'], spa: ['vesper'], tech: ['dex'], kitchen: ['juniper', 'jojo'], archive: ['opal'], plan: ['priya', 'regent', 'cherry'], wing: ['rashad', 'gus'], terrace: ['gus', 'silas', 'nate'], star: ['opal'] };
+const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novavale.aquadome.v1') || 'null'); const room = d && NODES[d.node] ? NODES[d.node].room : 'lobby'; return [...new Set([...(ROOMCAST[room] || []), 'cherry', 'kenji', 'harper'])]; } catch (e) { return ['cherry', 'kenji', 'harper']; } };
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast(firstCast(), (i, n) => {
   document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';
-})).then(() => setTimeout(() => {
+}, () => { if (V.node) sync(); })).then(() => setTimeout(() => {
   buildWorld(scene, renderer);
   showRoom('lobby'); place('L1'); sync();
   loop();
   document.getElementById('boot').remove();
   title();
 }, 30));
-window.__dbg = { S, go, story, NODES, V };
+window.__dbg = { S, go, story, NODES, V, focus, unfocus };

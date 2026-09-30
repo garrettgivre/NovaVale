@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { S, has, night } from './state.js';
 import * as T from './tex.js';
-import { buildPerson, CAST, animatePerson } from './people.js';
+import { buildPerson, CAST, animatePerson, castReady } from './people.js';
 import { speech } from './ui.js';
 
 export const rooms = {};
@@ -986,17 +986,21 @@ function applyTime() {
   }
 }
 
-// Where everyone is, by phase and story flags.
+// Where everyone is, by phase and story flags: [room, x, z, floor height].
+const DAY = {
+  vesper: ['spa', 4.5, -0.9], cherry: ['lobby', 1.8, -2.3], kenji: ['lobby', 6.3, 1.2], harper: ['lobby', -6.0, 4.3],
+  dex: ['tech', 2, -1.6], juniper: ['kitchen', -1.8, -1.4], jojo: ['kitchen', 2.9, 0.4], opal: ['archive', -0.9, -1.6],
+  priya: ['plan', -2.4, 1.3], regent: ['plan', 1.3, -6.0, 0.5], rashad: ['wing', 0.95, -8.0],
+  gus: ['terrace', -3.4, -2.6], silas: ['terrace', 6.0, 0.6], nate: ['terrace', 4.4, -13.5],
+};
+const NIGHT1 = { cherry: ['plan', -1.7, -5.9, 0.5], silas: ['lobby', -2.8, -4.6], gus: ['wing', 0.9, -2.0], nate: ['terrace', 4.4, -13.5] };
 export function whereIs(who) {
   const p = S.phase;
   if (p === 'd1' || p === 'd2') {
-    if (who === 'vesper') return ['spa', 4.5, -0.9];
-    if (who === 'cherry') return ['lobby', 1.8, -2.3];
-    if (who === 'dex') return ['tech', 2, -1.6];
-    if (who === 'juniper') return ['kitchen', -1.8, -1.4];
-    if (who === 'opal') return p === 'd2' && has('opal_left') ? null : ['archive', -0.9, -1.6];
+    if (who === 'opal' && p === 'd2' && has('opal_left')) return null;
+    return DAY[who] || null;
   }
-  if (p === 'n1' && who === 'cherry') return ['plan', -1.7, -5.9, 0.5];
+  if (p === 'n1') return NIGHT1[who] || null;
   if (p === 'n2' && who === 'opal' && !has('finale_done')) return ['star', 1.6, -1.8];
   return null;
 }
@@ -1012,11 +1016,11 @@ export function sync() {
   rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
   for (const w in CAST) {
     const at = whereIs(w);
-    if (!at) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
-    const c = chars[w] || (chars[w] = buildPerson(w, BRASS, HIT)); // sculpted on first appearance
+    if (!at || !castReady(w)) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
+    const c = chars[w] || (chars[w] = buildPerson(w, BRASS, HIT)); // built on first appearance
     const R = rooms[at[0]];
     if (c.parent !== R.g) R.g.add(c);
-    c.position.set(at[1], at[3] || 0, at[2]);
+    c.position.set(at[1], (at[3] || 0) + c.userData.yOff, at[2]);
   }
   applyTime();
 }

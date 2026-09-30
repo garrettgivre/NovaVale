@@ -35,6 +35,19 @@ Hub and spokes. The rotunda lobby is the hub; every door around it leads somewhe
 - Collectibles: eight 2003 postcards (`POSTCARDS` in world.js: room, position; `DOCS.pc1..pc8` in items.js), shown on the Journal's Postcards tab and in the ending letter. The archive bookcase holds a newspaper clipping (`DOCS.clipping`) and the Guest Wing has the crew photo (`DOCS.crewphoto`, also sets `pin_known` if you have the pin).
 - `js/state.js`: `S` (phase d1/n1/d2/n2/end, flags, inv, docs), localStorage key `novavale.aquadome.v1`, `checkpoint()`/`secondChance()`.
 
+## The cast
+Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal falls back to the SVG portrait). Phone contacts Remy, Dot and Celeste also have art.
+- Velvet Regent (`regent`): drag performer, favourite to win the Revue, wears the other long white coat. Suspect-ish; cleared by Harper's recording.
+- Harper Vance (`harper`): true-crime podcaster. Her 11:57 recording (Regent's alibi) catches the Star Room door groaning under the building.
+- Kenji Morimoto (`kenji`): conservator restoring Stella, a 1925 singing automaton (a ghost red herring). Says the meteorite is unsellable quietly: the thief didn't want money.
+- Dr. Priya Anand (`priya`): astronomer removing the projector; came as a child (postcard 1). Red torch, so the white light wasn't hers; knows Cygnus.
+- Mateo "Jojo" Reyes (`jojo`): Juniper's nephew on skates, pitching a roller disco. Heard a heavy door under the floor.
+- Rashad Okafor (`rashad`): bellhop, mystery reader, grandson of crew member Marcus Okafor. Saw Opal at 12:20; grandpa's notebook (`DOCS.okafor`) hints the ring door order.
+- Gus Haddad (`gus`): caretaker with every key except the Service door (Opal's). Padlocked boathouse = sequel hook.
+- Silas "Static" Boone (`silas`): paranormal web-show host. His 11:52 lobby tape (`DOCS.tape`) shows a long coat and a white flashlight.
+- Ranger Nate Begay (`nate`): lake warden, alibis Priya and Jojo, has seen boathouse lights (sequel hook).
+Placement: `DAY`/`NIGHT1` in world.js. Models: `CAST` in people.js (props in `PROP`, garments in `G`, paints in `PA`; `prepareCast(first,…)` builds the current room's people first, the rest in the background, and `sync()` adds each as it's ready).
+
 ## The case (spoilers)
 Day 1: examine the case, find Opal's brass pin, meet all five, read the keypad log (MAINT-0, a 2003 build-team code). Night 1: the singing ghost; switchboard → planetarium; Dex's hologram card; Cherry's secret rehearsal and the flashlight in a long coat. Day 2: Dex confesses the ghost (alibi); Vesper's acrostic = lip sync (alibi); Juniper's vegan cake puzzle (alibi, saw the long coat); the relaunch memo makes Opal leave the archive; her sketch → constellation → 7·2·9 → drawer: service key + Star Room blueprint. Night 2: service door → tunnel → ring door → Star Room → Opal. Choose compassion (save the planetarium) for the good ending.
 

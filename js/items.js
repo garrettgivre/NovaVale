@@ -140,3 +140,24 @@ PC.forEach(([title, msg], i) => {
       <div class="pc-back"><p class="hand">${msg}</p><span class="stamp">AQ</span></div></div>`,
   };
 });
+
+DOCS.tape = {
+  t: 'Static Hour: Tuesday\'s tape',
+  html: `<div class="paper photo"><div class="vhs"><svg viewBox="0 0 320 220"><rect width="320" height="220" fill="#101418"/>
+    <ellipse cx="160" cy="140" rx="120" ry="30" fill="#1a2228"/><circle cx="160" cy="120" r="34" fill="#20282e"/>
+    <g fill="#3a4448"><rect x="232" y="60" width="16" height="110"/><rect x="72" y="60" width="16" height="110"/></g>
+    <g><ellipse cx="206" cy="88" rx="9" ry="10" fill="#0a0c0e"/><path d="M194 98 L218 98 L224 172 L188 172 Z" fill="#0a0c0e"/><circle cx="222" cy="120" r="4" fill="#f0f0e0"/><path d="M226 120 L262 110 L262 130 Z" fill="rgba(240,240,220,.35)"/></g>
+    <text x="16" y="28" font-family="monospace" font-size="16" fill="#f0f0f0">REC ●</text><text x="200" y="28" font-family="monospace" font-size="14" fill="#f0f0f0">TUE 11:52PM</text>
+    <text x="16" y="206" font-family="monospace" font-size="12" fill="#f0f0f0">LOBBY CAM 2 · SP</text>
+    ${Array.from({ length: 22 }, (_, i) => `<rect x="0" y="${i * 10}" width="320" height="1" fill="rgba(255,255,255,.05)"/>`).join('')}</svg></div>
+    <p class="hand">Silas: "THE GREY LADY. Crossing the lobby toward the planetarium at 11:52. Note the ghostly light."</p>
+    <p>Nova's note: long coat. Ordinary white flashlight. Walking, not floating.</p></div>`,
+};
+DOCS.okafor = {
+  t: 'Marcus Okafor\'s notebook',
+  html: `<div class="paper lined"><p class="hand">June 21 '03 - opening night!!</p>
+    <p class="hand">After the show, the four of us went down to O's secret room. The Star Room. Nobody else knows it's there.</p>
+    <p class="hand">The door has three rings. O says you set them "from the outside in, like the solar system": the planet with the ring, then the moon, then the comet.</p>
+    <p class="hand">Toasted with ginger beer. Best night of my life. - M.O.</p>
+    <svg viewBox="0 0 200 60" style="width:60%"><g fill="none" stroke="#3a3a6a" stroke-width="2"><circle cx="30" cy="30" r="12"/><ellipse cx="30" cy="30" rx="22" ry="6"/><path d="M95 18 a13 13 0 1 0 0 26 a10 10 0 1 1 0 -26z"/><circle cx="162" cy="24" r="7"/><path d="M156 28 L140 44 M160 31 L146 48"/></g></svg></div>`,
+};

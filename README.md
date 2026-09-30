@@ -14,6 +14,9 @@ python -m http.server 8777
 
 Then visit http://localhost:8777. It works on phones and desktops. Progress saves automatically in the browser.
 
+## Cast
+Five suspects and nine other guests and staff, each with full-body art by Garrett (in the notebook's People page) and a sculpted 3D model.
+
 ## How it's built
 
 No build step, no frameworks besides three.js and its MarchingCubes addon (vendored in `vendor/`).

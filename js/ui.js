@@ -14,6 +14,15 @@ export const PEOPLE = {
   dot: { n: 'Dot', c: '#ffb020' },
   remy: { n: 'Remy', c: '#3e7bf2' },
   celeste: { n: 'Celeste Arden', c: '#c85fd6' },
+  silas: { n: 'Silas "Static" Boone', c: '#7a9ac8' },
+  jojo: { n: 'Jojo Reyes', c: '#e04aa8' },
+  priya: { n: 'Dr. Priya Anand', c: '#d8b060' },
+  kenji: { n: 'Kenji Morimoto', c: '#b08a5a' },
+  rashad: { n: 'Rashad Okafor', c: '#6aa870' },
+  gus: { n: 'Gus Haddad', c: '#8a9a6a' },
+  harper: { n: 'Harper Vance', c: '#e05a5a' },
+  regent: { n: 'Velvet Regent', c: '#b89ae0' },
+  nate: { n: 'Ranger Nate Begay', c: '#8ab070' },
 };
 
 // ---------- Portraits (SVG placeholders; a matching assets/portraits/<id>.webp replaces them) ----------
