@@ -253,8 +253,16 @@ UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float
 np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
-allm = cv2.erode((np.logical_or.reduce([M[v] for v in VIEWS])).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
-_, (iy, ix) = ndimage.distance_transform_edt(~allm, return_indices=True)
+# only trust confident pixels: nearly opaque, and not background-coloured near the outline (gaps between curls,
+# wisps); everything else takes the nearest confident colour, so no grey backdrop survives in the hair
+allA = np.maximum.reduce([A[v] for v in VIEWS])
+allm = np.logical_or.reduce([M[v] for v in VIEWS])
+bgc = np.median(sheet[allA < 0.02].reshape(-1, 3), 0)
+edge = cv2.distanceTransform(allm.astype(np.uint8), cv2.DIST_L2, 5)
+bglike = (np.linalg.norm(sheet.astype(np.float32) - bgc, axis=2) < cfg.get('bgTol', 24)) & (edge < 24)
+core = cv2.erode((allm & (allA > 0.93) & ~bglike).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+print('background', bgc.round(), 'grey pixels replaced', int((allm & ~core).sum()))
+_, (iy, ix) = ndimage.distance_transform_edt(~core, return_indices=True)
 tex = sheet[iy, ix]
 cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
 print('head centre height', round(float(Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1])), 3))

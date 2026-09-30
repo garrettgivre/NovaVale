@@ -38,8 +38,13 @@ Hub and spokes. The rotunda lobby is the hub; every door around it leads somewhe
 ## Painted figures (Sept 2026)
 Characters with turnaround art are real 3D models built from that art (`tools/figures/README.md`): depth-estimated front and
 back views fitted to the side silhouette, textured from the three paintings, rigged in Blender, `assets/figures/<who>.glb`.
-`js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally (arms relaxed out of the
-A-pose, breathing, sway, head follows the camera, talking arm gestures); world.js uses a figure instead of the sculpted
+`js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally. Keep motion mostly in
+the picture plane (these meshes come from paintings: big turns towards/away from the camera show them edge-on): arms come
+down by `autoRelax` (swept until the hand is a hand's width from the body, both sides kept within 0.05), slight elbow bend,
+weight shifts between legs every 5-11 s with a spine/head counter-tilt, breathing, occasional glances, head turns clamped
+to 0.35 yaw / 0.18 pitch, and talking gestures from `GESTS` (one hand, the other or both opening outward, small forward lift),
+eased in and out. Textures only keep confident cutout pixels (alpha > .93 and not backdrop-coloured near the outline);
+everything else takes the nearest confident colour, which removed the grey specks in hair; world.js uses a figure instead of the sculpted
 people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper, Dex, Harper, Velvet Regent, Gus, Nate, Rashad, Kenji, Priya (Silas and Jojo still sculpted); Celeste has a model (`assets/figures/celeste.glb`) but is only a phone contact, not placed in the world (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.

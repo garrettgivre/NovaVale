@@ -32,6 +32,7 @@ export function loadFigure(who, onReady) {
 }
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Zax = new THREE.Vector3(0, 0, 1);
+const vtmp = new THREE.Vector3();
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), va = new THREE.Vector3(), vb = new THREE.Vector3();
 
 export function buildFigure(who, HIT) {
@@ -59,8 +60,44 @@ export function buildFigure(who, HIT) {
   const head = new THREE.Object3D();
   if (bones.head) { bones.head.add(head); va.set(0, f.head, 0.02); g.localToWorld(va); bones.head.worldToLocal(va); head.position.copy(va); }
   else { head.position.set(0, f.head, 0); g.add(head); }
-  Object.assign(g.userData, { head, bones, rest, pq, t: Math.random() * 10, look: new THREE.Vector2(), talk: 0, gest: 0, gT: 0 });
+  Object.assign(g.userData, { head, bones, rest, pq, t: Math.random() * 10, look: new THREE.Vector2(), glance: new THREE.Vector2(),
+    talk: 0, w: 0, wT: 0, wNext: 3 + Math.random() * 4, gl: 0, glNext: 2 + Math.random() * 4, G: { R: new THREE.Vector3(), L: new THREE.Vector3() },
+    gNow: null, gNext: 0, relax: autoRelax(root, bones, f.relax) });
   return g;
+}
+
+// How far each arm can come down out of the A-pose before the hand meets the body: sweep the wrist down in the
+// picture plane and stop when it is a hand's width from the widest body vertex at that height.
+function autoRelax(root, bones, fallback) {
+  let mesh = null; root.traverse(o => { if (o.isSkinnedMesh) mesh = o; });
+  if (!mesh || !bones.upperR) return { R: fallback, L: fallback };
+  const pos = mesh.geometry.attributes.position, si = mesh.geometry.attributes.skinIndex, sw = mesh.geometry.attributes.skinWeight;
+  const names = mesh.skeleton.bones.map(b => b.name), arm = new Set(names.map((n, i) => /upper|fore|hand/.test(n) ? i : -1).filter(i => i >= 0));
+  const body = [];
+  for (let i = 0; i < pos.count; i++) {
+    let bi = si.getX(i), bw = sw.getX(i);
+    for (const c of ['Y', 'Z', 'W']) if (sw['get' + c](i) > bw) { bw = sw['get' + c](i); bi = si['get' + c](i); }
+    if (!arm.has(bi)) { vtmp.fromBufferAttribute(pos, i); mesh.localToWorld(vtmp); root.worldToLocal(vtmp); body.push(vtmp.x, vtmp.y); }
+  }
+  const out = {};
+  for (const [s, sg] of [['R', -1], ['L', 1]]) {
+    const S = new THREE.Vector3(), W = new THREE.Vector3();
+    bones['upper' + s].getWorldPosition(S); bones['hand' + s].getWorldPosition(W); root.worldToLocal(S); root.worldToLocal(W);
+    const dx = W.x - S.x, dy = W.y - S.y;
+    let best = 0;
+    for (let a = 0; a <= 0.75; a += 0.02) {
+      const c = Math.cos(a * -sg), sn = Math.sin(a * -sg), wx = S.x + dx * c - dy * sn, wy = S.y + dx * sn + dy * c;
+      let width = 0;
+      for (let i = 0; i < body.length; i += 2) if (Math.abs(body[i + 1] - wy) < 0.07 && Math.sign(body[i]) === sg) width = Math.max(width, Math.abs(body[i]));
+      if (Math.abs(wx) - width < 0.055) break;
+      best = a;
+    }
+    out[s] = best;
+  }
+  // keep the stance even: neither arm more than a few degrees lower than the other
+  const lo = Math.min(out.R, out.L);
+  out.R = Math.min(out.R, lo + 0.05); out.L = Math.min(out.L, lo + 0.05);
+  return out;
 }
 
 // rotate a bone about model-space axes: rot = [[axis, angle], ...] applied on top of its rest pose
@@ -71,29 +108,47 @@ function pose(u, k, rot) {
   b.quaternion.copy(qa).multiply(u.rest[k]);
 }
 
+const ease = (cur, tgt, rate, dt) => cur + (tgt - cur) * Math.min(1, dt * rate);
+// Talking gestures, kept mostly in the picture plane (these models come from paintings, so turning a forearm far
+// towards or away from the camera shows it edge-on): [side, lift (forward), open (out to the side), hold seconds]
+const GESTS = [['R', .35, .5, 1.3], ['L', .35, .5, 1.3], ['B', .3, .35, 1.1], ['R', .55, .25, 1], ['L', .55, .25, 1], ['B', .15, .6, 1.4], ['N', 0, 0, .9]];
+
 export function animateFigure(g, dt, cam, speech) {
-  const u = g.userData, f = FIG[u.who], t = (u.t += dt);
+  const u = g.userData, t = (u.t += dt);
   const talking = speech.who === u.who && speech.typing, focused = speech.focus === u.who;
-  u.talk += ((talking ? 1 : 0) - u.talk) * Math.min(1, dt * 3);
-  // head: turn towards the camera, within limits
+  u.talk = ease(u.talk, talking ? 1 : 0, 3, dt);
+  // look: at the camera when it matters, otherwise now and then somewhere else; small turns only
   u.head.getWorldPosition(va); vb.copy(cam.position).sub(va);
   g.getWorldQuaternion(qa); vb.applyQuaternion(qa.invert());
-  const yaw = THREE.MathUtils.clamp(Math.atan2(vb.x, vb.z), -0.7, 0.7), pitch = THREE.MathUtils.clamp(Math.atan2(-vb.y, Math.hypot(vb.x, vb.z)), -0.35, 0.35);
-  u.look.x += (yaw - u.look.x) * Math.min(1, dt * 3); u.look.y += (pitch - u.look.y) * Math.min(1, dt * 3);
-  const br = Math.sin(t * 1.5), sway = Math.sin(t * 0.42), nod = u.talk * 0.05 * Math.sin(t * 6.5) + (focused ? 0.02 * Math.sin(t * 1.3) : 0);
-  pose(u, 'hips', [[Zax, sway * 0.015], [Y, Math.sin(t * 0.3) * 0.03]]);
-  pose(u, 'spine', [[X, -0.01 * br], [Zax, -sway * 0.02]]);
-  pose(u, 'chest', [[X, -0.012 * br], [Y, u.look.x * 0.15]]);
-  pose(u, 'neck', [[Y, u.look.x * 0.3], [X, u.look.y * 0.3]]);
-  pose(u, 'head', [[Y, u.look.x * 0.45], [X, u.look.y * 0.5 + nod], [Zax, 0.04 * Math.sin(t * 0.37) + u.talk * 0.03 * Math.sin(t * 2.1)]]);
-  // arms: down out of the A-pose, a small swing; the talking arm lifts the forearm and moves
-  const R = f.relax;
-  u.gT += dt; const gest = u.talk * (0.5 + 0.5 * Math.sin(u.gT * 1.7));
+  let yaw = Math.atan2(vb.x, vb.z), pitch = Math.atan2(-vb.y, Math.hypot(vb.x, vb.z));
+  if ((u.glNext -= dt) < 0) { u.gl = focused || talking ? 0 : (Math.random() < .6 ? 1.6 : 0); u.glance.set((Math.random() - .5) * .6, (Math.random() - .3) * .2); u.glNext = 3 + Math.random() * 5; }
+  if (u.gl > 0) { u.gl -= dt; yaw += u.glance.x; pitch += u.glance.y; }
+  yaw = THREE.MathUtils.clamp(yaw, -0.35, 0.35); pitch = THREE.MathUtils.clamp(pitch, -0.18, 0.18);
+  u.look.x = ease(u.look.x, yaw, 3.5, dt); u.look.y = ease(u.look.y, pitch, 3.5, dt);
+  // weight on one leg, then the other; the spine and head counter the hips
+  if ((u.wNext -= dt) < 0) { u.wT = u.wT > 0 ? -1 : 1; u.wNext = 5 + Math.random() * 6; }
+  u.w = ease(u.w, u.wT, 0.9, dt);
+  const br = Math.sin(t * 1.35), br2 = Math.sin(t * 1.35 - .6), sw = Math.sin(t * .37) * .3 + u.w;
+  const nod = u.talk * (0.035 * Math.sin(t * 6.3) + 0.02 * Math.sin(t * 2.3)) + (focused && !talking ? 0.015 * Math.sin(t * 1.1) : 0);
+  if (u.bones.hips) u.bones.hips.position.x = (u.hipX ??= u.bones.hips.position.x) + sw * 0.01;
+  pose(u, 'hips', [[Zax, sw * 0.02]]);
+  pose(u, 'spine', [[Zax, -sw * 0.028], [X, -0.008 * br]]);
+  pose(u, 'chest', [[Zax, -sw * 0.012], [X, -0.012 * br], [Y, u.look.x * 0.12]]);
+  pose(u, 'neck', [[Y, u.look.x * 0.35], [X, u.look.y * 0.35]]);
+  pose(u, 'head', [[Y, u.look.x * 0.5], [X, u.look.y * 0.55 + nod], [Zax, sw * 0.02 + 0.025 * Math.sin(t * 0.31) + u.talk * 0.025 * Math.sin(t * 1.9)]]);
+  // talking: pick a gesture now and then and ease into it
+  if (talking && (u.gNext -= dt) < 0) { u.gNow = GESTS[Math.floor(Math.random() * GESTS.length)]; u.gNext = u.gNow[3] * (0.8 + Math.random() * .5); }
+  if (!talking) u.gNow = null;
   for (const s of ['R', 'L']) {
-    const side = s === 'R' ? 1 : -1, act = s === f.talk ? gest : 0;
-    pose(u, 'shoulder' + s, [[Zax, side * 0.02 * br]]);
-    pose(u, 'upper' + s, [[Zax, side * (R - act * 0.12) + side * 0.015 * br], [X, -0.05 - act * 0.35 + 0.02 * Math.sin(t * 0.6 + side)]]);
-    pose(u, 'fore' + s, [[X, -0.12 - act * (0.9 + 0.2 * Math.sin(u.gT * 4.3))], [Zax, side * 0.05]]);
-    pose(u, 'hand' + s, [[X, -0.05 - act * 0.2 * Math.sin(u.gT * 5.1)]]);
+    const G = u.gNow, on = G && (G[0] === s || G[0] === 'B') ? 1 : 0;
+    u.G[s].x = ease(u.G[s].x, on * (G ? G[1] : 0), 4, dt); u.G[s].y = ease(u.G[s].y, on * (G ? G[2] : 0), 4, dt);
+    u.G[s].z = ease(u.G[s].z, on, 4, dt);
+    const side = s === 'R' ? 1 : -1, lift = u.G[s].x, open = u.G[s].y, act = u.G[s].z;
+    const R = u.relax[s], idle = 0.012 * Math.sin(t * 0.6 + side);
+    pose(u, 'shoulder' + s, [[Zax, side * 0.015 * br2]]);
+    // relaxed: arm down (in the picture plane), a little forward; talking: out to the side and forward
+    pose(u, 'upper' + s, [[Zax, side * (R * (1 - act * .35) - open * 0.35 + idle)], [X, -0.06 - lift * 0.3]]);
+    pose(u, 'fore' + s, [[X, -0.18 - lift * 0.55 - act * 0.25 - act * 0.08 * Math.sin(t * 4.1 + side)], [Zax, side * (0.06 - open * 0.45)]]);
+    pose(u, 'hand' + s, [[X, -0.06 - act * 0.12 * Math.sin(t * 3.3 + side)], [Zax, -side * open * 0.2]]);
   }
 }
