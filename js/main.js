@@ -2,7 +2,7 @@
 // the first-person camera at fixed spots, conversation close-ups, input, the main loop.
 import * as THREE from 'three';
 import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
-import { buildWorld, showRoom, NODES, rooms, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
+import { buildWorld, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
@@ -122,7 +122,8 @@ async function go(nodeId, { fade = false, look } = {}) {
   V.busy = true;
   for (const R of Object.values(rooms)) R.g.children.filter(c => c.userData.go).forEach(c => R.g.remove(c));
   const d = Math.hypot(to.p[0] - from.p[0], to.p[1] - from.p[1]);
-  V.move = { a: [...from.p], b: [...to.p], t: 0, dur: Math.min(1.4, Math.max(0.6, d * 0.22)), y0: V.yaw, y1: yawTo(from.p, to.p[0], to.p[1]), p0: V.pitch, id: nodeId };
+  const here = [camera.position.x, camera.position.z];
+  V.move = { a: here, b: [...to.p], t: 0, dur: Math.min(1.4, Math.max(0.6, d * 0.22)), y0: V.yaw, y1: yawTo(here, to.p[0], to.p[1]), p0: V.pitch, id: nodeId };
 }
 
 function turn(dir) {
@@ -219,12 +220,64 @@ canvas.addEventListener('pointerup', e => {
   if (ed) turn(ed);
 });
 canvas.addEventListener('pointerleave', () => ui.tip(null));
+// ---------- Walking: WASD / arrow keys, or the thumb stick on touch screens ----------
+const KEYS = new Set(), JOY = { x: 0, y: 0, id: null };
 addEventListener('keydown', e => {
   if (e.key === 'Escape') ui.closePanel();
-  if (ui.talking() || ui.panelOpen() || !V.node || V.title) return;
-  if (e.key === 'ArrowLeft') turn(1);
-  if (e.key === 'ArrowRight') turn(-1);
+  if (ui.talking() || ui.panelOpen() || !V.node || V.title || e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'q', 'e'].includes(k)) { KEYS.add(k); e.preventDefault(); }
 });
+addEventListener('keyup', e => KEYS.delete(e.key.toLowerCase()));
+addEventListener('blur', () => KEYS.clear());
+{
+  const joy = document.querySelector('#joy'), knob = joy.querySelector('i');
+  const set = e => {
+    const r = joy.getBoundingClientRect(), R = r.width / 2;
+    let x = (e.clientX - r.left - R) / R, y = (e.clientY - r.top - R) / R; const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+    JOY.x = x; JOY.y = y; knob.style.transform = `translate(${x * R * 0.55}px, ${y * R * 0.55}px)`;
+  };
+  joy.addEventListener('pointerdown', e => { initAudio(); JOY.id = e.pointerId; joy.setPointerCapture(e.pointerId); set(e); e.stopPropagation(); });
+  joy.addEventListener('pointermove', e => { if (e.pointerId === JOY.id) set(e); });
+  const end = e => { if (e.pointerId !== JOY.id) return; JOY.id = null; JOY.x = JOY.y = 0; knob.style.transform = ''; };
+  joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
+  if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
+}
+const walkRay = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+const solid = h => { if (!h.object.visible || !h.object.material || h.object.material.visible === false) return false; for (let o = h.object; o; o = o.parent) { if (!o.visible) return false; if (o.userData.who) return false; } return true; };
+// can the camera stand at (x, z)? nothing in the way at knee, waist and eye height, floor underfoot, nobody too close
+function clear(x, z, dx, dz, R) {
+  const len = Math.hypot(dx, dz); if (!len) return true;
+  _d.set(dx / len, 0, dz / len);
+  for (const h of [0.35, 0.95, 1.5]) {
+    _o.set(camera.position.x, h, camera.position.z); walkRay.set(_o, _d); walkRay.far = len + 0.35;
+    if (walkRay.intersectObject(R.g, true).some(solid)) return false;
+  }
+  _o.set(x, 1.4, z); walkRay.set(_o, DOWN); walkRay.far = 1.6;
+  if (!walkRay.intersectObject(R.g, true).some(solid)) return false;
+  for (const w in chars) { const c = chars[w]; if (c.parent === R.g && Math.hypot(c.position.x - x, c.position.z - z) < 0.55) return false; }
+  return true;
+}
+let walkT = 0;
+function walk(dt) {
+  if (V.busy || V.focus || V.move || V.title || !V.node || ui.talking() || ui.panelOpen()) { KEYS.clear(); return; }
+  const k = KEYS;
+  let f = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0) - JOY.y;
+  let s = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0) + JOY.x * 0.8;
+  const turnIn = (k.has('arrowleft') || k.has('q') ? 1 : 0) - (k.has('arrowright') || k.has('e') ? 1 : 0);
+  if (turnIn) { V.yawT = null; V.yaw += turnIn * dt * 1.8; }
+  const mag = Math.hypot(f, s); if (mag < 0.12) { walkT = 0; return; }
+  if (mag > 1) { f /= mag; s /= mag; }
+  const R = roomOf(); if (!R) return;
+  V.yawT = null; walkT += dt;
+  const sp = 1.7 * Math.min(1, 0.4 + walkT * 2), fx = -Math.sin(V.yaw), fz = -Math.cos(V.yaw);
+  const dx = (fx * f + -fz * s) * sp * dt, dz = (fz * f + fx * s) * sp * dt;
+  const p = camera.position;
+  if (clear(p.x + dx, p.z + dz, dx, dz, R)) { p.x += dx; p.z += dz; }
+  else if (clear(p.x + dx, p.z, dx, 0, R)) p.x += dx;       // slide along walls
+  else if (clear(p.x, p.z + dz, 0, dz, R)) p.z += dz;
+  p.y = EYE + Math.sin(walkT * 9) * 0.012;
+}
 
 // ---------- HUD ----------
 const $ = s => document.querySelector(s);
@@ -308,6 +361,7 @@ function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, clock.getDelta()); t += dt;
   if (V.title) V.yaw += dt * 0.05;
+  walk(dt);
   if (V.move) {
     const m = V.move; m.t += dt / m.dur;
     const k = m.t >= 1 ? 1 : ease(m.t);

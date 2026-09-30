@@ -24,7 +24,7 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609301225';
+export const ASSET_V = '202609301802';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 export function loadFigure(who, onReady) {
@@ -125,6 +125,8 @@ export function animateFigure(g, dt, cam, speech) {
   g.getWorldQuaternion(qa); vb.applyQuaternion(qa.invert());
   let yaw = Math.atan2(vb.x, vb.z), pitch = Math.atan2(-vb.y, Math.hypot(vb.x, vb.z));
   if ((u.glNext -= dt) < 0) { u.gl = focused || talking ? 0 : (Math.random() < .6 ? 1.6 : 0); u.glance.set((Math.random() - .5) * .6, (Math.random() - .3) * .2); u.glNext = 3 + Math.random() * 5; }
+  if (!u.near && !focused && !talking) { yaw = 0; pitch = 0.05; }   // not paying you any attention: look about their own business
+  if (!u.near && u.gl <= 0 && Math.random() < dt * 0.25) { u.gl = 2; u.glance.set((Math.random() - .5) * .7, (Math.random() - .4) * .2); }
   if (u.gl > 0) { u.gl -= dt; yaw += u.glance.x; pitch += u.glance.y; }
   yaw = THREE.MathUtils.clamp(yaw, -0.35, 0.35); pitch = THREE.MathUtils.clamp(pitch, -0.18, 0.18);
   u.look.x = ease(u.look.x, yaw, 3.5, dt); u.look.y = ease(u.look.y, pitch, 3.5, dt);

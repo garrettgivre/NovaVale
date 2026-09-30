@@ -52,6 +52,17 @@ people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper,
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
 
+## Walking and facing
+Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
+thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
+and eye height against the current room, needs floor underfoot, keeps 0.55 m from people, and slides along walls. `go()`
+glides from wherever you are. People keep their own facing (`userData.base`: towards the room's middle, offset per
+person), turn fully to you when talking and partly when you're within 2.8 m; heads only track you when you're near.
+Figures: the stance is narrowed in `turn_build.py` (feet slide in to `stance` 0.1 m from the centre, arm-owned vertices
+excluded); legs are owned by the hips through a geodesic line down each leg; below the hips only the hand region
+(near the forearm/hand line, or further out than it) may follow the arms. `auto_joints.py` ends an arm run when it jumps
+sideways (it used to run on down a trouser leg: Gus, Rashad, Priya had fingertips on their thighs).
+
 ## Caching (important)
 GitHub Pages lets browsers cache files for 10 minutes, so a refresh right after a push can run old code/models. Run
 `python tools/bump.py` before committing changes to js/, css/ or assets/figures/: it stamps `?v=<time>` on every module

@@ -95,6 +95,11 @@ X = lambda u: (u - cxf) * px['front']
 Yf = lambda v: (bot['front'] - v) * px['front']
 ub = lambda x: cxb - x / px['back']
 
+# ---- feet (front view): centres of the leftmost and rightmost segments just above the soles
+def segs(row):
+    d = np.diff(np.concatenate([[0], row.astype(np.int8), [0]])); return list(zip(np.nonzero(d == 1)[0], np.nonzero(d == -1)[0] - 1))
+fr_ = int(bot['front'] - 0.04 * (bot['front'] - top['front'])); rs_ = segs(M['front'][fr_])
+footL_u, footR_u = (rs_[0][0] + rs_[0][1]) / 2, (rs_[-1][0] + rs_[-1][1]) / 2
 # ---- grid over the front silhouette
 gm = cv2.dilate(M['front'].astype(np.uint8), np.ones((3, 3), np.uint8))
 y0, y1, x0, x1 = span(gm)
@@ -218,15 +223,31 @@ Vall = np.concatenate([bot['front'] - y / px['front']] * 2)
 dist = []
 for _, _, h, t in BONES:
     (u0, v0), (u1, v1) = pj[h], pj[t]
-    segs = [((u0, v0), (u1, v1))]
-    if h == 'hips': segs.append(((u0, v0), (u0, bot['front'])))   # the hips own the legs: extend down the centre line
+    segs_ = [((u0, v0), (u1, v1))]
+    if h == 'hips':   # the hips own the legs: a line down each leg to its foot
+        segs_ += [((u0, v0), (footL_u, bot['front'])), ((u0, v0), (footR_u, bot['front']))]
     seeds = []
-    for (a0, b0), (a1, b1) in segs:
+    for (a0, b0), (a1, b1) in segs_:
         L = int(max(abs(a1 - a0), abs(b1 - b0))) + 1
         seeds += [(int(round(b0 + (b1 - b0) * i / L)), int(round(a0 + (a1 - a0) * i / L))) for i in range(L + 1)]
     geo, _ = MCP_Geometric(cost).find_costs(seeds)
     dist.append(ndimage.map_coordinates(geo, [Vall, Uall], order=1) * px['front'])
 dist = np.stack(dist, 1)
+# below the hips only the hands themselves may follow the arms (a hand hanging against a pocket or a jacket hem
+# otherwise drags the thigh along when the arms relax)
+lowV = P[:, 1] < J['hips'][1] + 0.03
+def seg2(p, a, b):
+    a, b = a[:2], b[:2]; ab = b - a; t = np.clip(((p - a) @ ab) / (ab @ ab), 0, 1); return np.linalg.norm(p - (a + t[:, None] * ab), axis=1)
+for s_, js in (('R', (6, 7, 8)), ('L', (10, 11, 12))):
+    tip = J['tip' + s_] + (J['tip' + s_] - J['wr' + s_]) * 0.4
+    near = np.minimum(seg2(P[:, :2], J['el' + s_], J['wr' + s_]), seg2(P[:, :2], J['wr' + s_], tip)) < 0.07
+    # anything further out than the hand (a thumb, a cuff) can't be leg
+    sgx = 1 if s_ == 'L' else -1
+    near |= (sgx * P[:, 0] > min(sgx * J['wr' + s_][0], sgx * J['tip' + s_][0]) - 0.01) & (P[:, 1] > J['tip' + s_][1] - 0.08)
+    for j in js: dist[lowV & ~near, j] = 9.0
+    # and what is right by the hand is the hand's: never the hips
+    handZ = lowV & (np.minimum(seg2(P[:, :2], J['wr' + s_], tip), 9) < 0.05)
+    dist[handZ, 0] = np.maximum(dist[handZ, 0], dist[handZ][:, list(js)].min(1) + 0.05)
 # the lower body (legs inside the gown) follows the hips; the head bone owns everything above the chin
 hi = P[:, 1] > J['chin'][1] + 0.01
 dist[hi, 4] = np.minimum(dist[hi, 4], 0.0)
@@ -267,6 +288,17 @@ k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))
 UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float32)
 
+# ---- a narrower stance: the sheets are drawn with feet wide apart. Below the hips each leg slides towards the centre,
+# growing linearly to the full amount at the feet (as if the leg swung in at the hip); tanh keeps the middle of a
+# skirt still so a gown compresses instead of folding over itself
+fx = (np.array([footL_u, footR_u]) - cxf) * px['front']; F_ = float(np.abs(fx).mean())
+T_ = cfg.get('stance', 0.1)
+if F_ > T_:
+    yh, yf = J['hips'][1], 0.0
+    k_ = np.clip((yh - P[:, 1]) / (yh - yf), 0, 1)
+    armW = (Wt * np.isin(top4, [6, 7, 8, 10, 11, 12])).sum(1)     # hands hanging by the legs stay with their arms
+    P[:, 0] -= (F_ - T_) * k_ * np.tanh(P[:, 0] / 0.07) * (1 - armW)
+    print('stance', round(F_, 3), '->', T_)
 np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)

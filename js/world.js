@@ -1025,6 +1025,12 @@ export function sync() {
     const R = rooms[at[0]];
     if (c.parent !== R.g) R.g.add(c);
     c.position.set(at[1], (at[3] || 0) + c.userData.yOff, at[2]);
+    if (c.userData.baseAt !== at.join()) {   // their own facing (recomputed when they move somewhere else)
+      c.userData.baseAt = at.join();   // roughly towards the middle of the room, a little off
+      let h = 0; for (const ch of w) h = (h * 31 + ch.charCodeAt(0)) % 997;
+      c.userData.base = Math.atan2(-at[1], -at[2]) + ((h % 100) / 100 - 0.5) * 0.7;
+      c.rotation.y = c.userData.base;
+    }
   }
   applyTime();
 }
@@ -1039,10 +1045,16 @@ export function update(dt, t, cam) {
   for (const u of updaters) u(dt, t);
   for (const w in chars) {
     const c = chars[w]; if (!c.parent || !c.parent.visible) continue;
-    // turn the body slowly towards the camera; the head, eyes and arms are animated by the rig
-    const want = Math.atan2(cam.position.x - c.position.x, cam.position.z - c.position.z);
+    // people keep their own facing; they turn to you when you talk to them, and partly when you come close
+    const toCam = Math.atan2(cam.position.x - c.position.x, cam.position.z - c.position.z);
+    const dist = Math.hypot(cam.position.x - c.position.x, cam.position.z - c.position.z);
+    const talking = speech.focus === w || speech.who === w, base = c.userData.base ?? toCam;
+    const off = Math.atan2(Math.sin(toCam - base), Math.cos(toCam - base));
+    const k = talking ? 1 : dist < 2.8 ? 0.6 * Math.min(1, (2.8 - dist) / 1.2) : 0;
+    const want = base + off * k;
     let d = want - c.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
-    c.rotation.y += d * Math.min(1, dt * 0.8);
+    c.rotation.y += d * Math.min(1, dt * (talking ? 2.2 : 1.1));
+    c.userData.near = talking || dist < 4.5;
     (c.userData.figure ? animateFigure : animatePerson)(c, dt, cam, speech);
   }
   const X = rooms.star;

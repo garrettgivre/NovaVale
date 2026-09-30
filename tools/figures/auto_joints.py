@@ -44,7 +44,8 @@ def joints(alpha, ox, oy):
         # the longest contiguous run of rows (earrings, glasses chains and hair make short ones)
         runs_, cur = [], [arm[0]]
         for a in arm[1:]:
-            if a[0] - cur[-1][0] <= 3: cur.append(a)
+            # a new run when rows skip, or when the segment jumps sideways (the hand ended and a leg took over)
+            if a[0] - cur[-1][0] <= 3 and abs(a[1] - cur[-1][1]) < .02 * H: cur.append(a)
             else: runs_.append(cur); cur = [a]
         runs_.append(cur)
         run = max(runs_, key=len)
