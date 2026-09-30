@@ -87,9 +87,10 @@ function resize() {
   post.uniforms.uRetro.value = RETRO ? 1 : 0;
   camera.aspect = a;
   const hf = 64 * Math.PI / 180;
-  camera.fov = a < 1 ? Math.min(88, 2 * Math.atan(Math.tan(hf / 2) / a) * 180 / Math.PI) : 58;
+  FOV0 = camera.fov = a < 1 ? Math.min(88, 2 * Math.atan(Math.tan(hf / 2) / a) * 180 / Math.PI) : 58;
   camera.updateProjectionMatrix();
 }
+let FOV0 = 58;
 addEventListener('resize', resize);
 
 // ---------- Camera state ----------
@@ -136,13 +137,21 @@ function focus(who) {
   ui.speech.focus = who;
   const from = { p: camera.position.clone(), yaw: V.yaw, pitch: V.pitch };
   const dir = new THREE.Vector3(camera.position.x - h.x, 0, camera.position.z - h.z).normalize();
-  // frame about a metre of the character vertically: head and shoulders above the text box
-  const cover = innerWidth < innerHeight ? 1.45 : 1.25;
-  const dist = Math.max(0.55, cover / (2 * Math.tan(camera.fov * Math.PI / 360)));
-  const p = new THREE.Vector3(h.x + dir.x * dist, h.y - 0.02, h.z + dir.z * dist);
-  const look = new THREE.Vector3(h.x, h.y - cover * 0.2, h.z);
-  const dx = look.x - p.x, dy = look.y - p.y, dz = look.z - p.z;
-  V.focus = { from, to: { p, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) }, t: 0, dir: 1 };
+  // a portrait lens, level and straight on: a narrow field of view from further back (a close wide-angle camera
+  // distorts faces), framing the head and upper body above the text box
+  const portrait = innerWidth < innerHeight, cover = portrait ? 1.45 : 1.15, fov = portrait ? 32 : 24;
+  const cy = h.y - cover * 0.22;
+  let dist = cover / (2 * Math.tan(fov * Math.PI / 360));
+  // don't back the camera through a wall or a piece of furniture
+  const R = roomOf();
+  if (R) {
+    ray.set(new THREE.Vector3(h.x, cy, h.z), dir); ray.far = dist + 0.3;
+    const hit = ray.intersectObject(R.g, true).find(x => x.object.visible && x.object.material && x.object.material.visible !== false && !(function up(o) { for (; o; o = o.parent) if (o.userData.who) return true; return false; })(x.object));
+    if (hit) dist = Math.max(1.2, hit.distance - 0.25);
+    ray.far = Infinity;
+  }
+  const p = new THREE.Vector3(h.x + dir.x * dist, cy, h.z + dir.z * dist);
+  V.focus = { from, to: { p, yaw: Math.atan2(-(h.x - p.x), -(h.z - p.z)), pitch: 0, fov }, t: 0, dir: 1 };
 }
 function unfocus() { ui.speech.focus = null; if (V.focus) { V.focus.dir = -1; } }
 
@@ -319,7 +328,8 @@ function loop() {
     camera.position.lerpVectors(F.from.p, F.to.p, k);
     yaw = F.from.yaw + angDiff(F.from.yaw, F.to.yaw) * k;
     pitch = F.from.pitch + (F.to.pitch - F.from.pitch) * k;
-    if (F.dir < 0 && F.t <= 0) { camera.position.copy(F.from.p); V.focus = null; }
+    camera.fov = FOV0 + (F.to.fov - FOV0) * k; camera.updateProjectionMatrix();
+    if (F.dir < 0 && F.t <= 0) { camera.position.copy(F.from.p); V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); }
   }
   camera.rotation.y = yaw; camera.rotation.x = pitch;
   update(dt, t, camera);

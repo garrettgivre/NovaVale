@@ -44,8 +44,9 @@ export function buildFigure(who, HIT) {
     if (o.isBone) bones[o.name] = o;
     if (o.isMesh) {
       const old = o.material;
-      o.material = new THREE.MeshStandardMaterial({ map: old.map, roughness: 0.8, metalness: 0,
-        emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.3 });
+      // matte: the painting already has its lighting; a standard material adds a Fresnel sheen at grazing angles,
+      // which lit up the jagged hair outlines as grey-white specks
+      o.material = new THREE.MeshLambertMaterial({ map: old.map, emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.3 });
       o.castShadow = true; o.frustumCulled = false;
     }
   });

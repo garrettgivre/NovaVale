@@ -44,7 +44,10 @@ down by `autoRelax` (swept until the hand is a hand's width from the body, both 
 weight shifts between legs every 5-11 s with a spine/head counter-tilt, breathing, occasional glances, head turns clamped
 to 0.35 yaw / 0.18 pitch, and talking gestures from `GESTS` (one hand, the other or both opening outward, small forward lift),
 eased in and out. Textures only keep confident cutout pixels (alpha > .93 and not backdrop-coloured near the outline);
-everything else takes the nearest confident colour, which removed the grey specks in hair; world.js uses a figure instead of the sculpted
+everything else takes the nearest confident colour. Figures use a matte `MeshLambertMaterial` (the paintings carry their own
+lighting; a standard material's Fresnel sheen lit jagged hair outlines as grey-white specks). Close-ups (`focus` in main.js)
+use a portrait lens: the fov eases to 32 (portrait) / 24 (landscape), the camera backs off to frame head and upper body,
+level (pitch 0), and stops short of walls (raycast); a close wide-angle camera distorted faces; world.js uses a figure instead of the sculpted
 people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper, Dex, Harper, Velvet Regent, Gus, Nate, Rashad, Kenji, Priya (Silas and Jojo still sculpted); Celeste has a model (`assets/figures/celeste.glb`) but is only a phone contact, not placed in the world (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
