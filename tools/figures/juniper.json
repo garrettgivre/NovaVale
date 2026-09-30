@@ -1,0 +1,14 @@
+{
+  "name": "juniper",
+  "sheet": "refs/juniper.png",
+  "height": 1.66,
+  "step": 3,
+  "views": ["front", "side2", "side", "back"],
+  "off": {"front": [58, 3], "side2": [603, 3], "side": [962, 4], "back": [1258, 3]},
+  "sideFaces": "left",
+  "joints": {
+    "top": [290, 20], "face": [290, 95], "chin": [290, 135], "neck": [290, 162], "chest": [290, 250], "spine": [290, 330], "hips": [290, 420],
+    "shR": [207, 195], "elR": [142, 330], "wrR": [100, 432], "tipR": [86, 495],
+    "shL": [374, 195], "elL": [438, 330], "wrL": [481, 432], "tipL": [494, 495]
+  }
+}
