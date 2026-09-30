@@ -40,12 +40,12 @@ Characters with turnaround art are real 3D models built from that art (`tools/fi
 back views fitted to the side silhouette, textured from the three paintings, rigged in Blender, `assets/figures/<who>.glb`.
 `js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally (arms relaxed out of the
 A-pose, breathing, sway, head follows the camera, talking arm gestures); world.js uses a figure instead of the sculpted
-people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry. The rest still use the sculpted models until their turnarounds exist.
+people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
 
 ## The cast
-Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal falls back to the SVG portrait). Phone contacts Remy, Dot and Celeste also have art.
+Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal's are cropped from her turnaround). Phone contacts Remy, Dot and Celeste also have art.
 - Velvet Regent (`regent`): drag performer, favourite to win the Revue, wears the other long white coat. Suspect-ish; cleared by Harper's recording.
 - Harper Vance (`harper`): true-crime podcaster. Her 11:57 recording (Regent's alibi) catches the Star Room door groaning under the building.
 - Kenji Morimoto (`kenji`): conservator restoring Stella, a 1925 singing automaton (a ghost red herring). Says the meteorite is unsellable quietly: the thief didn't want money.

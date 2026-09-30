@@ -11,6 +11,7 @@ import { GLTFLoader } from '../vendor/GLTFLoader.js';
 export const FIG = {
   vesper: { head: 1.632, talk: 'L', relax: 0.36 },
   cherry: { head: 1.714, talk: 'R', relax: 0.3 },
+  opal: { head: 1.553, talk: 'R', relax: 0.42 },
 };
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];

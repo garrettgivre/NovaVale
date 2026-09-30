@@ -1,0 +1,14 @@
+{
+  "name": "opal",
+  "sheet": "refs/opal.png",
+  "height": 1.68,
+  "step": 3,
+  "views": ["front", "side2", "side", "back"],
+  "off": {"front": [50, 0], "side2": [597, 0], "side": [949, 0], "back": [1233, 0]},
+  "sideFaces": "left",
+  "joints": {
+    "top": [297, 20], "face": [297, 78], "chin": [297, 112], "neck": [297, 140], "chest": [297, 230], "spine": [297, 300], "hips": [297, 370],
+    "shR": [215, 165], "elR": [150, 290], "wrR": [95, 390], "tipR": [80, 450],
+    "shL": [380, 165], "elL": [445, 290], "wrL": [500, 390], "tipL": [515, 450]
+  }
+}

@@ -14,7 +14,8 @@ def placed(view):
     ox, oy = cfg['off'][view]; a = np.zeros((SH, SW), np.float32)
     a[oy:oy + c.shape[0], ox:ox + c.shape[1]] = c[..., 3] / 255.0
     return a
-A = {v: placed(v) for v in ('front', 'side', 'back')}
+VIEWS = cfg.get('views', ['front', 'side', 'back'])
+A = {v: placed(v) for v in VIEWS}
 M = {v: (A[v] > 0.5) for v in A}
 def span(m):
     ys, xs = np.nonzero(m); return ys.min(), ys.max(), xs.min(), xs.max()
@@ -47,6 +48,10 @@ czs = float(np.mean(mids))
 facing = cfg.get('sideFaces', 'left')       # which way the nose points in the side view
 sgn = 1 if facing == 'left' else -1
 zS = lambda u: sgn * (czs - u) * px['side']
+# optional second side view (the other flank), facing the other way
+if 'side2' in M:
+    mids2 = [(np.nonzero(M['side2'][int(r)])[0].min() + np.nonzero(M['side2'][int(r)])[0].max()) / 2 for r in [rowOf('side2', HEIGHT * t) for t in (0.55, 0.62, 0.7)]]
+    czs2 = float(np.mean(mids2)); sgn2 = -sgn
 def sideRange(y):
     r = int(round(rowOf('side', y))); r = min(max(r, top['side']), bot['side'])
     xs = np.nonzero(M['side'][r])[0]
@@ -109,6 +114,9 @@ def scaleFit(Dm, m, view):
         if drop > 1e-3: ss.append((zf_ - zb_) / 2 / drop)
     return float(np.median(ss))
 sF, sB = scaleFit(Df, M['front'], 'front'), scaleFit(Db, M['back'], 'back')
+print('raw scale', sF, sB)
+lo_, hi_ = cfg.get('scaleRange', [0.07, 0.11])
+sF, sB = float(np.clip(sF, lo_, hi_)), float(np.clip(sB, lo_, hi_))
 zf = zF - sF * (mF - dF)
 zb = zB + sB * (mB - dB)
 zf = np.clip(zf, zB, zF); zb = np.clip(zb, zB, zF)
@@ -184,14 +192,16 @@ Vall = np.concatenate([bot['front'] - y / px['front']] * 2)
 dist = []
 for _, _, h, t in BONES:
     (u0, v0), (u1, v1) = pj[h], pj[t]
-    L = int(max(abs(u1 - u0), abs(v1 - v0))) + 1
-    seeds = [(int(round(v0 + (v1 - v0) * i / L)), int(round(u0 + (u1 - u0) * i / L))) for i in range(L + 1)]
+    segs = [((u0, v0), (u1, v1))]
+    if h == 'hips': segs.append(((u0, v0), (u0, bot['front'])))   # the hips own the legs: extend down the centre line
+    seeds = []
+    for (a0, b0), (a1, b1) in segs:
+        L = int(max(abs(a1 - a0), abs(b1 - b0))) + 1
+        seeds += [(int(round(b0 + (b1 - b0) * i / L)), int(round(a0 + (a1 - a0) * i / L))) for i in range(L + 1)]
     geo, _ = MCP_Geometric(cost).find_costs(seeds)
     dist.append(ndimage.map_coordinates(geo, [Vall, Uall], order=1) * px['front'])
 dist = np.stack(dist, 1)
 # the lower body (legs inside the gown) follows the hips; the head bone owns everything above the chin
-armMin = dist[:, [6, 7, 8, 10, 11, 12]].min(1)
-dist[:, 0] = np.minimum(dist[:, 0], np.where((P[:, 1] < J['hips'][1]) & (armMin > 0.045), 0.0, 9))
 hi = P[:, 1] > J['chin'][1] + 0.01
 dist[hi, 4] = np.minimum(dist[hi, 4], 0.0)
 sig = cfg.get('sigma', 0.028)
@@ -203,13 +213,21 @@ top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.s
 p0, p1, p2 = P[F[:, 0]], P[F[:, 1]], P[F[:, 2]]
 nrm = np.cross(p1 - p0, p2 - p0); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
 armV = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12])
-useSide = (np.abs(nrm[:, 0]) > cfg.get('sideAt', 0.93)) & ~armV[F].any(1)
+# side views only colour faces near the outline; steep steps inside the body (a coat edge over trousers) keep the front/back
+dtv = np.concatenate([dt, dt])
+useSide = (np.abs(nrm[:, 0]) > cfg.get('sideAt', 0.93)) & ~armV[F].any(1) & (dtv[F].max(1) < cfg.get('sideBand', 0.035))
 useBack = (~useSide) & (nrm[:, 2] < 0)
 Pc = P[F.ravel()]
 uvF = np.stack([(Pc[:, 0] / px['front'] + cxf), bot['front'] - Pc[:, 1] / px['front']], 1)
 uvB = np.stack([ub(Pc[:, 0]), rowOf('back', Pc[:, 1])], 1)
-uS = czs - sgn * Pc[:, 2] / px['side']
-uvS = np.stack([uS, rowOf('side', Pc[:, 1])], 1)
+uvS = np.stack([czs - sgn * Pc[:, 2] / px['side'], rowOf('side', Pc[:, 1])], 1)
+if 'side2' in M:
+    # a view with the nose pointing left sees the figure's left flank (+x); pointing right sees -x
+    uvS2 = np.stack([czs2 - sgn2 * Pc[:, 2] / px['side2'], rowOf('side2', Pc[:, 1])], 1)
+    plusIsSide = sgn > 0
+    fx = np.repeat(nrm[:, 0] > 0, 3)
+    pick1 = fx == plusIsSide
+    uvS = np.where(pick1[:, None], uvS, uvS2)
 # the side view must agree in colour with the front or back view there (ChatGPT's views don't always match)
 smp = cv2.GaussianBlur(sheet, (0, 0), 2).astype(np.float32)
 def col(uvc):
@@ -226,7 +244,7 @@ UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float
 np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
-allm = cv2.erode((M['front'] | M['side'] | M['back']).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+allm = cv2.erode((np.logical_or.reduce([M[v] for v in VIEWS])).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
 _, (iy, ix) = ndimage.distance_transform_edt(~allm, return_indices=True)
 tex = sheet[iy, ix]
 cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
