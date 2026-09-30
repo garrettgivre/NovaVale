@@ -5,7 +5,8 @@
 import * as THREE from 'three';
 import { S, has, night } from './state.js';
 import * as T from './tex.js';
-import { buildPerson, CAST } from './people.js';
+import { buildPerson, CAST, animatePerson } from './people.js';
+import { speech } from './ui.js';
 
 export const rooms = {};
 export const chars = {};
@@ -864,14 +865,11 @@ export function update(dt, t, cam) {
   for (const u of updaters) u(dt, t);
   for (const w in chars) {
     const c = chars[w]; if (!c.parent || !c.parent.visible) continue;
-    const u = c.userData; u.t += dt;
-    u.torso.scale.set(1 + Math.sin(u.t * 1.9) * 0.004, 1, 1 + Math.sin(u.t * 1.9) * 0.006);
+    // turn the body slowly towards the camera; the head, eyes and arms are animated by the rig
     const want = Math.atan2(cam.position.x - c.position.x, cam.position.z - c.position.z);
     let d = want - c.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
-    c.rotation.y += d * Math.min(1, dt * 1.6);
-    u.head.rotation.y = Math.sin(u.t * 0.5) * 0.12;
-    u.head.rotation.x = Math.sin(u.t * 0.37) * 0.03;
-    u.body.rotation.z = Math.sin(u.t * 0.3) * 0.008;
+    c.rotation.y += d * Math.min(1, dt * 0.8);
+    animatePerson(c, dt, cam, speech);
   }
   const X = rooms.star;
   if (X && X.g.visible && X.crown.visible) X.crown.rotation.y = t * 0.3;

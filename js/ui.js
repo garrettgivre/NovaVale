@@ -83,6 +83,8 @@ export function toast(text) {
 // lines: array of strings; "N: ..." is Nova, "*..." is narration, anything else is the speaker.
 let busy = false;
 export const talking = () => busy;
+// who is speaking right now (read by the character animation for lip-sync and nods)
+export const speech = { who: null, typing: false, focus: null };
 
 export function openTalk(who, { pt = false } = {}) {
   busy = true;
@@ -101,7 +103,7 @@ export function openTalk(who, { pt = false } = {}) {
   document.body.classList.add('talking');
 }
 export function closeTalk() {
-  busy = false;
+  busy = false; speech.who = null; speech.typing = false;
   $('#talk').className = '';
   document.body.classList.remove('talking');
 }
@@ -112,20 +114,20 @@ export function say(who, lines) {
     opts.innerHTML = '';
     let i = -1, typing = 0, full = '';
     const next = () => {
-      if (typing) { clearInterval(typing); typing = 0; box.querySelector('.tx').innerHTML = full; return; }
+      if (typing) { clearInterval(typing); typing = 0; box.querySelector('.tx').innerHTML = full; speech.typing = false; return; }
       i++;
       if (i >= lines.length) { box.onclick = null; box.classList.remove('more'); res(); return; }
       let l = lines[i], sp = who;
       if (l.startsWith('N:')) { sp = 'nova'; l = l.slice(2).trim(); }
       else if (l.startsWith('*')) { sp = null; l = l.slice(1).trim(); }
-      full = l;
+      full = l; speech.who = sp; speech.typing = true;
       box.className = 'more' + (sp === 'nova' ? ' nova' : sp ? '' : ' narr');
       box.innerHTML = `<b style="--c:${sp ? PEOPLE[sp].c : '#6a7a90'}">${sp ? PEOPLE[sp].n : ''}</b><span class="tx"></span><i class="nx">▼</i>`;
       const tx = box.querySelector('.tx');
       let k = 0;
       typing = setInterval(() => {
         k += 2; tx.textContent = l.slice(0, k);
-        if (k >= l.length) { clearInterval(typing); typing = 0; tx.innerHTML = l; }
+        if (k >= l.length) { clearInterval(typing); typing = 0; tx.innerHTML = l; speech.typing = false; }
       }, 16);
     };
     box.onclick = () => { sfx('click'); next(); };

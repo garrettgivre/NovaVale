@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
 import { buildWorld, showRoom, NODES, rooms, sync, update, showArrows, roomOf, headOf } from './world.js';
+import { prepareCast } from './people.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
 import { initAudio, sfx, setMuted, isMuted } from './audio.js';
@@ -108,6 +109,7 @@ function turn(dir) {
 // Conversation close-up: glide in to frame the character's head and shoulders.
 function focus(who) {
   const h = headOf(who); if (!h) return;
+  ui.speech.focus = who;
   const from = { p: camera.position.clone(), yaw: V.yaw, pitch: V.pitch };
   const dir = new THREE.Vector3(camera.position.x - h.x, 0, camera.position.z - h.z).normalize();
   // frame about a metre of the character vertically: head and shoulders above the text box
@@ -118,7 +120,7 @@ function focus(who) {
   const dx = look.x - p.x, dy = look.y - p.y, dz = look.z - p.z;
   V.focus = { from, to: { p, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) }, t: 0, dir: 1 };
 }
-function unfocus() { if (V.focus) { V.focus.dir = -1; } }
+function unfocus() { ui.speech.focus = null; if (V.focus) { V.focus.dir = -1; } }
 
 // ---------- Picking ----------
 const ray = new THREE.Raycaster();
@@ -306,7 +308,9 @@ function title() {
 // ---------- Boot ----------
 try { if (localStorage.getItem('novavale.mute')) setMuted(true); } catch (e) { }
 resize();
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(() => {
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast((i, n) => {
+  document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';
+})).then(() => setTimeout(() => {
   buildWorld(scene, renderer);
   showRoom('lobby'); place('L1'); sync();
   loop();
