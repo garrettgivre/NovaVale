@@ -1,5 +1,5 @@
 // All sound is synthesised with WebAudio, so there are no audio files.
-let ctx, master, amb, ambGain, ghost, verb, muted = false;
+let ctx, master, music, amb, ambGain, ghost, verb, muted = false, musicOn = true, lastAmb = null;
 
 export function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -7,6 +7,7 @@ export function initAudio() {
   if (!AC) return;
   ctx = new AC();
   master = ctx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(ctx.destination);
+  music = ctx.createGain(); music.gain.value = musicOn ? 1 : 0; music.connect(master);
   verb = ctx.createConvolver(); verb.buffer = impulse(2.8); const vg = ctx.createGain(); vg.gain.value = 0.5; verb.connect(vg); vg.connect(master);
 }
 
@@ -18,6 +19,9 @@ function impulse(sec) {
 
 export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; }
 export const isMuted = () => muted;
+// Music (the ambient score) can be switched off on its own; sound effects and the "ghost" stay.
+export function setMusic(on) { musicOn = on; if (music) music.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.3); }
+export const isMusic = () => musicOn;
 
 function tone(f, t0, dur, type = 'sine', vol = 0.15, wet = 0.3) {
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -52,7 +56,7 @@ export function ambience(kind) {
   const chords = { day: [261.6, 329.6, 392, 493.9], night: [196, 233.1, 293.7, 349.2], tunnel: [110, 164.8, 207.7] }[kind] || [];
   ambGain = ctx.createGain(); ambGain.gain.value = 0; ambGain.gain.setTargetAtTime(kind === 'tunnel' ? 0.05 : 0.035, ctx.currentTime, 1.5);
   const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = kind === 'day' ? 1800 : 900;
-  ambGain.connect(lp); lp.connect(master); const w = ctx.createGain(); w.gain.value = 0.6; lp.connect(w); w.connect(verb);
+  ambGain.connect(lp); lp.connect(music);
   amb = chords.map((f, i) => {
     const o = ctx.createOscillator(); o.type = i % 2 ? 'triangle' : 'sine'; o.frequency.value = f; o.detune.value = (i - 1.5) * 6;
     const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 0.07 + i * 0.03; lg.gain.value = 0.5;
@@ -64,7 +68,7 @@ export function ambience(kind) {
   if (kind === 'day') ambience.chime = setInterval(() => {
     if (Math.random() < 0.5) return;
     const f = [1047, 1175, 1319, 1568, 1760][Math.floor(Math.random() * 5)];
-    tone(f, ctx.currentTime, 1.6, 'sine', 0.02, 0.8);
+    if (musicOn) tone(f, ctx.currentTime, 1.6, 'sine', 0.02, 0.8);
   }, 2400);
 }
 

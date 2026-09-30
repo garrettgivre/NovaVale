@@ -102,3 +102,41 @@ export const DOCS = {
       <p class="big">outer: ringed planet · middle: moon · inner: comet</p></div>`,
   },
 };
+
+// ---------- Lore: the crew photo, a newspaper clipping, and the postcards ----------
+DOCS.crewphoto = {
+  t: 'Photograph: the build crew',
+  html: `<div class="paper photo"><div class="cat"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#b8a888"/><rect x="8" y="8" width="304" height="184" fill="#a8987a"/>
+    <path d="M40 170 A120 120 0 0 1 280 170" fill="none" stroke="#4a3e2e" stroke-width="3"/>${[0, 1, 2, 3, 4, 5].map(i => `<line x1="160" y1="50" x2="${60 + i * 40}" y2="170" stroke="#4a3e2e" stroke-width="2"/>`).join('')}
+    ${[0, 1, 2, 3].map(i => `<g><circle cx="${70 + i * 60}" cy="112" r="12" fill="#3a2e22"/><rect x="${56 + i * 60}" y="124" width="28" height="56" fill="#3a2e22"/><circle cx="${63 + i * 60}" cy="134" r="3.5" fill="#e0c070"/></g>`).join('')}</svg></div>
+    <p class="hand">Aquadome build crew, 21 June 2003.</p><p>Left to right: M. Okafor, R. Dunn, T. Beale and O. Finch (lead designer). Every one of them wears the same small brass star pin on the lapel.</p></div>`,
+};
+DOCS.clipping = {
+  t: 'Newspaper clipping, June 2003',
+  html: `<div class="paper news"><p class="mast">THE LAKESHORE LEDGER</p><p class="dateline">Sunday, June 22, 2003 · 50 cents</p>
+    <p class="head">"A SKY YOU CAN SWIM UNDER": AQUADOME OPENS</p>
+    <p>Hundreds of guests crowded the lakeshore last night for the opening of the Aquadome, a glass-domed spa and planetarium designed by architect Opal Finch.</p>
+    <p>The evening ended in the planetarium, where the lights dimmed and five stars appeared over the stage in the shape of a cross. "That one's for the crew," Finch said.</p>
+    <p>Each member of Finch's four-person build team was presented with a brass star pin. Asked about rumours of a hidden room, Finch only smiled: "Every building has one room its builders keep for themselves."</p></div>`,
+};
+const PC = [
+  ['The Rotunda Lobby', 'Mum, the fountain actually glows at night. Had tea under the dome. The architect gave us a tour herself, a tiny lady who knew every single bolt by name. Priya, July 2003'],
+  ['The Spa & Pools', 'Floated for an hour. The girl on the next lounger swore she heard singing in the pipes. Probably the steam. Probably. J., 2005'],
+  ['The Kitchen Café', 'Best lemon cake of my life. The chef wouldn\'t give up the recipe. Said it was her Nana\'s and her Nana would haunt her. Aunt Ro, 2006'],
+  ['Staff Only!', 'To whoever runs the tech office after me: the old PA board is wired in the wrong order. I labelled it anyway. The labels will wear off. Sorry. M., maintenance, 2004'],
+  ['Opening Night, June 21, 2003', 'O. You did it. Five stars in a cross, right over the stage, exactly like you drew it. Meet us downstairs after, in the room nobody else knows about. The crew'],
+  ['The Guest Wing', 'Suite 4 has the best view of the lake. Suite 2 has the worst bed in the building. Tell nobody. A regular, 2010'],
+  ['The Lakeside Terrace', 'Rowed the Solstice out to the middle of the lake at midnight. The dome glows like a lantern from out there. The boathouse keeper chased us off. Worth it. K & L, 2008'],
+  ['The Planetarium', 'Last show before they closed. Six of us in the seats. The old lady in the lavender coat stayed after the lights came up and just... looked. 2017'],
+];
+PC.forEach(([title, msg], i) => {
+  DOCS['pc' + (i + 1)] = {
+    t: `Postcard ${i + 1}: ${title}`,
+    html: `<div class="postcard"><div class="pc-front"><svg viewBox="0 0 300 180"><defs><linearGradient id="pcg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8c8a0"/><stop offset="1" stop-color="#8a7a58"/></linearGradient></defs>
+      <rect width="300" height="180" fill="url(#pcg${i})"/><path d="M40 170 A110 110 0 0 1 260 170" fill="none" stroke="#4a3a24" stroke-width="3"/>
+      ${[0, 1, 2, 3, 4].map(k => `<line x1="150" y1="62" x2="${70 + k * 40}" y2="170" stroke="#4a3a24" stroke-width="1.5"/>`).join('')}
+      <text x="150" y="36" text-anchor="middle" font-family="Georgia" font-style="italic" font-size="18" fill="#3a2a18">Greetings from the Aquadome</text>
+      <text x="150" y="58" text-anchor="middle" font-family="Georgia" font-size="12" fill="#3a2a18">${title}</text></svg></div>
+      <div class="pc-back"><p class="hand">${msg}</p><span class="stamp">AQ</span></div></div>`,
+  };
+});

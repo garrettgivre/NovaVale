@@ -31,6 +31,12 @@ export const NODES = {
   U1: { room: 'tunnel', p: [0, 0.4], look: [0, -15], exits: ['U2'] },
   U2: { room: 'tunnel', p: [0, -10.5], look: [0, -15], exits: ['U1'] },
   X1: { room: 'star', p: [0, 2.4], look: [0, -0.8], exits: [] },
+  W1: { room: 'wing', p: [0, 0.9], look: [0, -12], exits: ['W2'] },
+  W2: { room: 'wing', p: [0, -5.2], look: [0, -12], exits: ['W1', 'W3'] },
+  W3: { room: 'wing', p: [0, -10.6], look: [0, -13], exits: ['W2'] },
+  E1: { room: 'terrace', p: [0, 2.2], look: [0, -20], exits: ['E2', 'E3'] },
+  E2: { room: 'terrace', p: [4, -19.8], look: [0, 12], exits: ['E1'] },
+  E3: { room: 'terrace', p: [-6, -8.6], look: [-10, -14.6], exits: ['E1'] },
 };
 
 // ---------- Materials ----------
@@ -257,7 +263,7 @@ function buildLobby() {
   const crownM = M(0xe0d6c2, 0.7);
   struct(add(R.g, new THREE.TorusGeometry(8.88, 0.16, 8, 72), crownM, 0, 4.15, 0)).rotation.x = Math.PI / 2;
   // pilasters between the doors, with sconces
-  const doorAngles = [0, 55, 110, 180, 250, 305];
+  const doorAngles = [0, 55, 110, 150, 180, 250, 305];
   for (let k = 0; k < 24; k++) {
     const deg = k * 15; if (doorAngles.some(d => Math.abs(((deg - d + 540) % 360) - 180) < 12)) continue;
     const a = deg * Math.PI / 180, x = Math.sin(a) * 8.86, z = -Math.cos(a) * 8.86;
@@ -342,7 +348,7 @@ function buildLobby() {
 
   const D = (deg, label, hot) => { const a = deg * Math.PI / 180; return door(R, Math.sin(a) * 8.9, -Math.cos(a) * 8.9, label, hot, [0, 0]); };
   D(0, 'Planetarium', 'door_plan'); D(55, 'Spa & Pools', 'door_spa'); D(110, 'Tech Office', 'door_tech');
-  D(180, 'Guest Suites', 'door_suite'); D(250, 'Kitchen', 'door_kitchen'); D(305, 'Archive', 'door_archive');
+  D(150, 'Grand Staircase', 'door_stairs'); D(180, 'Terrace', 'door_terrace'); D(250, 'Kitchen', 'door_kitchen'); D(305, 'Archive', 'door_archive');
 
   lamps(R, [0, 7.2, 0, 0xffc98a, 30, 20], [0, 2.4, 0, 0xffd8a8, 6, 10]);
   return R;
@@ -636,6 +642,7 @@ function buildArchive() {
     }
   };
   bookcase(-4.28, 0.9, Math.PI / 2); bookcase(-1.6, 3.78, Math.PI);
+  hit(R.g, -4.05, 1.3, 0.9, 0.7, 'books', 'Bookcase');
   palm(R.g, 3.8, -3.3, 1);
   door(R, 1.2, 3.95, 'Lobby', 'exit_archive', [1.2, 0]);
   lamps(R, [0, 2.9, -0.5, 0xffd8a8, 11, 12], [1.2, 1.4, -2.3, 0xffe0b0, 3, 4]);
@@ -742,6 +749,163 @@ function buildStarRoom() {
   return R;
 }
 
+// ---------- Upstairs: the guest wing ----------
+function buildWing() {
+  const R = mkRoom('wing', { p: [3, 8, 3], t: [0, 0, -5], s: 10, day: [0xffe8c8, 1.2], night: [0xffd8a0, 0.3] });
+  rectRoom(R, -1.6, 1.6, -13, 2, 3.1, { floor: M(0xffffff, 0.45, 0, { t: TX.oak(), rep: [1, 5], bump: 0.01 }), wall: M(0xffffff, 0.85, 0, { t: TX.damaskRose(), bump: 0.01 }), wains: M(0xffffff, 0.5, 0, { t: TX.panel(), bump: 0.02 }), wh: 1.0 });
+  struct(add(R.g, new THREE.PlaneGeometry(1.3, 14.6), M(0xffffff, 0.95, 0, { t: TX.carpetRed(), rep: [1, 8], bump: 0.01 }), 0, 0.006, -5.5)).rotation.x = -Math.PI / 2;
+  for (const z of [0, -5.8, -10.8]) for (const s of [-1, 1]) sconce(R.g, s * 1.58, 2.0, z, s < 0 ? Math.PI / 2 : -Math.PI / 2);
+  for (const z of [-1.5, -7.5]) { cyl(R.g, 0.006, 0.006, 0.5, BRASS, 0, 2.85, z, 6); lathe(R.g, [[0.001, 0], [0.16, 0.02], [0.2, 0.12], [0.001, 0.14]], M(0xfff0d0, 0.5, 0, { emissive: 0xffc680, emissiveIntensity: 1 }), 0, 2.45, z, 20).userData.nocast = 1; }
+  door(R, -1.5, -2.6, 'Spa Suite', 'door_vsuite', [0, -2.6]);
+  door(R, 1.5, -4.2, 'Suite 2', 'door_suite', [0, -4.2]);
+  door(R, -1.5, -8.2, 'Linen', 'door_linen', [0, -8.2]);
+  door(R, 1.5, -9.2, 'Suite 4', 'door_csuite', [0, -9.2]);
+  door(R, 0, 1.95, 'Grand Staircase', 'exit_wing', [0, -5]);
+  // a card hanging on Vesper's door
+  const card = add(R.g, new THREE.PlaneGeometry(0.2, 0.28), new THREE.MeshStandardMaterial({ roughness: 0.9, map: T.textCanvas(160, 220, g => { g.fillStyle = '#f2ead6'; g.fillRect(0, 0, 160, 220); g.fillStyle = '#6a1a2a'; g.font = 'bold 22px Georgia'; g.textAlign = 'center'; ['VOCAL', 'REST'].forEach((l, i) => g.fillText(l, 80, 70 + i * 28)); g.font = 'italic 17px Georgia'; ['Do not knock.', 'This means you.'].forEach((l, i) => g.fillText(l, 80, 150 + i * 24)); }) }), -1.42, 1.45, -2.6);
+  card.rotation.y = Math.PI / 2;
+  // window seat at the end, over the lake
+  skyWindow(R, 1.8, 1.9, 0, 1.75, -12.97, 0, 0x5a2a3a);
+  box(R.g, 2.2, 0.45, 0.6, mat.mahog(), 0, 0.225, -12.65);
+  box(R.g, 2.1, 0.12, 0.55, M(0x6a1420, 0.9, 0, { t: TX.velvet() }), 0, 0.5, -12.65);
+  for (const s of [-1, 1]) { const p = sph(R.g, 0.18, M(0xd8c8a8, 0.9, 0, { t: TX.linen() }), s * 0.7, 0.66, -12.8, 14); p.scale.set(1, 0.7, 0.4); }
+  hit(R.g, 0, 0.7, -12.6, 0.6, 'windowseat', 'Window seat');
+  // console table with flowers
+  const ct = new THREE.Group(); ct.position.set(-1.35, 0, -5.4); ct.rotation.y = Math.PI / 2; R.g.add(ct);
+  box(ct, 1.0, 0.04, 0.34, mat.mahog(), 0, 0.82, 0);
+  for (const s of [-1, 1]) for (const t of [-1, 1]) cyl(ct, 0.02, 0.014, 0.8, mat.mahog(), s * 0.45, 0.4, t * 0.13, 8);
+  lathe(ct, [[0.001, 0], [0.06, 0], [0.09, 0.12], [0.05, 0.24], [0.06, 0.28], [0.001, 0.26]], M(0x2a4a6a, 0.2), 0, 0.84, 0, 20);
+  for (let i = 0; i < 7; i++) { const a = i * 0.9; sph(ct, 0.045, M([0xc84a5a, 0xe8d8b0, 0xa83a6a][i % 3], 0.7), Math.cos(a) * 0.07, 1.16 + (i % 3) * 0.04, Math.sin(a) * 0.07, 10); }
+  tag(ct, 'flowers', 'Flowers');
+  // housekeeping cart
+  const hc = new THREE.Group(); hc.position.set(1.15, 0, -6.4); hc.rotation.y = -Math.PI / 2; R.g.add(hc);
+  box(hc, 0.9, 0.04, 0.45, IRON, 0, 0.9, 0); box(hc, 0.9, 0.04, 0.45, IRON, 0, 0.45, 0);
+  for (const s of [-1, 1]) for (const t of [-1, 1]) cyl(hc, 0.012, 0.012, 0.9, IRON, s * 0.43, 0.45, t * 0.2, 6);
+  for (let i = 0; i < 3; i++) box(hc, 0.3, 0.07, 0.3, M(0xece4d4, 0.95, 0, { t: TX.linen() }), -0.25 + i * 0.25, 0.51 + (i % 2) * 0.07, 0);
+  tag(hc, 'cart', 'Housekeeping cart');
+  // framed pictures: the 2003 build crew photo is a clue, the others are paintings
+  const frame = (x, z, ry, w, h, tex, hot, name) => {
+    const g = new THREE.Group(); g.position.set(x, 1.85, z); g.rotation.y = ry; R.g.add(g);
+    box(g, w + 0.1, h + 0.1, 0.04, M(0xb89040, 0.3, 0.8), 0, 0, 0);
+    add(g, new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ roughness: 0.6, map: tex }), 0, 0, 0.022);
+    if (hot) tag(g, hot, name);
+  };
+  frame(1.56, -1.2, -Math.PI / 2, 0.8, 0.55, T.textCanvas(320, 220, g => {
+    g.fillStyle = '#b8a888'; g.fillRect(0, 0, 320, 220); const gr = g.createLinearGradient(0, 0, 0, 160); gr.addColorStop(0, '#d8ccb0'); gr.addColorStop(1, '#8a7c62'); g.fillStyle = gr; g.fillRect(10, 10, 300, 160);
+    g.strokeStyle = '#4a3e2e'; g.lineWidth = 2; g.beginPath(); g.arc(160, 150, 110, Math.PI, 0); g.stroke(); for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(160, 40); g.lineTo(50 + i * 44, 150); g.stroke(); }
+    g.fillStyle = '#3a2e22'; for (let i = 0; i < 4; i++) { const x = 70 + i * 60; g.beginPath(); g.arc(x, 110, 11, 0, 7); g.fill(); g.fillRect(x - 14, 122, 28, 48); g.fillStyle = '#d8b460'; g.beginPath(); g.arc(x - 6, 132, 3, 0, 7); g.fill(); g.fillStyle = '#3a2e22'; }
+    g.fillStyle = '#2a2018'; g.font = 'italic 15px Georgia'; g.textAlign = 'center'; g.fillText('The build crew, June 2003', 160, 200);
+  }), 'crewphoto', 'Old photograph');
+  frame(-1.56, -5.4, Math.PI / 2, 0.9, 0.6, T.sky(false), null);
+  frame(1.56, -11.4, -Math.PI / 2, 0.7, 0.5, T.starDome(true), null);
+  lamps(R, [0, 2.6, -2, 0xffd8a8, 8, 9], [0, 2.6, -9, 0xffd8a8, 8, 9]);
+  return R;
+}
+
+// ---------- Outside: the lakeside terrace ----------
+function buildTerrace() {
+  const R = mkRoom('terrace', { p: [-14, 20, -6], t: [0, 0, -4], s: 22, day: [0xffe8c8, 2.6], night: [0x8a9ac8, 0.45] });
+  R.outdoor = true;
+  const flag = M(0xffffff, 0.8, 0, { t: once('flags', () => T.tiles({ base: '#b0a894', grout: '#6a6454', n: 4, vary: 0.18, grime: 0.4, seed: 21 })), rep: [5, 3], bump: 0.03 });
+  struct(add(R.g, new THREE.PlaneGeometry(18, 12), flag, 0, 0.01, 2)).rotation.x = -Math.PI / 2;
+  const grass = M(0xffffff, 0.95, 0, { t: once('grass', () => T.plaster({ base: '#4c6a36', seed: 31 })), rep: [40, 40], bump: 0.04 });
+  struct(add(R.g, new THREE.PlaneGeometry(90, 90), grass, 0, -0.01, 30)).rotation.x = -Math.PI / 2;
+  const gravel = M(0xffffff, 0.95, 0, { t: once('gravel', () => T.concrete({ base: '#9a9282', seed: 41 })), rep: [2, 6], bump: 0.05 });
+  struct(add(R.g, new THREE.PlaneGeometry(2.4, 6.4), gravel, 0, 0.005, -7.2)).rotation.x = -Math.PI / 2;
+  struct(add(R.g, new THREE.PlaneGeometry(1.6, 8), gravel, -4.2, 0.004, -8.6)).rotation.set(-Math.PI / 2, 0, -0.6);
+  // the lake, with a stone shore wall
+  const water = struct(add(R.g, new THREE.PlaneGeometry(160, 70, 60, 30), new THREE.MeshStandardMaterial({ color: 0x16303a, roughness: 0.22, metalness: 0.35 }), 0, -0.35, -45.5));
+  water.rotation.x = -Math.PI / 2; water.userData.nocast = 1;
+  const wp = water.geometry.attributes.position;
+  updaters.push((dt, t) => { if (!R.g.visible) return; for (let i = 0; i < wp.count; i++) wp.setZ(i, Math.sin(wp.getX(i) * 0.6 + t * 0.8) * 0.03 + Math.cos(wp.getY(i) * 0.8 + t * 0.6) * 0.03); wp.needsUpdate = true; water.geometry.computeVertexNormals(); });
+  struct(box(R.g, 60, 0.5, 0.5, mat.stone([30, 1]), 0, -0.2, -10.3));
+  // balustrade round the terrace, open in the middle for the path to the lake
+  const bal = (x0, z0, x1, z1) => {
+    const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0), n = Math.round(len / 0.32);
+    box(R.g, 0.2, 0.1, len, mat.stone([1, 6]), (x0 + x1) / 2, 0.92, (z0 + z1) / 2).rotation.y = ang;
+    box(R.g, 0.24, 0.12, len, mat.stone([1, 6]), (x0 + x1) / 2, 0.06, (z0 + z1) / 2).rotation.y = ang;
+    for (let i = 0; i <= n; i++) { const t = i / n; lathe(R.g, [[0.001, 0.12], [0.05, 0.12], [0.03, 0.3], [0.065, 0.55], [0.03, 0.8], [0.05, 0.87], [0.001, 0.87]], mat.stone(), x0 + (x1 - x0) * t, 0, z0 + (z1 - z0) * t, 10); }
+  };
+  bal(-9, -4, -1.4, -4); bal(1.4, -4, 9, -4); bal(-9, -4, -9, 7); bal(9, -4, 9, 7);
+  const lampPost = (x, z) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); R.g.add(g);
+    lathe(g, [[0.001, 0], [0.14, 0], [0.1, 0.12], [0.05, 0.3], [0.04, 2.6], [0.07, 2.62], [0.001, 2.64]], IRON, 0, 0, 0, 12);
+    box(g, 0.24, 0.32, 0.24, M(0xfff0c8, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1.3 }), 0, 2.82, 0).userData.nocast = 1;
+    lathe(g, [[0.001, 3.14], [0.2, 2.98], [0.18, 2.96], [0.001, 3.1]], IRON, 0, 0, 0, 4);
+  };
+  for (const [x, z] of [[-8.6, -3.6], [8.6, -3.6], [-1.8, -4.2], [1.8, -4.2], [3.3, -10.6]]) lampPost(x, z);
+  for (const [x, z] of [[-6, -3.2], [6, -3.2], [-8.3, 5.5], [8.3, 5.5]]) { lathe(R.g, [[0.001, 0], [0.28, 0], [0.22, 0.1], [0.3, 0.55], [0.34, 0.62], [0.001, 0.6]], mat.stone(), x, 0, z, 20); sph(R.g, 0.5, M(0x3a5a2a, 0.9, 0, { t: TX.velvet(), rep: [3, 3] }), x, 1.1, z, 18); }
+  const bench = (x, z, ry) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; R.g.add(g);
+    for (let i = 0; i < 4; i++) box(g, 1.6, 0.03, 0.09, mat.oak(), 0, 0.45, -0.18 + i * 0.12);
+    for (let i = 0; i < 3; i++) box(g, 1.6, 0.09, 0.03, mat.oak(), 0, 0.62 + i * 0.12, -0.26);
+    for (const s of [-1, 1]) { box(g, 0.05, 0.45, 0.5, IRON, s * 0.72, 0.225, -0.02); box(g, 0.05, 0.5, 0.05, IRON, s * 0.72, 0.7, -0.26); }
+    return g;
+  };
+  tag(bench(-4.5, 1.5, 0.3), 'tbench', 'Bench');
+  bench(4.5, 1.5, -0.3);
+  // the dock, a rowboat and the padlocked boathouse
+  for (let i = 0; i < 26; i++) box(R.g, 1.6, 0.06, 0.38, mat.oak(), 4, 0.02, -10.4 - i * 0.42);
+  for (let i = 0; i < 6; i++) for (const s of [-1, 1]) cyl(R.g, 0.07, 0.07, 1.3, M(0x4a3a2a, 0.9), 4 + s * 0.8, -0.35, -10.6 - i * 2, 8);
+  box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 4.75, 0.45, -20.9); box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 3.25, 0.45, -20.9);
+  tag(box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 4.75, 0.45, -15), 'dockpost', 'Dock post');
+  const boat = new THREE.Group(); boat.position.set(5.8, -0.28, -16); boat.rotation.y = 0.12; R.g.add(boat);
+  lathe(boat, [[0.001, -0.3], [0.45, -0.26], [0.62, 0], [0.64, 0.08]], M(0x7a3a2a, 0.6, 0, { side: THREE.DoubleSide }), 0, 0.3, 0, 24).scale.set(0.9, 1, 2.6);
+  box(boat, 1.05, 0.04, 0.22, mat.oak(), 0, 0.3, 0.3); box(boat, 1.05, 0.04, 0.22, mat.oak(), 0, 0.3, -0.6);
+  updaters.push((dt, t) => { boat.position.y = -0.28 + Math.sin(t * 1.1) * 0.025; boat.rotation.z = Math.sin(t * 0.8) * 0.03; });
+  tag(boat, 'rowboat', 'Rowboat');
+  const bh = new THREE.Group(); bh.position.set(-10, 0, -14.6); faceTo(bh, -6, -9); R.g.add(bh);
+  const plank = M(0xffffff, 0.8, 0, { t: once('planks', () => T.wood({ base: '#6a5a48', dark: '#3a2e22', planks: 10, seed: 17 })), rep: [2, 1], bump: 0.03 });
+  box(bh, 4.6, 2.8, 4, plank, 0, 1.4, 0);
+  for (const s of [-1, 1]) box(bh, 2.7, 0.08, 4.4, M(0x3a3a3e, 0.8), s * 1.2, 3.35, 0).rotation.z = s * -0.62;
+  const bd = new THREE.Group(); bd.position.set(0, 0, 2.02); bh.add(bd);
+  box(bd, 2.2, 2.2, 0.06, M(0x4a3e30, 0.8), 0, 1.1, 0);
+  box(bd, 0.02, 2.2, 0.07, M(0x2a2018, 0.8), 0, 1.1, 0.01);
+  box(bd, 0.5, 0.05, 0.04, IRON, 0, 1.2, 0.05);
+  box(bd, 0.08, 0.1, 0.03, BRASS, 0.04, 1.12, 0.08);
+  tag(bd, 'boathouse', 'Boathouse doors');
+  // the Aquadome from outside: stone drum, glass dome, portico and front doors
+  const dome = new THREE.Group(); dome.position.set(0, 0, 18); R.g.add(dome);
+  struct(add(dome, new THREE.CylinderGeometry(9.3, 9.4, 4.6, 64, 1, true), mat.stone([12, 2]), 0, 2.3, 0));
+  add(dome, new THREE.TorusGeometry(9.35, 0.18, 8, 64), mat.stone(), 0, 4.6, 0).rotation.x = Math.PI / 2;
+  const glow = M(0xd8e0d8, 0.08, 0.2, { transparent: true, opacity: 0.55, emissive: 0xffc070, emissiveIntensity: 0 });
+  add(dome, new THREE.SphereGeometry(9.2, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), glow, 0, 4.6, 0).userData.nocast = 1;
+  R.domeGlow = glow;
+  for (let i = 0; i < 8; i++) add(dome, new THREE.TorusGeometry(9.25, 0.07, 6, 48, Math.PI), BRONZE, 0, 4.6, 0).rotation.y = (i / 8) * Math.PI;
+  const lit = M(0x2a2418, 0.3, 0, { emissive: 0xffb860, emissiveIntensity: 0 }); R.winGlow = lit;
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; if (Math.cos(a) < -0.85) continue; const w = box(R.g, 1.1, 1.7, 0.1, lit, Math.sin(a) * 9.42, 2.3, 18 + Math.cos(a) * 9.42); w.rotation.y = a; }
+  for (const x of [-3, -1.2, 1.2, 3]) lathe(R.g, [[0.001, 0], [0.34, 0], [0.34, 0.2], [0.26, 0.3], [0.24, 4.2], [0.34, 4.35], [0.36, 4.5], [0.001, 4.5]], mat.stone([2, 3]), x, 0, 7.6, 24);
+  box(R.g, 7.4, 0.5, 2.2, mat.stone([6, 1]), 0, 4.75, 8.2);
+  const ped = new THREE.Shape(); ped.moveTo(-3.8, 0); ped.lineTo(3.8, 0); ped.lineTo(0, 1.2); ped.closePath();
+  add(R.g, new THREE.ExtrudeGeometry(ped, { depth: 2.2, bevelEnabled: false }), mat.stone([2, 1]), 0, 5.0, 7.1);
+  plaqueMesh(R.g, 'THE AQUADOME', 3.2, 0.42, 0, 5.45, 7.06, Math.PI, { size: 0.5, bg: '#8a7a5a', fg: '#2a2014' });
+  door(R, 0, 9.05, 'Lobby', 'exit_terrace', [0, 0]);
+  for (let i = 0; i < 3; i++) box(R.g, 7 - i * 0.6, 0.12, 0.5, mat.stone([4, 1]), 0, 0.06 + i * 0.12, 6.9 + i * 0.5);
+  lamps(R, [0, 3, -4, 0xffc890, 10, 14], [4, 2.5, -12, 0xffc890, 6, 10]);
+  return R;
+}
+
+// ---------- Collectible postcards from 2003 (optional) ----------
+export const POSTCARDS = [
+  [1, 'lobby', [-6.5, 0.51, -2.45], 0.4], [2, 'spa', [-5.3, 0.345, 3.8], 1.2], [3, 'kitchen', [-3.6, 0.976, -3.45], 0.2], [4, 'tech', [-3.6, 1.306, -3.3], 2.3],
+  [5, 'archive', [3.25, 0.906, 1.45], 0.7], [6, 'wing', [1.15, 0.94, -6.2], 1.9], [7, 'terrace', [-4.5, 0.47, 1.5], 0.3], [8, 'plan', [5.51, 0.49, -0.97], 2.6],
+];
+function postcards() {
+  const tex = T.textCanvas(256, 170, g => {
+    const gr = g.createLinearGradient(0, 0, 0, 170); gr.addColorStop(0, '#c8b890'); gr.addColorStop(1, '#8a7a58'); g.fillStyle = gr; g.fillRect(0, 0, 256, 170);
+    g.strokeStyle = '#4a3a24'; g.lineWidth = 3; g.beginPath(); g.arc(128, 150, 90, Math.PI, 0); g.stroke();
+    g.fillStyle = '#f4ecd8'; g.fillRect(0, 0, 256, 8); g.fillRect(0, 162, 256, 8); g.fillRect(0, 0, 8, 170); g.fillRect(248, 0, 8, 170);
+    g.fillStyle = '#3a2a18'; g.font = 'italic 20px Georgia'; g.textAlign = 'center'; g.fillText('Greetings from the Aquadome', 128, 40);
+  });
+  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 });
+  for (const [n, room, p, r] of POSTCARDS) {
+    const g = new THREE.Group(); g.position.set(p[0], p[1], p[2]); g.rotation.y = r; rooms[room].g.add(g);
+    const c = add(g, new THREE.PlaneGeometry(0.15, 0.1), m, 0, 0.002, 0); c.rotation.x = -Math.PI / 2; c.userData.nocast = 1;
+    hit(g, 0, 0.05, 0, 0.2, 'pc_' + n, 'Postcard');
+    rooms[room]['pc' + n] = g;
+  }
+}
+
 // ---------- Walk spots (faint floor chevrons) ----------
 const spots = [];
 function spotMesh() {
@@ -787,7 +951,7 @@ export function buildWorld(sc, renderer) {
   key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
   scene.add(key); scene.add(key.target);
   envDay = envMap(renderer, false); envNight = envMap(renderer, true);
-  buildLobby(); buildSpa(); buildPlanetarium(); buildKitchen(); buildTech(); buildArchive(); buildSuite(); buildTunnel(); buildStarRoom();
+  buildLobby(); buildSpa(); buildPlanetarium(); buildKitchen(); buildTech(); buildArchive(); buildSuite(); buildTunnel(); buildStarRoom(); buildWing(); buildTerrace(); postcards();
   // shadows: furniture and people cast; structure (walls, floors, ceilings) only receives
   const flag = root => root.traverse(o => {
     if (!o.isMesh) return;
@@ -844,6 +1008,8 @@ export function sync() {
   P.code.visible = has('const_done');
   A.sketch.visible = !has('sketch');
   X.crown.visible = !has('crown_back');
+  for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
+  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
   for (const w in CAST) {
     const at = whereIs(w);
     if (!at) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
@@ -873,4 +1039,19 @@ export function update(dt, t, cam) {
   }
   const X = rooms.star;
   if (X && X.g.visible && X.crown.visible) X.crown.rotation.y = t * 0.3;
+}
+
+// Hotspot reveal: where each clickable thing in view sits on screen (for the Reveal button).
+const _b = new THREE.Box3(), _v = new THREE.Vector3();
+export function hotspotsOnScreen(camera, w, h) {
+  const R = rooms[curRoom], out = [];
+  R.g.traverse(o => {
+    const u = o.userData; if (!(u.hot || u.who) || u.go || o.isMesh && o.parent && (o.parent.userData.hot || o.parent.userData.who)) return;
+    for (let p = o; p; p = p.parent) if (!p.visible) return;
+    _b.setFromObject(o); if (_b.isEmpty()) return; _b.getCenter(_v);
+    if (_v.distanceTo(camera.position) > 14) return;
+    _v.project(camera); if (_v.z > 1 || Math.abs(_v.x) > 1 || Math.abs(_v.y) > 1) return;
+    out.push({ x: (_v.x + 1) / 2 * w, y: (1 - _v.y) / 2 * h, name: u.name || u.hot || u.who });
+  });
+  return out;
 }

@@ -2,11 +2,11 @@
 // the first-person camera at fixed spots, conversation close-ups, input, the main loop.
 import * as THREE from 'three';
 import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
-import { buildWorld, showRoom, NODES, rooms, sync, update, showArrows, roomOf, headOf } from './world.js';
+import { buildWorld, showRoom, NODES, rooms, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
-import { initAudio, sfx, setMuted, isMuted } from './audio.js';
+import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic } from './audio.js';
 import { ITEMS, icon } from './items.js';
 
 const EYE = 1.62, PITCH0 = -0.07;
@@ -21,21 +21,32 @@ const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 200);
 camera.rotation.order = 'YXZ';
 
 // ---------- Post-process ----------
-const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+// Two looks: "retro" (default) renders the 3D view at about 640 px on its long side, then shows it with
+// chunky pixels, 15-bit colour with ordered dithering and faint scanlines, like a 2003 game on a CRT;
+// "smooth" is a soft ~0.9 MP render. The models are the same either way, and the UI stays sharp.
+const pref = (k, d) => { try { const v = localStorage.getItem('novavale.' + k); return v === null ? d : v === '1'; } catch (e) { return d; } };
+const setPref = (k, v) => { try { localStorage.setItem('novavale.' + k, v ? '1' : '0'); } catch (e) { } };
+let RETRO = pref('retro', true);
+let rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 2 });
 const post = new THREE.ShaderMaterial({
-  uniforms: { tD: { value: rt.texture }, uT: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tD: { value: rt.texture }, uT: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uRetro: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
-    uniform sampler2D tD; uniform float uT; uniform vec2 uRes; varying vec2 vUv;
+    uniform sampler2D tD; uniform float uT; uniform vec2 uRes; uniform float uRetro; varying vec2 vUv;
     float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+    float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
     void main(){
       vec2 px = 1.0 / uRes;
-      vec3 c = texture2D(tD, vUv).rgb;
-      vec3 s = (texture2D(tD, vUv + vec2(px.x, 0.)).rgb + texture2D(tD, vUv - vec2(px.x, 0.)).rgb
-              + texture2D(tD, vUv + vec2(0., px.y)).rgb + texture2D(tD, vUv - vec2(0., px.y)).rgb) * 0.25;
-      c = mix(c, s, 0.3);
+      vec2 uv = uRetro > 0.5 ? (floor(vUv * uRes) + 0.5) / uRes : vUv;
+      vec3 c = texture2D(tD, uv).rgb;
+      if (uRetro < 0.5) {
+        vec3 s = (texture2D(tD, uv + vec2(px.x, 0.)).rgb + texture2D(tD, uv - vec2(px.x, 0.)).rgb
+                + texture2D(tD, uv + vec2(0., px.y)).rgb + texture2D(tD, uv - vec2(0., px.y)).rgb) * 0.25;
+        c = mix(c, s, 0.3);
+      }
       vec3 glow = vec3(0.);
-      for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; glow += max(texture2D(tD, vUv + vec2(cos(a), sin(a)) * px * 7.0).rgb - 0.9, 0.0); }
+      for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; glow += max(texture2D(tD, uv + vec2(cos(a), sin(a)) * px * (uRetro > 0.5 ? 3.0 : 7.0)).rgb - 0.9, 0.0); }
       c += glow * 0.1;
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, 0.8);
@@ -46,7 +57,12 @@ const post = new THREE.ShaderMaterial({
       vec2 d = vUv - 0.5;
       gl_FragColor.rgb *= mix(0.55, 1.0, smoothstep(0.85, 0.25, length(d * vec2(1.0, 0.92))));
       gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * vec3(1.0, 0.97, 0.9) + vec3(0.02, 0.012, 0.0), 0.6);
-      gl_FragColor.rgb += (hash(floor(vUv * uRes) + fract(uT) * 91.0) - 0.5) * 0.045;
+      vec2 lp = floor(vUv * uRes);
+      if (uRetro > 0.5) {
+        gl_FragColor.rgb += (hash(lp + fract(uT) * 91.0) - 0.5) * 0.03;
+        gl_FragColor.rgb = floor(gl_FragColor.rgb * 31.0 + bayer4(lp)) / 31.0;              // 15-bit colour, dithered
+        gl_FragColor.rgb *= 1.0 - 0.16 * smoothstep(0.5, 1.0, fract(vUv.y * uRes.y));       // faint scanlines
+      } else gl_FragColor.rgb += (hash(lp + fract(uT) * 91.0) - 0.5) * 0.045;
     }`,
   depthTest: false, depthWrite: false,
 });
@@ -55,12 +71,20 @@ postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
 
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h;
-  // about 0.9 megapixels at most: soft, like an 800x600 pre-rendered game on a CRT
-  const pr = Math.min(devicePixelRatio || 1, Math.sqrt(900000 / (w * h)));
-  renderer.setPixelRatio(pr);
-  renderer.setSize(w, h, false);
-  const bw = Math.round(w * pr), bh = Math.round(h * pr);
-  rt.setSize(bw, bh); post.uniforms.uRes.value.set(bw, bh);
+  if (RETRO) {
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, false);
+    const k = 640 / Math.max(w, h), lw = Math.round(w * k), lh = Math.round(h * k);
+    rt.setSize(lw, lh); post.uniforms.uRes.value.set(lw, lh);
+  } else {
+    // about 0.9 megapixels at most: soft, like an 800x600 pre-rendered game
+    const pr = Math.min(devicePixelRatio || 1, Math.sqrt(900000 / (w * h)));
+    renderer.setPixelRatio(pr);
+    renderer.setSize(w, h, false);
+    const bw = Math.round(w * pr), bh = Math.round(h * pr);
+    rt.setSize(bw, bh); post.uniforms.uRes.value.set(bw, bh);
+  }
+  post.uniforms.uRetro.value = RETRO ? 1 : 0;
   camera.aspect = a;
   const hf = 64 * Math.PI / 180;
   camera.fov = a < 1 ? Math.min(88, 2 * Math.atan(Math.tan(hf / 2) / a) * 180 / Math.PI) : 58;
@@ -200,17 +224,43 @@ $('#turnR').onclick = () => turn(-1);
 $('#btnNote').onclick = () => { initAudio(); sfx('click'); story.openNotebook(); };
 $('#btnPhone').onclick = () => { initAudio(); sfx('click'); story.openPhone(); };
 $('#btnMenu').onclick = () => { initAudio(); sfx('click'); openMenu(); };
+$('#btnMap').onclick = () => { initAudio(); sfx('click'); story.openMap(); };
+function musicUI() { $('#btnMusic').classList.toggle('off', !isMusic()); $('#btnMusic').title = isMusic() ? 'Music: on' : 'Music: off'; }
+$('#btnMusic').onclick = () => { initAudio(); setMusic(!isMusic()); setPref('music', isMusic()); musicUI(); sfx('click'); ui.toast(isMusic() ? 'Music on' : 'Music off'); };
+function setRetro(on) {
+  RETRO = on; setPref('retro', on);
+  rt.dispose();
+  const f = on ? THREE.NearestFilter : THREE.LinearFilter;
+  rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 2, minFilter: f, magFilter: f });
+  post.uniforms.tD.value = rt.texture; resize();
+}
+// Reveal: briefly mark everything you can click in view (no pixel hunting, especially on touch screens)
+$('#btnReveal').onclick = () => {
+  if (V.busy || V.focus || !V.node || ui.talking()) return;
+  initAudio(); sfx('click');
+  const box = $('#reveal'); box.innerHTML = '';
+  for (const p of hotspotsOnScreen(camera, innerWidth, innerHeight)) {
+    const m = document.createElement('div'); m.className = 'rv'; m.style.left = p.x + 'px'; m.style.top = p.y + 'px';
+    m.innerHTML = '<i></i><span></span>'; m.querySelector('span').textContent = ui.PEOPLE[p.name] ? ui.PEOPLE[p.name].n : p.name; box.appendChild(m);
+  }
+  box.classList.remove('on'); void box.offsetWidth; box.classList.add('on');
+  clearTimeout(box._t); box._t = setTimeout(() => box.classList.remove('on'), 2600);
+};
 
 function openMenu() {
   const b = ui.panel(`<div class="menu">
     <button class="mbtn" data-a="resume">Return to Game</button>
-    <button class="mbtn" data-a="sound">Sound: ${isMuted() ? 'Off' : 'On'}</button>
+    <button class="mbtn" data-a="music">Music: ${isMusic() ? 'On' : 'Off'}</button>
+    <button class="mbtn" data-a="sound">All sound: ${isMuted() ? 'Off' : 'On'}</button>
+    <button class="mbtn" data-a="retro">Retro picture: ${RETRO ? 'On' : 'Off'}</button>
     <button class="mbtn" data-a="title">Save and Quit</button>
     <p class="small">${S.diff === 'senior' ? 'Senior' : 'Junior'} Detective · your progress saves automatically</p></div>`, { cls: 'menu-p', title: 'Options' });
   b.querySelectorAll('[data-a]').forEach(x => x.onclick = () => {
     const a = x.dataset.a; sfx('click');
     if (a === 'resume') ui.closePanel();
-    if (a === 'sound') { setMuted(!isMuted()); x.textContent = 'Sound: ' + (isMuted() ? 'Off' : 'On'); try { localStorage.setItem('novavale.mute', isMuted() ? '1' : ''); } catch (e) { } }
+    if (a === 'sound') { setMuted(!isMuted()); x.textContent = 'All sound: ' + (isMuted() ? 'Off' : 'On'); try { localStorage.setItem('novavale.mute', isMuted() ? '1' : ''); } catch (e) { } }
+    if (a === 'music') { setMusic(!isMusic()); setPref('music', isMusic()); musicUI(); x.textContent = 'Music: ' + (isMusic() ? 'On' : 'Off'); }
+    if (a === 'retro') { setRetro(!RETRO); x.textContent = 'Retro picture: ' + (RETRO ? 'On' : 'Off'); }
     if (a === 'title') { save(); location.reload(); }
   });
 }
@@ -307,6 +357,8 @@ function title() {
 
 // ---------- Boot ----------
 try { if (localStorage.getItem('novavale.mute')) setMuted(true); } catch (e) { }
+setMusic(pref('music', true)); musicUI();
+if (RETRO) setRetro(true);
 resize();
 (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast((i, n) => {
   document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';

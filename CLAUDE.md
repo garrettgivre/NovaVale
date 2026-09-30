@@ -9,6 +9,21 @@ A first-person Nancy Drew-style mystery made by Garrett for his partner Beau (wh
 - Mobile first, and it has to work on desktop too.
 - Don't draw four-point sparkle stars (Garrett's rule from his other projects); five-point stars are fine.
 
+## Nova's voice
+A know-it-all who really does know it all (Garrett: "Beau is like that"). Bratty, confident, funny, never cruel. She calls people out when the evidence lets her ("call-out" topics are starred and appear once she has proof: Vesper's backup track, Dex's 11pm email, Juniper's oven log, Opal's pin and coat). Nancy Drew's audacity is the model. Keep new lines in that voice.
+
+## Design rules from fan research (what Nancy Drew fans love and hate)
+- Love: atmospheric places with lots to explore, suspects who each hide something, lore to read, Nancy's sass, phone friends, puzzles woven into the story, Second Chance.
+- Hate: chores and padding, backtracking and slow travel, unclear next steps, hotspots that are hard to find, repeated puzzles, endgames stuffed with puzzles, long anticlimactic endings.
+- So: no chores; the Map fast-travels to any visited place; the Reveal button (top right) marks every clickable thing in view; the task list and Dot always say what's next; optional lore rewards exploring (postcards, clippings, the crew photo) but is never required; the finale stays short.
+
+## Layout (built to grow)
+Hub and spokes. The rotunda lobby is the hub; every door around it leads somewhere (Planetarium N, Spa NE, Tech Office E, Grand Staircase SE, Terrace S, Kitchen W, Archive NW). Upstairs: the Guest Wing (Vesper's Spa Suite and Cherry's Suite 4 are locked, Linen, Suite 2 = Nova's room, window seat, the 2003 build crew photo). Outside: the Lakeside Terrace (dock, rowboat, the dome seen from outside, a padlocked boathouse that is a deliberate hook for a future case; Remy is "looking into" who owned the boats). Below: the service tunnel and the Star Room. To add a place: a `build<Place>()` in world.js (`mkRoom` with its key light, two `lamps`, doors tagged `door_x`/`exit_x`), nodes in `NODES`, door handlers in story `HOT`, an entry in `PLACES` (the map, with its position in `openMap`'s SVG), and optionally a `FIRST_VISIT` line.
+
+## Options and look
+- Retro picture (default on, Menu > Retro picture): the 3D view renders at 640 px on its long side and is shown with nearest-neighbour pixels, 15-bit colour with 4x4 Bayer dithering and faint scanlines (`post` shader, `uRetro`). Off = the soft ~0.9 MP render. The UI is always sharp. Prefs in localStorage `novavale.retro` / `novavale.music`.
+- Music has its own switch (corner button, and Menu), separate from All sound. The ghost voice counts as a sound effect, not music.
+
 ## Structure
 - Rendering (`js/main.js`): scene renders to a half-float target at about 0.9 MP, then a post shader softens, warms, desaturates, adds vignette and grain (the pre-rendered 800x600 feel). Shadows from one directional key light per room (`R.key` config); walls/floors/ceilings are `struct` (receive only). Conversations glide the camera to a head-and-shoulders close-up (`focus`/`unfocus`, story calls `E.focus(who)`).
 - `js/tex.js`: procedural textures (marble, wood, carpet, damask wallpaper, tiles, plaster, fabric, brushed metal, hair, palm fronds, brass plaques, painted skies, star domes), each `{map, bump}`.
@@ -17,6 +32,7 @@ A first-person Nancy Drew-style mystery made by Garrett for his partner Beau (wh
 - `js/world.js`: rooms (`buildLobby`, `buildSpa`, `buildPlanetarium`, `buildKitchen`, `buildTech`, `buildArchive`, `buildSuite`, `buildTunnel`, `buildStarRoom`), each a Group at the origin with exactly two point lights (so switching rooms doesn't recompile shaders). `NODES` = camera spots {room, p:[x,z], look, exits}. Clickable things carry `userData.hot` (hotspot id), `.who` (character) or `.go` (walk arrow). Invisible hit spheres use the `HIT` material. `whereIs(who)` places characters by phase; `sync()` applies flags to the scene (pin, hologram card, sketch, dome code, crown).
 - `js/story.js`: `taskList()` (tasks + Dot's hints, junior/senior), `HOT` (hotspot handlers), `INTRO`/`TOPICS` (dialogue; lines starting `N:` are Nova, `*` is narration; `when`, `after`, `hot` = starred new lead), `REST_NEED` (what unlocks sleeping to the next phase), `finale()`, `badEnding()`, `ending()`, phone `CALLS`, notebook `NOTES`.
 - `js/puzzles.js`: `aquaOS` (password pixel2003), `switchboard` (zone 5 = planetarium; MAIN = bad ending), `acrostic` (LIPSYNC), `recipe` (vegan swaps), `constellation` (stars 0–4), `drawerDial` (729), `starDoor` (outer ringed planet, middle moon, inner comet).
+- Collectibles: eight 2003 postcards (`POSTCARDS` in world.js: room, position; `DOCS.pc1..pc8` in items.js), shown on the Journal's Postcards tab and in the ending letter. The archive bookcase holds a newspaper clipping (`DOCS.clipping`) and the Guest Wing has the crew photo (`DOCS.crewphoto`, also sets `pin_known` if you have the pin).
 - `js/state.js`: `S` (phase d1/n1/d2/n2/end, flags, inv, docs), localStorage key `novavale.aquadome.v1`, `checkpoint()`/`secondChance()`.
 
 ## The case (spoilers)
