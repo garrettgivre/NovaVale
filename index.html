@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1aa6d9">
+<title>Nova Vale: The Secret of the Aquadome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900;1,400&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<div id="boot"><div class="spin"></div></div>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="top">
+    <button id="btnMenu" class="round" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+    <div id="phase"></div>
+  </div>
+  <button id="turnL" class="turn" aria-label="Turn left"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <button id="turnR" class="turn" aria-label="Turn right"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+  <div id="caption"></div>
+  <div id="bottom">
+    <div id="inv"></div>
+    <button id="btnNote" class="pill"><svg viewBox="0 0 24 24"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6zM6 3v18M10 8h6M10 12h6"/></svg><span>Notebook</span></button>
+    <button id="btnPhone" class="pill"><svg viewBox="0 0 24 24"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM10 18h4M9 6h6v6H9z"/></svg><span>Phone</span></button>
+  </div>
+</div>
+
+<div id="tip"></div>
+<div id="talk"><div id="talkPt"></div><div id="talkBox"><div id="talkName"></div><div id="talkLine"></div><div id="talkOpts"></div></div></div>
+<div id="panel"></div>
+<div id="toasts"></div>
+<div id="screen"></div>
+<div id="fade"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
