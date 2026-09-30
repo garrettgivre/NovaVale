@@ -1,0 +1,13 @@
+{
+  "name": "cherry",
+  "sheet": "refs/cherry.png",
+  "height": 2.02,
+  "step": 3,
+  "off": {"front": [91, 0], "side": [601, 0], "back": [961, 0]},
+  "sideFaces": "right",
+  "joints": {
+    "top": [335, 16], "face": [336, 160], "chin": [337, 196], "neck": [337, 236], "chest": [336, 320], "spine": [335, 400], "hips": [335, 480],
+    "shR": [248, 258], "elR": [186, 412], "wrR": [132, 492], "tipR": [120, 556],
+    "shL": [424, 258], "elL": [492, 412], "wrL": [540, 492], "tipL": [546, 552]
+  }
+}

@@ -13,5 +13,10 @@ no props, plain background (ChatGPT prompt in CLAUDE.md). The model looks like t
    bones (lower body follows the hips, so gowns don't tear). Writes `<who>_turn.npz` and `<who>_tex.png`.
 4. `blender -b -P turn_blend.py -- <who> [angles]`: mesh, armature, vertex groups, turnaround renders, GLB export.
 
+Rigging notes: skin weights use geodesic distance inside the front silhouette (scikit-image `MCP_Geometric`), so hands
+don't bind to the thighs they hang beside and a gown doesn't follow the arms; arm joints take the depth of the arm itself.
+Silhouette vertices are snapped to the cutout's smooth contour (no stair-step outline); the side view is only used where
+its colour agrees with the front or back view. `posetest.py <who>` renders the arms lowered, to check the weights.
+
 Python: a venv with `rembg[cpu]`, `onnxruntime==1.19.2` (newer builds fail to load on this PC), `opencv-python-headless`,
-`scipy`, `huggingface_hub`. Blender 4.5. Add the character to `FIG` in `js/figures.js` (head height, talking arm).
+`scipy`, `huggingface_hub`, `scikit-image`. Blender 4.5. Add the character to `FIG` in `js/figures.js` (head height, talking arm).

@@ -6,7 +6,7 @@ from scipy import ndimage
 D = os.path.dirname(os.path.abspath(__file__))
 cfg = json.load(open(os.path.join(D, sys.argv[1])))
 name, HEIGHT, STEP = cfg['name'], cfg['height'], cfg.get('step', 2)
-sheet = cv2.imread(os.path.join(D, cfg['sheet'])); SH, SW = sheet.shape[:2]
+sheet = cv2.imread(os.path.join(D, os.path.join(D, cfg['sheet']))); SH, SW = sheet.shape[:2]
 
 # ---- masks in sheet coordinates (from turn_cut.py cutouts and their offsets)
 def placed(view):
@@ -121,7 +121,7 @@ bad = zf - zb < 0.004; zf[bad] = zm[bad] + 0.002; zb[bad] = zm[bad] - 0.002
 # smooth along the grid (depth noise)
 def smooth(z):
     g = np.zeros(inside.shape, np.float32); g[inside] = z; wgt = inside.astype(np.float32)
-    gs = cv2.GaussianBlur(g, (0, 0), 1.0); ws = cv2.GaussianBlur(wgt, (0, 0), 1.0)
+    gs = cv2.GaussianBlur(g, (0, 0), cfg.get('zsmooth', 2.0)); ws = cv2.GaussianBlur(wgt, (0, 0), cfg.get('zsmooth', 2.0))
     return (gs / np.maximum(ws, 1e-6))[inside]
 zf, zb = smooth(zf), smooth(zb)
 print('scale', sF, sB, 'depth', zf.max(), zb.min())
@@ -138,6 +138,20 @@ E = np.concatenate([T[:, [0, 1]], T[:, [1, 2]], T[:, [2, 0]]])
 key = np.sort(E, 1); _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
 bnd = E[cnt[inv.ravel()] == 1]
 side = np.concatenate([np.stack([bnd[:, 1], bnd[:, 0], bnd[:, 0] + n], 1), np.stack([bnd[:, 1], bnd[:, 0] + n, bnd[:, 1] + n], 1)])
+# smooth outline: slide each edge vertex onto the cutout's alpha = 0.5 contour (the grid alone gives stair steps)
+bv = np.unique(bnd.ravel())
+al = cv2.GaussianBlur(A['front'], (0, 0), 1.2)
+gyA, gxA = np.gradient(al)
+bu, bvv = U[bv].astype(np.float64), V[bv].astype(np.float64)
+for _ in range(8):
+    a_ = ndimage.map_coordinates(al, [bvv, bu], order=1)
+    gx_ = ndimage.map_coordinates(gxA, [bvv, bu], order=1); gy_ = ndimage.map_coordinates(gyA, [bvv, bu], order=1)
+    g2 = gx_ ** 2 + gy_ ** 2 + 1e-4
+    du, dv = -(a_ - 0.5) * gx_ / g2, -(a_ - 0.5) * gy_ / g2
+    l = np.hypot(du, dv); k_ = np.minimum(1, STEP * 0.5 / np.maximum(l, 1e-9))
+    bu += du * k_; bvv += dv * k_
+bu = U[bv] + np.clip(bu - U[bv], -STEP * 1.2, STEP * 1.2); bvv = V[bv] + np.clip(bvv - V[bv], -STEP * 1.2, STEP * 1.2)
+x[bv] = X(bu); y[bv] = Yf(bvv)
 Ff = T; Fb = T[:, [0, 2, 1]] + n; Fs = side
 F = np.concatenate([Ff, Fb, Fs])
 P = np.concatenate([np.stack([x, y, zf], 1), np.stack([x, y, zb], 1)]).astype(np.float32)
@@ -147,8 +161,11 @@ kind = np.concatenate([np.zeros(len(Ff)), np.ones(len(Fb)), np.full(len(Fs), 2)]
 J = {}
 for kk, (u, v) in cfg['joints'].items():
     J[kk] = np.array([X(u), Yf(v), 0.0])
-for kk in J:  # joints sit mid-depth of the body at their height
+for kk in J:  # joints sit mid-depth of the body at their height; arm joints mid-depth of the arm itself
     zf_, zb_ = sideRange(J[kk][1]); J[kk][2] = (zf_ + zb_) / 2
+    if kk[:2] in ('sh', 'el', 'wr', 'ti'):
+        near = np.linalg.norm(P[:, :2] - J[kk][:2], axis=1) < 0.025
+        if near.sum() > 4: J[kk][2] = float(np.median(P[near, 2]))
 BONES = [  # name, parent, head joint, tail joint
     ('hips', None, 'hips', 'spine'), ('spine', 'hips', 'spine', 'chest'), ('chest', 'spine', 'chest', 'neck'),
     ('neck', 'chest', 'neck', 'chin'), ('head', 'neck', 'chin', 'top'),
@@ -157,9 +174,24 @@ BONES = [  # name, parent, head joint, tail joint
 ]
 def segd(p, a, b):
     ab = b - a; t = np.clip(((p - a) @ ab) / (ab @ ab), 0, 1); return np.linalg.norm(p - (a + t[:, None] * ab), axis=1)
-dist = np.stack([segd(P, J[h], J[t]) for _, _, h, t in BONES], 1)
+# distance to each bone measured inside the front silhouette (geodesic), so a hand never binds to the
+# thigh it hangs next to, and the gown beside an arm never binds to that arm
+from skimage.graph import MCP_Geometric
+cost = np.where(cv2.dilate(M["front"].astype(np.uint8), np.ones((11, 11), np.uint8)) > 0, 1.0, 50.0)
+pj = cfg['joints']
+Uall = np.concatenate([np.where(np.isin(np.arange(n), bv), (x / px['front'] + cxf), U)] * 2)
+Vall = np.concatenate([bot['front'] - y / px['front']] * 2)
+dist = []
+for _, _, h, t in BONES:
+    (u0, v0), (u1, v1) = pj[h], pj[t]
+    L = int(max(abs(u1 - u0), abs(v1 - v0))) + 1
+    seeds = [(int(round(v0 + (v1 - v0) * i / L)), int(round(u0 + (u1 - u0) * i / L))) for i in range(L + 1)]
+    geo, _ = MCP_Geometric(cost).find_costs(seeds)
+    dist.append(ndimage.map_coordinates(geo, [Vall, Uall], order=1) * px['front'])
+dist = np.stack(dist, 1)
 # the lower body (legs inside the gown) follows the hips; the head bone owns everything above the chin
-dist[:, 0] = np.minimum(dist[:, 0], np.where(P[:, 1] < J['hips'][1], 0.0, 9))
+armMin = dist[:, [6, 7, 8, 10, 11, 12]].min(1)
+dist[:, 0] = np.minimum(dist[:, 0], np.where((P[:, 1] < J['hips'][1]) & (armMin > 0.045), 0.0, 9))
 hi = P[:, 1] > J['chin'][1] + 0.01
 dist[hi, 4] = np.minimum(dist[hi, 4], 0.0)
 sig = cfg.get('sigma', 0.028)
@@ -178,6 +210,15 @@ uvF = np.stack([(Pc[:, 0] / px['front'] + cxf), bot['front'] - Pc[:, 1] / px['fr
 uvB = np.stack([ub(Pc[:, 0]), rowOf('back', Pc[:, 1])], 1)
 uS = czs - sgn * Pc[:, 2] / px['side']
 uvS = np.stack([uS, rowOf('side', Pc[:, 1])], 1)
+# the side view must agree in colour with the front or back view there (ChatGPT's views don't always match)
+smp = cv2.GaussianBlur(sheet, (0, 0), 2).astype(np.float32)
+def col(uvc):
+    c = uvc.reshape(-1, 3, 2).mean(1)
+    return smp[np.clip(c[:, 1].round().astype(int), 0, SH - 1), np.clip(c[:, 0].round().astype(int), 0, SW - 1)]
+cS, cF, cB = col(uvS), col(uvF), col(uvB)
+near = np.minimum(np.linalg.norm(cS - cF, axis=1), np.linalg.norm(cS - cB, axis=1))
+useSide &= near < cfg.get('sideTol', 55)
+useBack = (~useSide) & (nrm[:, 2] < 0)
 k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))
 UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float32)
@@ -189,4 +230,5 @@ allm = cv2.erode((M['front'] | M['side'] | M['back']).astype(np.uint8), np.ones(
 _, (iy, ix) = ndimage.distance_transform_edt(~allm, return_indices=True)
 tex = sheet[iy, ix]
 cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
+print('head centre height', round(float(Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1])), 3))
 print('verts', len(P), 'faces', len(F), 'side faces', int(useSide.sum()))

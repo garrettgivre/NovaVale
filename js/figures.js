@@ -9,7 +9,8 @@ import { GLTFLoader } from '../vendor/GLTFLoader.js';
 
 // who -> { head: model-space height of the head centre, talk: which arm gestures ('R' | 'L') }
 export const FIG = {
-  vesper: { head: 1.66, talk: 'L', relax: 0.36 },
+  vesper: { head: 1.632, talk: 'L', relax: 0.36 },
+  cherry: { head: 1.714, talk: 'R', relax: 0.3 },
 };
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
@@ -41,7 +42,7 @@ export function buildFigure(who, HIT) {
   const rest = {}, pq = {};
   for (const k in bones) {
     rest[k] = bones[k].quaternion.clone();
-    bones[k].parent.getWorldQuaternion(qa); g.getWorldQuaternion(qb); pq[k] = qb.invert().multiply(qa).invert();
+    bones[k].parent.getWorldQuaternion(qa); g.getWorldQuaternion(qb); pq[k] = qb.clone().invert().multiply(qa).invert();
   }
   const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.9, 10), HIT); hb.position.y = 0.95; hb.userData.who = who; hb.userData.nocast = 1; g.add(hb);
   const head = new THREE.Object3D();
