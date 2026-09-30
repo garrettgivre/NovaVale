@@ -17,6 +17,12 @@ def placed(view):
 VIEWS = cfg.get('views', ['front', 'side', 'back'])
 A = {v: placed(v) for v in VIEWS}
 M = {v: (A[v] > 0.5) for v in A}
+# trim the outline inward: the paintings fade into the backdrop over the last few pixels (a pale rim round the hair),
+# and the rounded edge of the mesh stretched that rim into grey mottling
+TRIM = cfg.get('trim', 3)
+for v in M:
+    M[v] = cv2.erode(M[v].astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * TRIM + 1, 2 * TRIM + 1))) > 0
+    A[v] = np.where(M[v], np.maximum(A[v], 0.51), np.minimum(A[v], 0.49))
 for v, k_ in cfg.get('open', {}).items():   # break thin bridges to a neighbouring view
     M[v] = cv2.morphologyEx(M[v].astype(np.uint8), cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_, k_))) > 0
 for v in M:   # keep each view's main body (drops slivers of a neighbouring view's cape or train)
@@ -28,6 +34,17 @@ for v in M:   # keep each view's main body (drops slivers of a neighbouring view
         A[v] = A[v] * M[v]
 def span(m):
     ys, xs = np.nonzero(m); return ys.min(), ys.max(), xs.min(), xs.max()
+# fill small enclosed gaps (between curls, inside a glasses chain): the cutout leaves them as holes, which made holes
+# in the mesh, so the room showed through the hair as light spots
+holeInfo = {}
+for v in M:
+    holes = ndimage.binary_fill_holes(M[v]) & ~M[v]
+    lab_, nh = ndimage.label(holes)
+    if nh:
+        sizes = ndimage.sum(holes, lab_, range(1, nh + 1)); small = 1 + np.nonzero(sizes < M[v].sum() * cfg.get('holeMax', 0.02))[0]
+        fill = np.isin(lab_, small); M[v] = M[v] | fill; A[v] = np.maximum(A[v], fill * 0.6)
+        holeInfo[v] = (len(small), int(fill.sum()))
+print('holes filled', holeInfo)
 top, bot = {}, {}
 for v in M: top[v], bot[v], _, _ = span(M[v])
 px = {v: HEIGHT / (bot[v] - top[v]) for v in M}
@@ -264,6 +281,25 @@ core = cv2.erode((allm & (allA > 0.93) & ~bglike).astype(np.uint8), np.ones((3, 
 print('background', bgc.round(), 'grey pixels replaced', int((allm & ~core).sum()))
 _, (iy, ix) = ndimage.distance_transform_edt(~core, return_indices=True)
 tex = sheet[iy, ix]
+# the paintings have a pale halo where hair meets the backdrop, and the cutout calls it solid. In a band along the
+# outline, treat each pixel as a mix of the colour just inside (F) and the backdrop (B), estimate how much backdrop
+# is in it, and take it out: strand detail stays, the grey goes
+BAND = cfg.get('haloBand', 9)
+inner = cv2.erode(core.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * BAND + 1, 2 * BAND + 1))) > 0
+_, (jy, jx) = ndimage.distance_transform_edt(~inner, return_indices=True)
+Fc = cv2.GaussianBlur(sheet, (0, 0), 2.5)[jy, jx].astype(np.float32)
+band = allm & ~inner
+I = tex.astype(np.float32); FB = Fc - bgc
+a_ = np.clip(((I - bgc) * FB).sum(2) / np.maximum((FB * FB).sum(2), 1.0), 0, 1)
+af = np.maximum(a_, 0.62)[..., None]                 # never boost a pixel more than ~1.6x (that oversaturates)
+un = (I - (1 - af) * bgc) / af
+lum = lambda c: c @ np.array([0.114, 0.587, 0.299], np.float32)
+sat = lambda c: c.max(2) - c.min(2)
+fix = band & (a_ < 0.92) & (np.linalg.norm(FB, axis=2) > 25) & (lum(I) > lum(Fc) + 6) & (sat(I) < sat(Fc) - 8)   # paler and greyer than inside
+new = np.clip(un, 0, 255)
+tex = tex.copy(); tex[fix] = new[fix].astype(np.uint8)
+halo = fix
+print('halo pixels', int(halo.sum()))
 cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
 print('head centre height', round(float(Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1])), 3))
 print('verts', len(P), 'faces', len(F), 'side faces', int(useSide.sum()))

@@ -52,6 +52,16 @@ people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper,
 Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
 neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
 
+## Caching (important)
+GitHub Pages lets browsers cache files for 10 minutes, so a refresh right after a push can run old code/models. Run
+`python tools/bump.py` before committing changes to js/, css/ or assets/figures/: it stamps `?v=<time>` on every module
+(import map in index.html), the stylesheet and the figure GLBs (`ASSET_V` in figures.js).
+
+Hair edges: the paintings fade into the backdrop over the outline's last few pixels. `turn_build.py` trims every view's
+mask inward (`trim`, 3 px), fills small enclosed gaps, keeps only confident pixels and un-mixes the backdrop from a band
+along the outline (paler-and-greyer-than-inside pixels only). `headshot.py <who> <height> <tag>` renders a tele close-up
+of the head in Blender to check.
+
 ## The cast
 Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal's are cropped from her turnaround). Phone contacts Remy, Dot and Celeste also have art.
 - Velvet Regent (`regent`): drag performer, favourite to win the Revue, wears the other long white coat. Suspect-ish; cleared by Harper's recording.

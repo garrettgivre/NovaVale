@@ -23,11 +23,13 @@ export const FIG = {
   kenji: { head: 1.618, talk: 'R', relax: 0.32 },
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
+// bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
+export const ASSET_V = '202609301225';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 export function loadFigure(who, onReady) {
   if (!FIG[who] || loading[who]) return;
-  loading[who] = new GLTFLoader().loadAsync(`assets/figures/${who}.glb`).then(gl => { loaded[who] = gl.scene; onReady && onReady(who); })
+  loading[who] = new GLTFLoader().loadAsync(`assets/figures/${who}.glb?v=${ASSET_V}`).then(gl => { loaded[who] = gl.scene; onReady && onReady(who); })
     .catch(e => console.warn('figure', who, e));
 }
 
