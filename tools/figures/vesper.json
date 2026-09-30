@@ -1,0 +1,13 @@
+{
+  "name": "vesper",
+  "sheet": "refs/vesper.png",
+  "height": 1.8,
+  "step": 3,
+  "off": {"front": [69, 0], "side": [632, 0], "back": [1009, 0]},
+  "sideFaces": "left",
+  "joints": {
+    "top": [303, 20], "chin": [303, 140], "neck": [303, 192], "chest": [303, 290], "spine": [303, 370], "hips": [303, 450],
+    "shR": [220, 218], "elR": [158, 368], "wrR": [110, 470], "tipR": [100, 530],
+    "shL": [386, 218], "elL": [448, 368], "wrL": [492, 470], "tipL": [497, 530]
+  }
+}

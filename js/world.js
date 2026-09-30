@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { S, has, night } from './state.js';
 import * as T from './tex.js';
 import { buildPerson, CAST, animatePerson, castReady } from './people.js';
+import { FIG, figReady, loadFigure, buildFigure, animateFigure } from './figures.js';
 import { speech } from './ui.js';
 
 export const rooms = {};
@@ -1016,8 +1017,11 @@ export function sync() {
   rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
   for (const w in CAST) {
     const at = whereIs(w);
-    if (!at || !castReady(w)) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
-    const c = chars[w] || (chars[w] = buildPerson(w, BRASS, HIT)); // built on first appearance
+    if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync());
+    const ready = FIG[w] ? figReady(w) : castReady(w);
+    if (!at || !ready) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
+    // painted figures (from the art) replace the sculpted models where they exist
+    const c = chars[w] || (chars[w] = FIG[w] ? buildFigure(w, HIT) : buildPerson(w, BRASS, HIT)); // built on first appearance
     const R = rooms[at[0]];
     if (c.parent !== R.g) R.g.add(c);
     c.position.set(at[1], (at[3] || 0) + c.userData.yOff, at[2]);
@@ -1039,7 +1043,7 @@ export function update(dt, t, cam) {
     const want = Math.atan2(cam.position.x - c.position.x, cam.position.z - c.position.z);
     let d = want - c.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
     c.rotation.y += d * Math.min(1, dt * 0.8);
-    animatePerson(c, dt, cam, speech);
+    (c.userData.figure ? animateFigure : animatePerson)(c, dt, cam, speech);
   }
   const X = rooms.star;
   if (X && X.g.visible && X.crown.visible) X.crown.rotation.y = t * 0.3;

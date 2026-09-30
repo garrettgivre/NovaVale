@@ -35,6 +35,15 @@ Hub and spokes. The rotunda lobby is the hub; every door around it leads somewhe
 - Collectibles: eight 2003 postcards (`POSTCARDS` in world.js: room, position; `DOCS.pc1..pc8` in items.js), shown on the Journal's Postcards tab and in the ending letter. The archive bookcase holds a newspaper clipping (`DOCS.clipping`) and the Guest Wing has the crew photo (`DOCS.crewphoto`, also sets `pin_known` if you have the pin).
 - `js/state.js`: `S` (phase d1/n1/d2/n2/end, flags, inv, docs), localStorage key `novavale.aquadome.v1`, `checkpoint()`/`secondChance()`.
 
+## Painted figures (Sept 2026)
+Characters with turnaround art are real 3D models built from that art (`tools/figures/README.md`): depth-estimated front and
+back views fitted to the side silhouette, textured from the three paintings, rigged in Blender, `assets/figures/<who>.glb`.
+`js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally (arms relaxed out of the
+A-pose, breathing, sway, head follows the camera, talking arm gestures); world.js uses a figure instead of the sculpted
+people.js model whenever `FIG[who]` exists. Done: Vesper. The rest still use the sculpted models until their turnarounds exist.
+Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
+neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
+
 ## The cast
 Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal falls back to the SVG portrait). Phone contacts Remy, Dot and Celeste also have art.
 - Velvet Regent (`regent`): drag performer, favourite to win the Revue, wears the other long white coat. Suspect-ish; cleared by Harper's recording.
