@@ -118,7 +118,21 @@ def smoothRows(dct, sig):
     if vals.ndim == 1: vals = vals[:, None]
     sm = ndimage.gaussian_filter1d(vals, sig, axis=0, mode='nearest')
     return {k: (sm[i] if sm.shape[1] > 1 else sm[i, 0]) for i, k in enumerate(ks)}
+rngRaw = dict(rng)
 rng = smoothRows(rng, 3.0 / STEP * 2)
+# torso depth from the side outline, minus narrow forward/backward bumps (hands hanging in front of a coat made lumps)
+chinY = Yf(cfg['joints']['chin'][1])
+ks = sorted(rng); zFr = np.array([rng[k][0] for k in ks]); zBr = np.array([rng[k][1] for k in ks]); yr = np.array([Yf(k) for k in ks])
+win = max(3, int(0.13 / (px['front'] * STEP)))
+zFo = ndimage.maximum_filter1d(ndimage.minimum_filter1d(zFr, win), win)
+zBo = -ndimage.maximum_filter1d(ndimage.minimum_filter1d(-zBr, win), win)
+body = yr < chinY - 0.02
+zFr = np.where(body, ndimage.gaussian_filter1d(zFo, 2), zFr); zBr = np.where(body, ndimage.gaussian_filter1d(zBo, 2), zBr)
+rng = {k: (a_, b_) for k, a_, b_ in zip(ks, zFr, zBr)}
+# the face profile: raw side outline minus a smooth head curve = nose, lips, chin
+zFraw = np.array([rngRaw[k][0] for k in ks]); zFsm = ndimage.gaussian_filter1d(zFraw, max(2, 0.035 / (px['front'] * STEP)))
+profBump = {k: max(0.0, a_ - b_) for k, a_, b_ in zip(ks, zFraw, zFsm)}
+headSm = {k: b_ for k, b_ in zip(ks, zFsm)}
 zF = np.array([rng[r][0] for r in V]); zB = np.array([rng[r][1] for r in V])
 
 # front surface: per row, the nearest point of the front view sits at the side silhouette's front edge
@@ -172,7 +186,8 @@ for i in range(n):
     ne = 2.1 if y[i] > Yf(cfg['joints']['chin'][1]) - 0.02 else NEXP     # heads rounder than bodies
     sh = (1 - t ** ne) ** (1 / ne)
     if a_ <= cu2 <= b_:                      # the torso / head piece: depth from the side outline
-        c_, h_ = (zF[i] + zB[i]) / 2, (zF[i] - zB[i]) / 2
+        zf_i = headSm.get(r, zF[i]) if y[i] > chinY - 0.03 else zF[i]
+        c_, h_ = (zf_i + zB[i]) / 2, (zf_i - zB[i]) / 2
     else:                                    # a limb: round, centred in the body's depth
         c_ = (zF[i] + zB[i]) / 2; h_ = min(hw * px['front'], (zF[i] - zB[i]) / 2)
     hullF[i] = c_ + h_ * sh; hullB[i] = c_ - h_ * sh
@@ -185,8 +200,13 @@ def gsm(z, sig):   # smooth a per-vertex value over the grid (the outline's wigg
     g = np.zeros(inside.shape, np.float32); g[inside] = z; w_ = inside.astype(np.float32)
     return (cv2.GaussianBlur(g, (0, 0), sig) / np.maximum(cv2.GaussianBlur(w_, (0, 0), sig), 1e-6))[inside]
 hullF, hullB = gsm(hullF, cfg.get('hullSmooth', 3.0)), gsm(hullB, cfg.get('hullSmooth', 3.0))
+# sculpt the face: the profile's nose/lips/chin stand out along the middle of the face, nose-width
+faceTop = Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1]) + 0.045
+faceRows = (y > chinY - 0.015) & (y < faceTop)
+pb = np.array([profBump.get(int(v), 0.0) for v in V])
+
 headV = y > Yf(cfg['joints']['chin'][1]) - 0.03
-lim = np.where(headV, 0.014, 0.007)                  # a little relief on the face, very little on clothes
+lim = np.where(headV, 0.006, 0.007)                  # a little relief on the face, very little on clothes
 detF, detB = np.clip(gsm(hp(zf), 1.0), -lim, lim), np.clip(gsm(hp(zb), 1.0), -lim, lim)
 zf = np.minimum(hullF + detF, zF); zb = np.maximum(hullB + detB, zB)
 bad = zf - zb < 0.003; zm = (hullF + hullB) / 2; zf[bad] = zm[bad] + 0.0015; zb[bad] = zm[bad] - 0.0015
@@ -196,6 +216,28 @@ def smooth(z):
     gs = cv2.GaussianBlur(g, (0, 0), cfg.get('zsmooth', 2.0)); ws = cv2.GaussianBlur(wgt, (0, 0), cfg.get('zsmooth', 2.0))
     return (gs / np.maximum(ws, 1e-6))[inside]
 zf, zb = smooth(zf), smooth(zb)
+# ---- sculpt the face: run the depth model on a close crop of the face (at body scale a face is ~100 px and comes out
+# flat), keep the mid/fine detail (nose, brow, eye sockets, cheekbones, lips, chin), scale it so the nose stands
+# ~FACE_D proud of the cheeks, and add it to the front surface inside a soft oval over the face
+jfc, jch = cfg['joints'].get('face', cfg['joints']['chin']), cfg['joints']['chin']
+fcy = (jfc[1] + jch[1]) / 2 - 0.1 * (jch[1] - jfc[1]); ry = max(12.0, (jch[1] - jfc[1]) * 1.55); rx = ry * cfg.get('faceAspect', 0.74)
+half = int(ry * 1.35); cxI, cyI = int(round(cxf)), int(round(fcy))
+bx0, bx1, by0, by1 = max(0, cxI - half), min(SW, cxI + half), max(0, cyI - half), min(SH, cyI + half)
+crop = cv2.cvtColor(sheet[by0:by1, bx0:bx1], cv2.COLOR_BGR2RGB).astype(np.float32) / 255
+al_ = A['front'][by0:by1, bx0:bx1, None]; crop = crop * al_ + 0.5 * (1 - al_)
+inp = (cv2.resize(crop, (518, 518), interpolation=cv2.INTER_CUBIC) - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+fd = sess.run(None, {sess.get_inputs()[0].name: inp.transpose(2, 0, 1)[None].astype(np.float32)})[0][0]
+fd = cv2.resize(fd, (bx1 - bx0, by1 - by0), interpolation=cv2.INTER_CUBIC)
+fdet = fd - cv2.GaussianBlur(fd, (0, 0), (bx1 - bx0) * 0.16)
+yy, xx = np.mgrid[by0:by1, bx0:bx1]; ell = ((xx - cxf) / rx) ** 2 + ((yy - fcy) / ry) ** 2
+inner = ell < 0.55
+sc_ = cfg.get('faceDepth', 0.03) / max(np.percentile(fdet[inner], 99.5), 1e-4)
+fdet = np.clip(fdet * sc_, -0.025, 0.04)
+feather = np.clip((1.0 - ell) / 0.35, 0, 1); feather = feather * feather * (3 - 2 * feather)
+relief = np.zeros((SH, SW), np.float32); relief[by0:by1, bx0:bx1] = fdet * feather * (A['front'][by0:by1, bx0:bx1] > 0.5)
+fr_ = ndimage.map_coordinates(relief, [V, U], order=1)
+zf = zf + fr_
+print('face relief: nose', round(float(fr_.max()), 3), 'm, sockets', round(float(fr_.min()), 3), 'm')
 print('scale', sF, sB, 'depth', zf.max(), zb.min())
 
 # ---- triangles
@@ -302,7 +344,7 @@ top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.s
 # ---- per-corner UVs: front view, back view, or side view, by face normal
 p0, p1, p2 = P[F[:, 0]], P[F[:, 1]], P[F[:, 2]]
 nrm = np.cross(p1 - p0, p2 - p0); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
-armV = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12])
+armV = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12]) & (P[:, 1] < min(J['shR'][1], J['shL'][1]) - 0.12)   # shoulders may use the side view
 # side views only colour faces near the outline; steep steps inside the body (a coat edge over trousers) keep the front/back
 dtv = np.concatenate([dt, dt])
 useSide = (np.abs(nrm[:, 0]) > cfg.get('sideAt', 0.8)) & ~armV[F].any(1) & (dtv[F].max(1) < cfg.get('sideBand', 0.08))
@@ -331,6 +373,14 @@ zFa, zBa = np.concatenate([zF, zF]), np.concatenate([zB, zB])
 frac = ((P[:, 2] - zBa) / np.maximum(zFa - zBa, 1e-3))[F].mean(1)
 useSide |= headF & (np.abs(nrm[:, 0]) > 0.7) & (frac < 0.62)     # the face (front third) keeps the front painting
 useSide &= ~(headF & (frac >= 0.62))
+headSide = headF & (np.abs(nrm[:, 0]) > 0.55) & (frac < 0.62)     # the head: purely by which way it faces
+headSide |= ~headF & (np.abs(nrm[:, 0]) > 0.8) & (near < cfg.get('sideTol', 55)) & ~armV[F].any(1)   # steep body sides
+useSide |= headSide
+for _ in range(cfg.get('sideSmooth', 3)):
+    acc = np.zeros(len(P)); cnt = np.zeros(len(P))
+    np.add.at(acc, F.ravel(), np.repeat(useSide.astype(float), 3)); np.add.at(cnt, F.ravel(), 1)
+    useSide = ((acc / np.maximum(cnt, 1))[F].mean(1) > 0.5) | headSide
+useSide = (useSide | headSide) & ~(headF & (frac >= 0.62)) & ~armV[F].any(1)
 useBack = (~useSide) & (nrm[:, 2] < 0)
 k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))

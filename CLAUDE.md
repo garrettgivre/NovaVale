@@ -62,6 +62,12 @@ always keeps the front painting (otherwise the profile's eye and nose landed on 
 surfaces meeting at the front outline) made lens-shaped blobs from the side. Next step if needed: a better head/face
 profile at 90° (the face is still mostly front-textured).
 
+Faces are sculpted by a second depth pass on a close crop of the face (`faceDepth` 0.03: the nose stands ~3 cm proud of
+the cheeks, eye sockets up to 2.5 cm in), band-passed and added inside a soft oval (`faceAspect`), on top of the head's
+smooth base (the side outline with the nose/lips smoothed out). Head sides take the side painting by facing direction
+(>55°, never the front third of the head's depth); steep body sides (>~37°) too where the colours agree; shoulders may,
+arms below the shoulders never. `heads3.py <who> <height>` renders head close-ups at 0/45/90 to check.
+
 ## Walking and facing
 Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
 thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
