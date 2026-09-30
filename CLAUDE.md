@@ -55,7 +55,10 @@ neutral expression, empty hands, flat even studio lighting, plain light grey bac
 ## Figure shape (visual hull)
 Each row of the front outline is split into pieces (torso/head, arms, legs). Every piece gets a rounded-box cross-section
 (`boxy` exponent 2.6): the torso/head piece's depth is the side outline at that height (so the side profile matches the
-side painting), limbs are round. The depth estimate only adds high-passed detail (±2 cm). The old method (front/back depth
+side painting), limbs are round. Heads use a rounder exponent (2.1). Cross-sections are smoothed over the grid (`hullSmooth` 3) so outline wiggles don't
+make lumps; the depth estimate only adds high-passed detail (±0.7 cm on clothes, ±1.4 cm on the face). Head texturing:
+sides and back of the head come from the side painting (faces turned >45°), but the front third of the head's depth
+always keeps the front painting (otherwise the profile's eye and nose landed on the cheeks). The old method (front/back depth
 surfaces meeting at the front outline) made lens-shaped blobs from the side. Next step if needed: a better head/face
 profile at 90° (the face is still mostly front-textured).
 

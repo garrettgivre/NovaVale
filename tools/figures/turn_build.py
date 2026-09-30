@@ -169,7 +169,8 @@ for i in range(n):
     r = int(V[i]); u = U[i]; ss = segRow.get(r, [])
     sg = min(ss, key=lambda q: 0 if q[0] <= u <= q[1] else min(abs(u - q[0]), abs(u - q[1]))) if ss else (u - 1, u + 1)
     a_, b_ = sg; hw = max((b_ - a_) / 2, 1.0); t = min(abs(u - (a_ + b_) / 2) / hw, 1.0)
-    sh = (1 - t ** NEXP) ** (1 / NEXP)
+    ne = 2.1 if y[i] > Yf(cfg['joints']['chin'][1]) - 0.02 else NEXP     # heads rounder than bodies
+    sh = (1 - t ** ne) ** (1 / ne)
     if a_ <= cu2 <= b_:                      # the torso / head piece: depth from the side outline
         c_, h_ = (zF[i] + zB[i]) / 2, (zF[i] - zB[i]) / 2
     else:                                    # a limb: round, centred in the body's depth
@@ -179,8 +180,14 @@ for i in range(n):
 def hp(z):
     g = np.zeros(inside.shape, np.float32); g[inside] = z; w_ = inside.astype(np.float32)
     lo = cv2.GaussianBlur(g, (0, 0), 6) / np.maximum(cv2.GaussianBlur(w_, (0, 0), 6), 1e-6)
-    return np.clip(z - lo[inside], -0.02, 0.02)
-detF, detB = hp(zf), hp(zb)
+    return z - lo[inside]
+def gsm(z, sig):   # smooth a per-vertex value over the grid (the outline's wiggles made every row a little different)
+    g = np.zeros(inside.shape, np.float32); g[inside] = z; w_ = inside.astype(np.float32)
+    return (cv2.GaussianBlur(g, (0, 0), sig) / np.maximum(cv2.GaussianBlur(w_, (0, 0), sig), 1e-6))[inside]
+hullF, hullB = gsm(hullF, cfg.get('hullSmooth', 3.0)), gsm(hullB, cfg.get('hullSmooth', 3.0))
+headV = y > Yf(cfg['joints']['chin'][1]) - 0.03
+lim = np.where(headV, 0.014, 0.007)                  # a little relief on the face, very little on clothes
+detF, detB = np.clip(gsm(hp(zf), 1.0), -lim, lim), np.clip(gsm(hp(zb), 1.0), -lim, lim)
 zf = np.minimum(hullF + detF, zF); zb = np.maximum(hullB + detB, zB)
 bad = zf - zb < 0.003; zm = (hullF + hullB) / 2; zf[bad] = zm[bad] + 0.0015; zb[bad] = zm[bad] - 0.0015
 # smooth along the grid (depth noise)
@@ -319,6 +326,11 @@ def col(uvc):
 cS, cF, cB = col(uvS), col(uvF), col(uvB)
 near = np.minimum(np.linalg.norm(cS - cF, axis=1), np.linalg.norm(cS - cB, axis=1))
 useSide &= near < cfg.get('sideTol', 55)
+headF = (P[:, 1] > Yf(cfg['joints']['chin'][1]) - 0.03)[F].all(1)
+zFa, zBa = np.concatenate([zF, zF]), np.concatenate([zB, zB])
+frac = ((P[:, 2] - zBa) / np.maximum(zFa - zBa, 1e-3))[F].mean(1)
+useSide |= headF & (np.abs(nrm[:, 0]) > 0.7) & (frac < 0.62)     # the face (front third) keeps the front painting
+useSide &= ~(headF & (frac >= 0.62))
 useBack = (~useSide) & (nrm[:, 2] < 0)
 k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))
