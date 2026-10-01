@@ -198,8 +198,43 @@ export function contradiction(cards, answer, done, onWrong) {
     b.classList.toggle('on', pick.has(k)); go.disabled = pick.size !== 2;
   });
   go.onclick = () => {
-    if (answer.every(k => pick.has(k))) { sfx('solve'); closePanel(true); done(); return; }
+    // answer: one pair, or a list of pairs that each prove the lie
+    const pairs = Array.isArray(answer[0]) ? answer : [answer];
+    if (pairs.some(p => p.every(k => pick.has(k)))) { sfx('solve'); closePanel(true); done(); return; }
     shake(body.querySelector('.ev-grid')); onWrong && onWrong([...pick]);
+  };
+}
+
+// ---------- Silas's tape, frame by frame: freeze the frame where the flashlight swings back across the coat ----------
+export function tapeScrub(done) {
+  const N = 40, HIT = [21, 25];   // frames 11:51:50 .. 11:52:30; the beam crosses the coat around 11:52:11-15
+  const frame = f => {
+    const t = f / (N - 1), x = 40 + t * 220, beam = f >= HIT[0] && f <= HIT[1] ? -1 : 1, lit = beam < 0;
+    const sec = 50 + f, mm = 51 + Math.floor(sec / 60), ss = String(sec % 60).padStart(2, '0');
+    const bx = x + 14 * beam, by = 64;
+    return `<svg viewBox="0 0 320 200" class="tp-svg"><rect width="320" height="200" fill="#0b0d10"/>
+      <ellipse cx="160" cy="150" rx="70" ry="14" fill="#1a1f22"/><rect x="146" y="96" width="28" height="52" fill="#161a1c"/><ellipse cx="160" cy="96" rx="34" ry="7" fill="#1d2326"/>
+      <rect x="250" y="112" width="34" height="42" fill="#15181a"/><rect x="246" y="104" width="42" height="10" fill="#1b1f21"/>
+      <path d="M${bx} ${by} L${bx + 150 * beam} ${by + 30} L${bx + 150 * beam} ${by + 90} Z" fill="rgba(255,250,225,${lit ? .22 : .16})"/>
+      <g transform="translate(${x} 0)"><path d="M-9 44 Q0 34 9 44 L13 150 L-13 150 Z" fill="${lit ? '#9d86b0' : '#222327'}"/><circle cx="0" cy="34" r="8" fill="${lit ? '#3a3036' : '#1c1d20'}"/>
+      ${lit ? '<path d="M-4 58 l1.3 3.6 3.8.1-3 2.4 1.1 3.7-3.2-2.2-3.2 2.2 1.1-3.7-3-2.4 3.8-.1z" fill="#e8c060"/>' : ''}<rect x="${beam > 0 ? 8 : -14}" y="${by - 4}" width="6" height="5" fill="#ccc"/></g>
+      <text x="12" y="22" fill="#e04040" font-family="VT323, monospace" font-size="16">● REC</text>
+      <text x="206" y="190" fill="#e8e8d8" font-family="VT323, monospace" font-size="16">TUE 11:${mm}:${ss} PM</text>
+      <rect width="320" height="200" fill="url(#tpscan)"/><defs><pattern id="tpscan" width="2" height="3" patternUnits="userSpaceOnUse"><rect width="2" height="1" fill="rgba(255,255,255,.04)"/></pattern></defs></svg>`;
+  };
+  let f = 0;
+  const body = panel(`<div class="tp"><p>${junior() ? 'Step through the tape. Freeze it on the frame where the flashlight lights up the coat.' : 'Find the frame that shows the coat.'}</p>
+    <div class="tp-scr" id="tpscr">${frame(0)}</div>
+    <div class="tp-row"><button class="btn" id="tpb">◀ Frame</button><input type="range" min="0" max="${N - 1}" value="0" id="tpr"><button class="btn" id="tpf">Frame ▶</button></div>
+    <button class="btn" id="tpgo">Freeze this frame</button></div>`, { cls: 'doc', title: 'Static Hour: Tuesday, 11:52' });
+  const scr = body.querySelector('#tpscr'), r = body.querySelector('#tpr');
+  const show = () => { scr.innerHTML = frame(f); r.value = f; };
+  r.oninput = () => { f = +r.value; show(); };
+  body.querySelector('#tpb').onclick = () => { sfx('click'); f = Math.max(0, f - 1); show(); };
+  body.querySelector('#tpf').onclick = () => { sfx('click'); f = Math.min(N - 1, f + 1); show(); };
+  body.querySelector('#tpgo').onclick = () => {
+    if (f >= HIT[0] && f <= HIT[1]) { sfx('solve'); closePanel(true); done(); }
+    else { shake(scr); toast(junior() ? 'Too dark. Keep stepping: the beam swings back at some point.' : 'Too dark.'); }
   };
 }
 

@@ -90,6 +90,10 @@ Suite 2 advances once `REST_NEED` is met.
   (`musicBox`) → the real star (the Star's Tear, sold from the Morimoto family in 1946) and Kenji's letter. Confront him:
   police = bad ending "Wrong Call"; otherwise he tells Celeste, the crown wears his replica, the stone goes home. Ending
   letter from Celeste.
+- Optional threads (Oct 2026): Silas's tape frame by frame (`tapeScrub`, flag `tape_pin`: lavender coat, brass star pin);
+  gala day: Harper's Monday room tone (`harper_monday`, a second way to solve the evidence board: harper vs repairlog),
+  Rashad's detective rules by progress, Priya identifying the Star's Tear (`priya_star`); Night 1: the boathouse window is
+  lit and Nate talks about it (`boat_light`, sequel hook).
 - Second Chance (checkpoints before risky choices) on every bad ending. Junior/Senior difficulty changes hints and task
   wording. Eight optional 2003 postcards, a newspaper clipping, the crew photo.
 

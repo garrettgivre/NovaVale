@@ -3874,7 +3874,7 @@ export function sync() {
   X.crown.visible = !has('crown_back');
   L.caseCrown.visible = has('crown_back');
   for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
-  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0;
+  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0; rooms.terrace.bhGlass.emissiveIntensity = night() ? 1.3 : 0;   // someone's in the boathouse at night
   for (const w in CAST) {
     const at = whereIs(w);
     if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync(), at[0] === curRoom);

@@ -375,3 +375,9 @@ body.talking #joy, body.paneled #joy { opacity: 0; pointer-events: none; }
 .mb-p.on { background: radial-gradient(circle at 40% 35%, #fff4c8, #e8c050 40%, #8a6420); }
 .mb-bars { display: flex; justify-content: space-around; padding-left: 28px; font-size: 11px; color: #3a2a10; font-family: var(--caps); }
 canvas#c.c-walk { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><ellipse cx='11' cy='19' rx='4' ry='6.5' fill='%23efe4c8' stroke='%232a1e14' stroke-width='1.5'/><ellipse cx='21' cy='12' rx='4' ry='6.5' fill='%23efe4c8' stroke='%232a1e14' stroke-width='1.5'/></svg>") 16 16, pointer; }
+/* Silas's tape, frame by frame */
+.tp-scr { margin: 10px auto; max-width: 480px; border: 6px solid #1a1a1a; border-radius: 6px; box-shadow: inset 0 0 0 1px #333, 0 3px 10px rgba(0,0,0,.5); background: #000; }
+.tp-svg { display: block; width: 100%; height: auto; }
+.tp-row { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 8px 0 12px; }
+.tp-row input[type=range] { flex: 1; max-width: 280px; accent-color: var(--gold); }
+.tp { text-align: center; }
