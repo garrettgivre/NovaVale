@@ -24,7 +24,7 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609301933';
+export const ASSET_V = '202609301946';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 export function loadFigure(who, onReady) {
@@ -175,7 +175,7 @@ export function animateFigure(g, dt, cam, speech) {
     pose(u, 'shoulder' + s, [[Zax, side * 0.015 * br2]]);
     // relaxed: arm down (in the picture plane), a little forward; talking: out to the side and forward
     pose(u, 'upper' + s, [[Zax, side * (R * (1 - act * .35) - open * 0.35 + idle)], [X, -0.06 - lift * 0.3]]);
-    pose(u, 'fore' + s, [[X, -0.18 - lift * 0.55 - act * 0.25 - act * 0.08 * Math.sin(t * 4.1 + side)], [Zax, side * (0.06 - open * 0.45)]]);
-    pose(u, 'hand' + s, [[X, -0.06 - act * 0.12 * Math.sin(t * 3.3 + side)], [Zax, -side * open * 0.2]]);
+    pose(u, 'fore' + s, [[X, -0.1 - lift * 0.4 - act * 0.15 - act * 0.05 * Math.sin(t * 4.1 + side)], [Zax, side * (0.04 - open * 0.35)]]);
+    pose(u, 'hand' + s, [[X, -0.03 - act * 0.08 * Math.sin(t * 3.3 + side)], [Zax, -side * open * 0.12]]);
   }
 }

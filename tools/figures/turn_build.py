@@ -337,7 +337,9 @@ for s_, js in (('R', (6, 7, 8)), ('L', (10, 11, 12))):
 hi = P[:, 1] > J['chin'][1] + 0.01
 dist[hi, 4] = np.minimum(dist[hi, 4], 0.0)
 sig = cfg.get('sigma', 0.028)
-W = np.exp(-(dist - dist.min(1, keepdims=True)) / sig)
+# arm joints blend over a short stretch (a long blend made elbows bend like rubber); the body stays soft
+sigv = np.full(len(BONES), sig); sigv[[6, 7, 8, 10, 11, 12]] = cfg.get('armSigma', 0.013)
+W = np.exp(-(dist - dist.min(1, keepdims=True)) / sigv)
 # shoulders (clavicles) only take a little
 W[:, [5, 9]] *= 0.35
 top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.sum(1, keepdims=True)
@@ -407,7 +409,7 @@ pxu, pxv = vF[:, 0] * (SW - 1), (1 - vF[:, 1]) * (SH - 1)
 ellV = ((pxu - cxf) / rx) ** 2 + ((pxv - fcy) / ry) ** 2
 # the face stays front-painted: no side painting in the front part of the head's depth near the face (the side
 # paintings' profile eye and nose would land on the cheeks); ears and the back half of the head do take it
-faceZone = ss_(0.5, 0.64, fracV) * ss_(2.2, 1.4, ellV)
+faceZone = np.maximum(ss_(0.36, 0.5, fracV), ss_(0.5, 0.64, fracV) * ss_(2.2, 1.4, ellV))   # only hair/ears behind the face
 wS *= np.where(headVv, 1 - faceZone, 1.0)
 armVv = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12]) & (P[:, 1] < min(J['shR'][1], J['shL'][1]) - 0.12)
 wS *= ~armVv                                                           # arms: side views show hair/body over them

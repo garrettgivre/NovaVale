@@ -76,6 +76,10 @@ is zero on the face (front part of the head's depth within a widened face oval: 
 eye/nose land on the cheeks), zero on arms below the shoulders, and on the body only where the side painting's colour
 agrees (the side paintings show arms hanging over the torso).
 
+Arm bones blend over a short stretch (`armSigma` 0.013 vs 0.028 for the body) so elbows bend cleanly; talking gestures
+are kept small (forearm lift ≤ ~0.55 rad). Head side texture only behind the face (fracV < ~0.45 of the head's depth),
+else the side paintings left a ghost face behind the cheek. `posetest2.py <who>` renders a gesture pose at 20°/70°.
+
 ## Walking and facing
 Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
 thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
