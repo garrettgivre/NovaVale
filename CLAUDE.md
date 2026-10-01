@@ -129,6 +129,8 @@ still use the old sculpted models; their turnaround sheets are the next thing to
   opens from the notebook's People page.
 
 ## Testing
+- Raycasts use three-mesh-bvh (`vendor/three-mesh-bvh.js`, `accelerate()` in main.js builds a tree for every static room mesh after `buildWorld`; meshes added later get none). Walking rays use layer 2 (room meshes only, not people). Merged static meshes without a BVH made walking drop to 30 fps on the terrace.
+- Lost WebGL context (switching apps on a phone): index.html makes every 2D canvas `willReadFrequently` (memory-backed, survives backgrounding); main.js rebuilds the env maps on restore (`rebuildEnv`) and reloads into the save if a probe canvas was wiped. Test with `WEBGL_lose_context`.
 - Draw-call budget: views run ~150-430 calls/frame (`__dbg.renderer.info`); merge static meshes per material (`mergeGeometries`) and instance repeats when adding detail. `__dbg.view(node)` jumps to a camera spot instantly.
 - Serve locally: `python -m http.server 8777` from the repo root. In the Claude desktop app, `.claude/launch.json`
   (git-ignored) holds `{"version":"0.0.1","configurations":[{"name":"aquadome","runtimeExecutable":"python","runtimeArgs":["-m","http.server","8777"],"port":8777}]}`.

@@ -2,7 +2,8 @@
 // the first-person camera at fixed spots, conversation close-ups, input, the main loop.
 import * as THREE from 'three';
 import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
-import { buildWorld, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
+import { computeBoundsTree, acceleratedRaycast } from '../vendor/three-mesh-bvh.js';
+import { buildWorld, rebuildEnv, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
 import { FIG } from './figures.js';
 import * as story from './story.js';
@@ -270,7 +271,9 @@ addEventListener('blur', () => KEYS.clear());
   joy.addEventListener('pointerup', end); joy.addEventListener('pointercancel', end);
   if (matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
 }
-const walkRay = new THREE.Raycaster(), _o = new THREE.Vector3(), _d = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+const walkRay = new THREE.Raycaster();
+const _o = new THREE.Vector3(), _d = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
+walkRay.layers.set(2);   // the room only, never the people
 const solid = h => { if (!h.object.visible || !h.object.material || h.object.material.visible === false) return false; for (let o = h.object; o; o = o.parent) { if (!o.visible) return false; if (o.userData.who) return false; } return true; };
 // can the camera stand at (x, z)? nothing in the way at knee, waist and eye height, floor underfoot, nobody too close
 function clear(x, z, dx, dz, R) {
@@ -446,6 +449,36 @@ function loop() {
   renderer.setRenderTarget(null); post.uniforms.uT.value = t; renderer.render(postScene, postCam);
 }
 
+// ---------- Fast raycasts ----------
+// Rooms merge their static pieces into big meshes, so a plain raycast tests tens of thousands of triangles; walking
+// casts four rays a frame. A bounding-volume tree per static mesh makes each ray cheap. People are left out of layer 2.
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+function accelerate() {
+  for (const k in rooms) rooms[k].g.traverse(o => {
+    if (!o.isMesh) return;
+    o.layers.enable(2);
+    const g = o.geometry, n = g && (g.index ? g.index.count : g.attributes.position && g.attributes.position.count) / 3;
+    if (!o.isSkinnedMesh && !o.isInstancedMesh && !g.boundsTree && n > 300 && !g.attributes.position.isInterleavedBufferAttribute) {
+      try { g.computeBoundsTree(); } catch (e) { }
+    }
+  });
+}
+
+// ---------- Lost WebGL context (phones drop it when you switch apps) ----------
+// three.js restores itself and re-uploads textures; the environment maps are render targets, so rebuild them. Some
+// phones also wipe 2D canvases while the app is in the background (canvas textures would come back black): a small
+// probe canvas detects that, and then the page reloads into the saved game.
+const probe = document.createElement('canvas'); probe.width = probe.height = 2;
+const pctx = probe.getContext('2d', { willReadFrequently: true }); pctx.fillStyle = '#ff0000'; pctx.fillRect(0, 0, 2, 2);
+const wiped = () => { try { return pctx.getImageData(0, 0, 1, 1).data[0] < 200; } catch (e) { return false; } };
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); try { save(); } catch (err) { } }, false);
+canvas.addEventListener('webglcontextrestored', () => {
+  if (wiped()) { location.reload(); return; }
+  try { rebuildEnv(renderer); } catch (e) { location.reload(); }
+}, false);
+addEventListener('visibilitychange', () => { if (document.hidden) { try { save(); } catch (e) { } } });
+
 // ---------- Title ----------
 function title() {
   V.title = true;
@@ -486,9 +519,10 @@ const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novav
   document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';
 }, () => { if (V.node) sync(); }, Object.keys(FIG))).then(() => setTimeout(() => {
   buildWorld(scene, renderer);
+  accelerate();
   showRoom('lobby'); place('L1'); sync();
   loop();
   document.getElementById('boot').remove();
   title();
 }, 30));
-window.__dbg = { S, renderer, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };
+window.__dbg = { S, renderer, rooms, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };

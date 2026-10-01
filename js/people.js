@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { MarchingCubes } from '../vendor/MarchingCubes.js';
 
-const VERSION = 'cast-31';
+const VERSION = 'cast-32';
 
 // ---------- SDF kit ----------
 const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
@@ -699,7 +699,7 @@ async function generate(who) {
   const o = CAST[who], J = joints(o), b = body(o, J), caps = capsules(J), out = [];
   const yieldUI = () => new Promise(r => setTimeout(r, 0));
   // two aligned body grids (same spacing) split at y 0.74: identical triangles where they overlap, so no seam
-  const ST = 0.0095, SPLIT = 0.74, UP = [[0, 1.14, 0.01], 46 * ST, 92], LO = [[0, 1.14 - 80 * ST, 0.01], 42 * ST, 84];
+  const ST = 0.0095, SPLIT = 0.74, UP = [[0, 1.14, 0.01], 46 * ST, 66], LO = [[0, 1.14 - 80 * ST, 0.01], 42 * ST, 60];
   const both = (sdf, paint) => join(polygonise(sdf, LO[0], LO[1], LO[2], paint, y => y < SPLIT, 0.6), polygonise(sdf, UP[0], UP[1], UP[2], paint, y => y >= SPLIT, 0.6));
   const skinBase = solid(o.skin, 0.08, 150), skinPaint = o.skinPaint ? o.skinPaint(skinBase) : skinBase;
   const sp = o.skinParts(b); if (sp) { out.push({ mat: { kind: 'skin' }, ...weigh(both(sp, skinPaint), caps) }); await yieldUI(); }
@@ -708,7 +708,7 @@ async function generate(who) {
     const H = handSDF(J, s), Wf = H.W;
     const wrist = p => { const t = ss(Wf[1] + 0.012, Wf[1] - 0.012, p[1]); return [[BI[s > 0 ? 'handR' : 'handL'], t + 1e-4], [BI[s > 0 ? 'foreR' : 'foreL'], 1 - t + 1e-4]]; };
     const hp = o.handColor ? solid(o.handColor, 0.06) : skinBase;
-    out.push({ mat: o.handColor ? { kind: 'cloth', roughness: 0.5, sheen: 0.8 } : { kind: 'skin' }, ...weigh(polygonise(H.sdf, [Wf[0] + s * 0.004, Wf[1] - 0.07, Wf[2] + 0.015], 0.086, 50, hp, null, 0.8), null, wrist) });
+    out.push({ mat: o.handColor ? { kind: 'cloth', roughness: 0.5, sheen: 0.8 } : { kind: 'skin' }, ...weigh(polygonise(H.sdf, [Wf[0] + s * 0.004, Wf[1] - 0.07, Wf[2] + 0.015], 0.086, 40, hp, null, 0.8), null, wrist) });
   }
   await yieldUI();
   const headW = p => {
@@ -717,10 +717,10 @@ async function generate(who) {
     const nk = ss(-0.07, -0.12, y);
     return [[BI.jaw, jaw * (1 - nk) + 1e-4], [BI.head, (1 - jaw) * (1 - nk) + 1e-4], [BI.neck, nk + 1e-4]];
   };
-  out.push({ mat: { kind: 'skin' }, ...weigh(polygonise(at(headSDF(o), HC), [0, HC[1] - 0.02, HC[2]], 0.165, 88, atP(paintHead(o), HC), null, 1), null, headW) });
+  out.push({ mat: { kind: 'skin' }, ...weigh(polygonise(at(headSDF(o), HC), [0, HC[1] - 0.02, HC[2]], 0.165, 72, atP(paintHead(o), HC), null, 1), null, headW) });
   await yieldUI();
   const hb = o.hairBox, hp = o.hairPaintFn ? o.hairPaintFn() : hairPaint(o.hairC, 0.22, o.hairTip);
-  out.push({ mat: { kind: 'hair', color: o.hairC, ...(o.hairMat || {}) }, ...weigh(polygonise(at(o.hair(), HC), [hb[0][0] + HC[0], hb[0][1] + HC[1], hb[0][2] + HC[2]], hb[1], 80, atP(hp, HC), null, 0.35), null, () => [[BI.head, 1]]) });
+  out.push({ mat: { kind: 'hair', color: o.hairC, ...(o.hairMat || {}) }, ...weigh(polygonise(at(o.hair(), HC), [hb[0][0] + HC[0], hb[0][1] + HC[1], hb[0][2] + HC[2]], hb[1], 60, atP(hp, HC), null, 0.35), null, () => [[BI.head, 1]]) });
   return out;
 }
 

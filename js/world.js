@@ -3254,14 +3254,14 @@ function buildTerrace() {
   });
 
   // ----- balustrade with newel posts, open for the three paths -----
-  const BAL = [[-9, -4, -4.4, -4], [-2.4, -4, -1.4, -4], [1.4, -4, 9, -4], [-9, -4, -9, 7], [9, -4, 9, 7]];
+  const BAL = [[-9, -4, -4.4, -4], [-2.4, -4, -0.25, -4], [2.45, -4, 9, -4], [-9, -4, -9, 7], [9, -4, 9, 7]];
   for (const [x0, z0, x1, z1] of BAL) {
     const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0), n = Math.round(len / 0.3), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     b.box(0.26, 0.1, len, mStone, cx, 0.1, cz, ang, 1.5); b.box(0.3, 0.07, len, mStone, cx, 0.035, cz, ang, 1.5);
     b.box(0.25, 0.1, len, mStone, cx, 0.87, cz, ang, 1.5); b.box(0.31, 0.05, len, mStone, cx, 0.945, cz, ang, 1.5);
     for (let i = 1; i < n; i++) { const t = i / n; b.lathe([[0.001, 0], [0.06, 0], [0.06, 0.04], [0.04, 0.1], [0.032, 0.16], [0.07, 0.33], [0.075, 0.37], [0.04, 0.45], [0.04, 0.55], [0.06, 0.62], [0.001, 0.62]], mStone, x0 + (x1 - x0) * t, 0.15, z0 + (z1 - z0) * t, 10); }
   }
-  for (const [x, z] of [[-9, -4], [-4.4, -4], [-2.4, -4], [-1.4, -4], [1.4, -4], [4.6, -4], [9, -4], [-9, 1.5], [9, 1.5], [-9, 7], [9, 7]]) {
+  for (const [x, z] of [[-9, -4], [-4.4, -4], [-2.4, -4], [-0.25, -4], [2.45, -4], [5.7, -4], [9, -4], [-9, 1.5], [9, 1.5], [-9, 7], [9, 7]]) {
     b.box(0.36, 1.0, 0.36, mStone, x, 0.5, z, 0, 1.5); b.box(0.44, 0.08, 0.44, mStone, x, 1.04, z, 0, 1.5); b.box(0.3, 0.1, 0.3, mStone, x, 0.12, z, 0, 1.5);
     b.add(new THREE.SphereGeometry(0.13, 10, 8), mStone, x, 1.2, z); b.cyl(0.07, 0.1, 0.08, mStone, x, 1.12, z, 10);
   }
@@ -3269,7 +3269,7 @@ function buildTerrace() {
   // ----- lamp posts (lit at night, with pools of light) -----
   const poolM = new THREE.MeshBasicMaterial({ map: terPoolTex('255,196,120'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2 });
   const pools = [];
-  const LAMPS = [[-8.6, -3.6], [8.6, -3.6], [-1.8, -4.2], [1.8, -4.2], [2.75, -10.2]];
+  const LAMPS = [[-8.6, -3.6], [8.6, -3.6], [-0.7, -4.25], [2.9, -4.25], [2.75, -10.2]];
   for (const [x, z] of LAMPS) {
     b.lathe([[0.001, 0], [0.21, 0], [0.21, 0.08], [0.16, 0.14], [0.12, 0.26], [0.1, 0.42], [0.06, 0.55], [0.045, 0.7], [0.045, 2.3], [0.07, 2.36], [0.07, 2.42], [0.05, 2.46], [0.06, 2.5], [0.001, 2.5]], IRON, x, 0, z, 14);
     b.box(0.3, 0.04, 0.3, IRON, x, 2.52, z); b.box(0.24, 0.36, 0.24, lampM, x, 2.72, z);
@@ -3540,6 +3540,8 @@ function envMap(renderer, isNight) {
   const pm = new THREE.PMREMGenerator(renderer), rt = pm.fromScene(es, 0.04); pm.dispose();
   return rt.texture;
 }
+
+export function rebuildEnv(renderer) { envDay = envMap(renderer, false); envNight = envMap(renderer, true); applyTime(); }
 
 export function buildWorld(sc, renderer) {
   scene = sc;
