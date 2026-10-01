@@ -362,3 +362,51 @@ export function textCanvas(w, h, draw) {
   const c = canvas(w, h); draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
+
+// ---------- What the windows see: the grounds round the Aquadome ----------
+// kind 'garden': lawn, the gravel walk, box hedges, flowers, clipped cones and lamp posts, woods and hills behind (the
+// wings that face away from the lake); 'lawnlake': a flower border and lawn, then the lake and the far shore (the wings
+// that face it at an angle). Sky from sky(), so clouds and stars match the rest of the game.
+export function view(kind, isNight, skyTex) {
+  const W = 1024, H = 512, c = canvas(W, H), g = c.getContext('2d'), r = rng(kind === 'garden' ? 61 : 62);
+  const dim = isNight ? 0.28 : 1, col = (h, k = 1) => { const [a, b, d] = hexRGB(h); return `rgb(${a * dim * k | 0},${b * dim * k | 0},${d * dim * k | 0})`; };
+  // sky: the top of the game's sky panorama
+  const src = skyTex.image; g.drawImage(src, 0, 0, src.width, src.height * 0.5, 0, 0, W, H * 0.6);
+  const hz = kind === 'garden' ? 0.6 : 0.5;
+  // far hills in haze, then the woods
+  g.fillStyle = isNight ? '#141c2a' : '#9fb0b4'; g.beginPath(); g.moveTo(0, H * hz);
+  for (let x = 0; x <= W; x += 16) g.lineTo(x, H * (hz - 0.07) - Math.sin(x * 0.006) * 22 - Math.sin(x * 0.017 + 1) * 10); g.lineTo(W, H * hz); g.fill();
+  const pine = (x, y, h, k) => { g.fillStyle = col('#2f4a30', k); g.beginPath(); g.moveTo(x, y - h); g.lineTo(x + h * 0.28, y); g.lineTo(x - h * 0.28, y); g.fill(); };
+  for (let x = -10; x < W + 10; x += 7 + r() * 9) pine(x, H * (hz + 0.02), 30 + r() * 46, 0.85 + r() * 0.3);
+  if (kind === 'lawnlake') {
+    // the lake: lighter far off, darker near the shore, ripple lines; the far shore's reflection
+    const lk = g.createLinearGradient(0, H * 0.52, 0, H * 0.7);
+    lk.addColorStop(0, isNight ? '#1a2638' : '#8fa8b0'); lk.addColorStop(1, isNight ? '#0a1018' : '#41606a');
+    g.fillStyle = lk; g.fillRect(0, H * 0.52, W, H * 0.18);
+    g.fillStyle = isNight ? 'rgba(200,210,255,.12)' : 'rgba(255,255,255,.22)'; for (let i = 0; i < 70; i++) g.fillRect(r() * W, H * (0.54 + r() * 0.15), 10 + r() * 50, 1);
+    g.fillStyle = col('#3e5a38'); g.fillRect(0, H * 0.69, W, H * 0.012);
+    for (let i = 0; i < 40; i++) { const x = r() * W; g.strokeStyle = col('#5a6a38'); g.lineWidth = 2; g.beginPath(); g.moveTo(x, H * 0.705); g.lineTo(x + (r() - .5) * 8, H * (0.66 + r() * 0.03)); g.stroke(); }
+  }
+  // lawn with mown stripes
+  const ly = kind === 'garden' ? H * 0.62 : H * 0.7;
+  for (let i = 0; i < 9; i++) { const y0 = ly + (H - ly) * Math.pow(i / 9, 1.6), y1 = ly + (H - ly) * Math.pow((i + 1) / 9, 1.6); g.fillStyle = col(i % 2 ? '#6a8a44' : '#7c9a4e'); g.fillRect(0, y0, W, y1 - y0 + 1); }
+  if (kind === 'garden') {
+    // the gravel walk, clipped cones and lamp posts along it, a box hedge with flowers in front
+    g.fillStyle = col('#c8b894'); g.beginPath(); g.moveTo(0, H * 0.74); g.lineTo(W, H * 0.7); g.lineTo(W, H * 0.77); g.lineTo(0, H * 0.82); g.fill();
+    for (let i = 0; i < 6; i++) {
+      const x = 80 + i * 175 + r() * 30, y = H * (0.72 - i * 0.004);
+      if (i % 2) { g.fillStyle = col('#3f5f34'); g.beginPath(); g.moveTo(x, y - 70); g.lineTo(x + 22, y); g.lineTo(x - 22, y); g.fill(); g.fillStyle = col('#cfc6b0'); g.fillRect(x - 14, y, 28, 10); }
+      else {
+        g.fillStyle = col('#24221e'); g.fillRect(x - 2, y - 80, 4, 80); g.fillRect(x - 7, y - 92, 14, 14);
+        if (isNight) { const gl = g.createRadialGradient(x, y - 85, 0, x, y - 85, 60); gl.addColorStop(0, 'rgba(255,200,120,.75)'); gl.addColorStop(1, 'rgba(255,200,120,0)'); g.fillStyle = gl; g.fillRect(x - 60, y - 145, 120, 120); g.fillStyle = '#ffe0a0'; g.fillRect(x - 5, y - 90, 10, 10); }
+        else { g.fillStyle = '#e8e0c8'; g.fillRect(x - 5, y - 90, 10, 10); }
+      }
+    }
+  }
+  // the border right under the window: box hedge and flowers
+  g.fillStyle = col('#355a2c'); g.beginPath(); g.moveTo(0, H); g.lineTo(0, H * 0.88);
+  for (let x = 0; x <= W; x += 22) g.lineTo(x, H * (0.865 + r() * 0.012)); g.lineTo(W, H); g.fill();
+  const FL = ['#d8506a', '#f0d060', '#ffffff', '#9070c8', '#f08848'];
+  for (let i = 0; i < 160; i++) { g.fillStyle = col(FL[i % 5], 0.95); g.beginPath(); g.arc(r() * W, H * (0.9 + r() * 0.08), 3 + r() * 4, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}

@@ -117,6 +117,11 @@ The terrace's Aquadome exterior matches the inside: wings sit where the lobby's 
 terrace direction (-sin a, cos a) from the drum centre (0, 18)): Planetarium (copper dome, behind), Spa (glazed lantern),
 Tech Office with the Guest Wing above (two storeys, dormers), Grand Staircase tower by the portico, Kitchen (chimney),
 Archive (hipped roof). Rooms are separate scenes at the origin; only this model shows how they fit together.
+Windows inside show what their wing faces outside: `skyWindow(..., view)` / `material.userData.view` = 'garden' (spa,
+archive, tech) or 'lawnlake' (kitchen, Suite 2), painted by `T.view(kind, night, skyTex)`; no view = the lake panorama
+(Guest Wing end window). The exterior follows the rooms: one wide kitchen window (inside x -> outside -u, you face the wall
+from opposite sides) and the back door on its side, one archive window with blind arches, spa blind arches on the sides
+(niches inside) and a skylight over the coffered ceiling's, blind roundels on the planetarium (dark inside).
 Detail (Oct 2026): quoins, string courses, cornice grime and splash streaks (nine years closed), downpipes, iron ridge
 cresting, chimney pots; the spa is a glass pool pavilion with a barrel vault ("a sky you can swim under"); gold five-point
 stars on the planetarium's copper dome; Guest Wing shutters; ivy; scaffolding, ladder and paint at the kitchen (being
