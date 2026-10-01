@@ -352,14 +352,14 @@ function lobbyPanes(R, cy, nm, phis) {
   const P = [], N = [], C = [], I = [], rnd = T.rng(5);
   const pos = (th, ph) => [R * 0.996 * Math.cos(ph) * Math.sin(th), cy + R * 0.996 * Math.sin(ph), -R * 0.996 * Math.cos(ph) * Math.cos(th)];
   for (let j = 0; j < phis.length - 1; j++) for (let i = 0; i < nm; i++) {
-    const dirty = rnd() < 0.18, sh = 0.88 + rnd() * 0.24, a0 = dirty ? 0.52 + rnd() * 0.15 : 0.34 + rnd() * 0.16;
-    const col = dirty ? [0.46 * sh, 0.45 * sh, 0.38 * sh] : [0.45 * sh, 0.66 * sh, 0.88 * sh];
+    const dirty = rnd() < 0.14, sh = 0.7 + rnd() * 0.55, a0 = dirty ? 0.55 + rnd() * 0.15 : 0.3 + rnd() * 0.2;
+    const col = dirty ? [0.46 * sh, 0.46 * sh, 0.36 * sh] : [0.36 * sh, 0.7 * sh, 0.74 * sh];
     const th0 = (i + 0.06) / nm * Math.PI * 2, th1 = (i + 0.94) / nm * Math.PI * 2, p0 = phis[j] + 0.012, p1 = phis[j + 1] - 0.012, SX = 2;
     const base = P.length / 3;
     for (let ky = 0; ky <= 1; ky++) for (let kx = 0; kx <= SX; kx++) {
       const th = th0 + (th1 - th0) * kx / SX, ph = p0 + (p1 - p0) * ky, p = pos(th, ph);
       P.push(p[0], p[1], p[2]); N.push(-p[0] / R, -(p[1] - cy) / R, -p[2] / R);
-      C.push(col[0], col[1], col[2], Math.min(0.8, a0 + (ky === 0 ? 0.1 : 0)));
+      const tp = ky ? 1.18 : 0.88; C.push(col[0] * tp, col[1] * tp, col[2] * tp, Math.min(0.8, a0 + (ky === 0 ? 0.12 : -0.08 - j * 0.004)));
     }
     for (let kx = 0; kx < SX; kx++) { const a = base + kx, b = a + 1, c = a + SX + 1, d = c + 1; I.push(a, b, c, b, d, c); }
   }
@@ -439,7 +439,7 @@ function lbTex(key, w, h, draw, rep) {
   return once(key, () => { const c = T.canvas(w, h); draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; t.wrapS = t.wrapT = THREE.RepeatWrapping; if (rep) t.repeat.set(rep[0], rep[1]); return t; });
 }
 const lbMedallion = () => lbTex('lb_med', 1024, 1024, (g) => {
-  const k = 98.5, C = 512, GOLD = '#b6903f', DG = '#34503f', BR = '#74502e', CR = '#f0e8d4';
+  const k = 98.5, C = 512, GOLD = '#b6903f', DG = '#566a60', BR = '#7c6a58', CR = '#f0e8d4';
   const ring = (r0, r1, col) => { g.beginPath(); g.arc(C, C, r1 * k, 0, Math.PI * 2); g.arc(C, C, r0 * k, 0, Math.PI * 2, true); g.fillStyle = col; g.fill('evenodd'); };
   ring(2.3, 2.34, GOLD); ring(2.4, 3.2, DG); ring(2.4, 2.43, GOLD); ring(3.17, 3.2, GOLD);
   g.fillStyle = CR; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; lbStar(g, C + Math.cos(a) * 2.8 * k, C + Math.sin(a) * 2.8 * k, 0.22 * k); }
@@ -450,8 +450,8 @@ const lbMedallion = () => lbTex('lb_med', 1024, 1024, (g) => {
     g.fillStyle = DG; g.beginPath(); g.moveTo(...tip); g.lineTo(...l); g.lineTo(...m); g.closePath(); g.fill();
     g.fillStyle = BR; g.beginPath(); g.moveTo(...tip); g.lineTo(...r); g.lineTo(...m); g.closePath(); g.fill();
   };
-  for (let i = 0; i < 8; i++) spike(i / 8 * Math.PI * 2 + Math.PI / 8, 3.35, 4.0, 0.06);
-  for (let i = 0; i < 8; i++) spike(i / 8 * Math.PI * 2, 3.35, i % 2 ? 4.45 : 4.72, i % 2 ? 0.075 : 0.095);
+  for (let i = 0; i < 8; i++) spike(i / 8 * Math.PI * 2 + Math.PI / 8, 3.35, 4.0, 0.04);
+  for (let i = 0; i < 8; i++) spike(i / 8 * Math.PI * 2, 3.35, i % 2 ? 4.45 : 4.72, i % 2 ? 0.05 : 0.062);
   ring(3.3, 3.32, GOLD); ring(4.78, 4.84, GOLD); ring(4.84, 4.9, DG); ring(4.9, 4.93, GOLD);
   g.fillStyle = CR; for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2; g.beginPath(); g.arc(C + Math.cos(a) * 4.87 * k, C + Math.sin(a) * 4.87 * k, 0.012 * k, 0, 7); g.fill(); }
 });
@@ -541,7 +541,7 @@ function buildLobby() {
 
   // floor, wall, wainscot, mouldings
   struct(add(R.g, new THREE.CircleGeometry(9, 64), mat.marble(), 0, 0, 0)).rotation.x = -Math.PI / 2;
-  const wp = M(0xffffff, 0.85, 0, { t: TX.damask(), rep: [48, 3.6], bump: 0.01 }); wp.side = THREE.BackSide;
+  const wp = M(0xffffff, 0.85, 0, { t: TX.damask(), rep: [72, 5.4], bump: 0.01 }); wp.side = THREE.BackSide;
   struct(add(R.g, new THREE.CylinderGeometry(9, 9, 4.2, 72, 1, true), wp, 0, 2.1, 0));
   const wn = M(0xffffff, 0.5, 0, { t: TX.panel(), rep: [30, 1], bump: 0.02 }); wn.side = THREE.BackSide;
   struct(add(R.g, new THREE.CylinderGeometry(8.97, 8.97, 1.1, 72, 1, true), wn, 0, 0.55, 0));
@@ -687,11 +687,30 @@ function buildLobby() {
   const dkIn = M(0x3a1a0c, 0.5);
   for (let i = 0; i < 4; i++) box(dk, 0.48, 0.66, 0.02, dkIn, -0.84 + i * 0.56, 0.5, 0.37);
   box(dk, 2.5, 0.05, 0.82, mat.marbleTopM, 0, 1.02, 0);
-  const crt = new THREE.Group(); crt.position.set(0.6, 1.05, -0.12); crt.rotation.y = Math.PI; dk.add(crt);
-  const beige = M(0xd8cfb8, 0.6);
-  box(crt, 0.42, 0.36, 0.38, beige, 0, 0.2, 0); box(crt, 0.3, 0.26, 0.2, beige, 0, 0.18, -0.25);
-  box(crt, 0.34, 0.26, 0.01, M(0x10181a, 0.2, 0, { emissive: 0x16302a, emissiveIntensity: 0.6 }), 0, 0.21, 0.195);
-  box(dk, 0.44, 0.03, 0.16, beige, 0.6, 1.06, 0.12);
+  const crt = new THREE.Group(); crt.position.set(0.55, 1.05, -0.1); crt.rotation.y = 2.35; dk.add(crt);
+  const beige = M(0xd2c8ae, 0.6), beigeD = M(0xb8ae94, 0.65), vent = M(0x3a352c, 0.8);
+  box(crt, 0.36, 0.03, 0.3, beigeD, 0, 0.015, 0); box(crt, 0.14, 0.05, 0.14, beigeD, 0, 0.055, 0);
+  box(crt, 0.42, 0.36, 0.2, beige, 0, 0.26, 0.1); box(crt, 0.3, 0.27, 0.22, beige, 0, 0.25, -0.08);
+  cyl(crt, 0.1, 0.16, 0.14, beige, 0, 0.25, -0.24, 10).rotation.x = Math.PI / 2;
+  box(crt, 0.34, 0.27, 0.01, M(0x10181a, 0.15, 0, { emissive: 0x1a3a30, emissiveIntensity: 0.7 }), 0, 0.27, 0.205);
+  box(crt, 0.4, 0.34, 0.012, beigeD, 0, 0.26, 0.203);
+  for (let v = 0; v < 7; v++) { box(crt, 0.16, 0.012, 0.01, vent, 0, 0.3 + v * 0.025 - 0.07, -0.19); box(crt, 0.012, 0.1, 0.1, vent, -0.151, 0.27, -0.08); box(crt, 0.012, 0.1, 0.1, vent, 0.151, 0.27, -0.08); }
+  box(crt, 0.05, 0.015, 0.01, M(0x6a6458, 0.5), 0.1, 0.1, 0.206);
+  cyl(crt, 0.008, 0.008, 0.5, IRON, 0.05, 0.1, -0.5, 5).rotation.x = Math.PI / 2;
+  const kbTex = once('lb_kbd', () => { const c = T.canvas(256, 96), g = c.getContext('2d'); g.fillStyle = '#c9bfa5'; g.fillRect(0, 0, 256, 96); g.fillStyle = '#e4dcc6'; for (let r = 0; r < 5; r++) for (let k = 0; k < 15; k++) { if (r === 4 && (k < 3 || k > 11)) continue; const w = r === 4 ? 12 * 14 : 14; if (r === 4 && k !== 3) continue; g.fillRect(8 + k * 16, 8 + r * 16, r === 4 ? 150 : 13, 12); } g.fillStyle = '#9a917c'; g.fillRect(0, 0, 256, 3); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; });
+  box(dk, 0.44, 0.025, 0.16, M(0xffffff, 0.6, 0, { map: kbTex }), 0.2, 1.065, 0.2).rotation.y = 0.12;
+  const ruled = once('lb_ruled', () => { const c = T.canvas(128, 160), g = c.getContext('2d'); g.fillStyle = '#efe8d2'; g.fillRect(0, 0, 128, 160); g.strokeStyle = '#8aa6c0'; g.lineWidth = 1; for (let y = 24; y < 160; y += 9) { g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke(); } g.strokeStyle = '#c06a6a'; g.beginPath(); g.moveTo(18, 0); g.lineTo(18, 160); g.stroke(); g.fillStyle = '#4a4a5a'; for (let y = 28; y < 100; y += 18) g.fillRect(24, y, 30 + (y * 7) % 60, 2); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; });
+  const paperM = M(0xffffff, 0.9, 0, { map: ruled });
+  for (let p = 0; p < 4; p++) box(dk, 0.2, 0.004, 0.27, paperM, -1.0 + p * 0.01, 1.05 + p * 0.004, 0.22 + p * 0.005).rotation.y = 0.25 + p * 0.12;
+  cyl(dk, 0.04, 0.035, 0.1, M(0x2a5a4a, 0.3), 0.15, 1.1, -0.16, 12);
+  for (const [px, pz, t] of [[-0.01, 0, 0.2], [0.01, 0.01, -0.15], [0.0, -0.01, 0.05]]) cyl(dk, 0.004, 0.004, 0.15, M(px > 0 ? 0x1a2a6a : 0x7a1a1a, 0.4), 0.15 + px, 1.19, -0.16 + pz, 5).rotation.z = t;
+  // key rack with pigeonholes at the back of the desk
+  { const kx = -0.35, kz = -0.3, wd = M(0x4a2514, 0.55), keyM = M(0xc9a15a, 0.3, 1), tagM = M(0xe8dcc0, 0.8);
+    box(dk, 1.0, 0.5, 0.02, wd, kx, 1.3, kz - 0.09); box(dk, 1.0, 0.025, 0.2, wd, kx, 1.055, kz); box(dk, 1.0, 0.025, 0.2, wd, kx, 1.555, kz);
+    for (const sx of [-0.5, -0.25, 0, 0.25, 0.5]) box(dk, 0.02, 0.5, 0.2, wd, kx + sx, 1.3, kz);
+    for (const sy of [1.3]) box(dk, 1.0, 0.02, 0.2, wd, kx, sy, kz);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 2; r++) { const x = kx - 0.375 + c * 0.25; box(dk, 0.03, 0.04, 0.012, keyM, x, 1.17 + r * 0.25, kz - 0.02); box(dk, 0.05, 0.035, 0.008, tagM, x, 1.12 + r * 0.25, kz - 0.02); }
+    for (let c = 0; c < 4; c += 2) box(dk, 0.2, 0.09, 0.012, M(0xe8e0c8, 0.9), kx - 0.375 + c * 0.25, 1.355, kz + 0.03); }
   lathe(dk, [[0.001, 0], [0.07, 0], [0.07, 0.02], [0.06, 0.05], [0.03, 0.08], [0.01, 0.1], [0.001, 0.11]], BRASS, -0.2, 1.045, 0.1, 20);
   const book = new THREE.Group(); book.position.set(-0.7, 1.05, 0.08); book.rotation.y = 0.2; dk.add(book);
   box(book, 0.46, 0.02, 0.32, M(0x3a1a12, 0.6), 0, 0.005, 0);
