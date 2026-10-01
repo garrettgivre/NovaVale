@@ -384,13 +384,8 @@ canvas#c.c-walk { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3
 .tp-row { display: flex; align-items: center; gap: 10px; justify-content: center; margin: 8px 0 12px; }
 .tp-row input[type=range] { flex: 1; max-width: 280px; accent-color: var(--gold); }
 .tp { text-align: center; }
-/* Title art on tall screens: a crop from the dome to Nova at full width (a cover crop zoomed into the dome and lost the
-   lake, the dock and Nova), fading into the art's own sky above and lake below */
+/* Title art on tall screens: Garrett's portrait painting, full screen; the title sits in its sky, the buttons on the lake */
 @media (orientation: portrait) {
-  #screen.title-s { background: linear-gradient(180deg, #2e2446 0%, #453765 20%, #5a3f63 30%, #3a2a30 70%, #1d161e 82%, #0d0a10 100%); }
-  #screen.title-s::before { content: ''; position: fixed; left: 0; right: 0; top: 22%; aspect-ratio: 1100 / 1020; max-height: 64%; pointer-events: none; z-index: 0;
-    background: url(../assets/title_portrait.webp) 50% 50% / cover no-repeat;
-    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 86%, transparent 100%); mask-image: linear-gradient(180deg, transparent 0, #000 16%, #000 86%, transparent 100%); }
-  #screen.title-s .title { position: relative; z-index: 1; }
-  #screen.title-s .tbtns { margin-top: 44vh; }   /* the buttons sit on the dark lake under the art */
+  #screen.title-s { background: linear-gradient(180deg, rgba(8,6,14,.35), rgba(8,6,14,0) 30%, rgba(8,6,14,0) 60%, rgba(8,6,14,.55)), url(../assets/title_portrait.webp) 84% 62% / cover no-repeat, #1a1424; }
+  #screen.title-s .tbtns { margin-top: 44vh; }
 }
