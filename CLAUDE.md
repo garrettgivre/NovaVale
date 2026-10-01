@@ -129,6 +129,7 @@ still use the old sculpted models; their turnaround sheets are the next thing to
   opens from the notebook's People page.
 
 ## Testing
+- Draw-call budget: views run ~150-430 calls/frame (`__dbg.renderer.info`); merge static meshes per material (`mergeGeometries`) and instance repeats when adding detail. `__dbg.view(node)` jumps to a camera spot instantly.
 - Serve locally: `python -m http.server 8777` from the repo root. In the Claude desktop app, `.claude/launch.json`
   (git-ignored) holds `{"version":"0.0.1","configurations":[{"name":"aquadome","runtimeExecutable":"python","runtimeArgs":["-m","http.server","8777"],"port":8777}]}`.
 - Debug handle: `window.__dbg = { S, go, story, NODES, V, focus, unfocus }`. E.g. `__dbg.go('L1')`,
@@ -142,7 +143,7 @@ still use the old sculpted models; their turnaround sheets are the next thing to
   Act 3's good path end to end (the "Wrong Call" bad ending has not been played yet).
 
 ## Status and next steps
-Recently done (newest first): coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
+Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
 - Build Silas and Jojo from turnaround sheets when Garrett sends them (then `people.js` could be retired).
