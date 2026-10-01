@@ -5,7 +5,7 @@ import { S, has, set, hasItem, giveItem, addDoc, night, checkpoint, secondChance
 import { openTalk, closeTalk, say, choose, caption, panel, closePanel, fade, screen, closeScreen, toast, portrait, PEOPLE } from './ui.js';
 import { ITEMS, DOCS, icon } from './items.js';
 import { aquaOS, switchboard, acrostic, recipe, constellation, drawerDial, starDoor, contradiction, musicBox, tapeScrub } from './puzzles.js';
-import { sfx, ghostVoice, ambience } from './audio.js';
+import { sfx, ghostVoice, ambience, roomSound } from './audio.js';
 import { whereIs, sync, POSTCARDS } from './world.js';
 
 let E; // engine: { go(node, opts), room(), refresh(), focus(who), unfocus(), resume() }
@@ -107,6 +107,7 @@ async function rest() {
   const next = { d1: 'n1', n1: 'd2', d2: 'n2' }[S.phase];
   await fade(async () => { S.phase = next; save(); sync(); E.refresh(); onRoom('suite'); }, 700);
   sfx('door');
+  sfx(next === 'd2' ? 'dawn' : 'night');
   if (next === 'n1') await think(['*You fall asleep to the old building ticking as it cools.', '*Hours later, you wake with a start.', 'Someone is singing. Not in the walls. In the speakers.', 'No words, just "ooh" and "aah", slightly flat. If that\'s a ghost, it needs a vocal coach.']);
   if (next === 'd2') {
     await think(['*Grey morning light comes in through the dome.', has('cherry_light') ? 'Recap: Cherry has a secret rehearsal, somebody in a long coat has a flashlight, and "D.H." has a hologram card with his initials on it.' : 'Recap: Cherry has a secret rehearsal, and "D.H." has a hologram card with his initials on it.', 'Today, everybody tells me the truth. Whether they plan to or not.']);
@@ -368,7 +369,7 @@ const TOPICS = {
     { id: 'ghost', q: 'Have you heard the singing at night?', lines: ['The "ghost"? Honey, if a ghost is singing in this building it had better be singing MY songs.', 'It\'s thin. Wobbly. No breath support.', '*She says it lightly, but her hand drifts to her throat.'] },
     { id: 'song', q: 'What are you performing on Saturday?', lines: ['"Starfall." Brand new. Written for this very dome.', 'The sheet is on the side table, if you must. Don\'t smudge it.', 'N: I never smudge. I annotate.'] },
     { id: 'track', q: 'Nobody needs a "backup track" for a nap, Vesper.', hot: 1, when: () => has('vesper_mail'), lines: ['You read my EMAIL? What kind of intern are you?', 'N: The thorough kind. It was on a hotel computer with the password on a sticky note. Anyone could have read it.', '...Touché, darling. A backup track is a precaution. Every professional has one. Next question.'] },
-    { id: 'lipsync', q: '"First letters in gold." L-I-P-S-Y-N-C.', hot: 1, when: () => has('acrostic'), lines: ['*Vesper slowly takes off her sunglasses. Her eyes are red.', '...Two weeks ago my voice cracked in rehearsal. The doctor said no singing for a month.', 'Saturday is my comeback, darling. I couldn\'t cancel. So I\'ll mouth my own song over my own recording.', 'Stealing the crown is the LAST thing I\'d do. This gala is the only thing keeping my career afloat.', 'N: Then prove it. Where were you at 11:52 on Tuesday?', 'On a video call with my vocal coach, half eleven to half twelve, doing silent breathing exercises. Glamorous. She\'ll swear to it.', 'N: For what it\'s worth, hiding it in the song was smart. I only caught it because I\'m smarter.', '*Despite herself, Vesper laughs.', 'Please. Not a word to Cherry.'], after: () => { set('vesper_clear'); toast('Vesper has an alibi'); } },
+    { id: 'lipsync', q: '"First letters in gold." L-I-P-S-Y-N-C.', hot: 1, when: () => has('acrostic'), lines: ['*Vesper slowly takes off her sunglasses. Her eyes are red.', '...Two weeks ago my voice cracked in rehearsal. The doctor said no singing for a month.', 'Saturday is my comeback, darling. I couldn\'t cancel. So I\'ll mouth my own song over my own recording.', 'Stealing the crown is the LAST thing I\'d do. This gala is the only thing keeping my career afloat.', 'N: Then prove it. Where were you at 11:52 on Tuesday?', 'On a video call with my vocal coach, half eleven to half twelve, doing silent breathing exercises. Glamorous. She\'ll swear to it.', 'N: For what it\'s worth, hiding it in the song was smart. I only caught it because I\'m smarter.', '*Despite herself, Vesper laughs.', 'Please. Not a word to Cherry.'], after: () => { set('vesper_clear'); (toast('Vesper has an alibi'), sfx('reveal')); } },
     { id: 'pin', ...pinQ, lines: ['Brass? On a gown? Never, darling.', 'Although... the people who built this place all wore little pins like that. There\'s an old photograph upstairs.'] },
   ],
   cherry: [
@@ -389,7 +390,7 @@ const TOPICS = {
     { id: 'holo', q: 'I found your hologram card in the planetarium.', hot: 1, when: () => hasItem('holocard') && S.phase === 'd2', lines: () => ['...Oh no.', 'Okay. OKAY. Yes. The ghost is me. It\'s a hologram show for the gala: the singing ghost of the dome. Spooky, fun, very 2003.', 'I was testing it Tuesday and it glitched. Now it switches itself on every night. I didn\'t want Celeste to know until it worked.',
       ...(has('dex_partial') ? ['N: So you were in the planetarium until 11:40. Told you you\'d tell me.', 'The projector log stops at 11:41, you can check. Then I went to bed. For real this time.']
         : S.asked['dex:tuesday'] ? ['N: So much for asleep by eleven. How late were you in there?', 'Until about 11:40. The projector log stops at 11:41, you can check. Then I went to bed. For real this time.']
-          : ['N: How late were you in there on Tuesday?', 'Until about 11:40. The projector log stops at 11:41, you can check. Then I went to bed.']), 'N: And MAINT-0?', 'Only the 2003 build team ever knew that code. Four of them. Three moved away years ago.', 'The fourth is Opal.'], after: () => { set('dex_confess'); toast('Dex has an alibi'); } },
+          : ['N: How late were you in there on Tuesday?', 'Until about 11:40. The projector log stops at 11:41, you can check. Then I went to bed.']), 'N: And MAINT-0?', 'Only the 2003 build team ever knew that code. Four of them. Three moved away years ago.', 'The fourth is Opal.'], after: () => { set('dex_confess'); (toast('Dex has an alibi'), sfx('reveal')); } },
     { id: 'pin', ...pinQ, lines: ['Staff pin, 2003 vintage! Collector\'s item.', 'Opal wears one on her coat. Or... she did? I don\'t think I\'ve seen it this week.'], after: () => set('pin_known') },
   ],
   juniper: [
@@ -514,7 +515,7 @@ async function doTopic(who, t) {
   if (t.puzzle === 'recipe') {
     await new Promise(res => recipe(async () => {
       await say(who, ['*She tastes the batter and closes her eyes.*', 'Oh, that\'s lovely. You\'d be welcome in my kitchen.', 'That\'s exactly what I did on Tuesday. The first cake went in with the wrong milk; I only noticed at eleven, so I remade it.', 'It went in at 11:40 and came out at 12:30. I stood at the window the whole time.', 'N: And what did you see from the window? Because you saw something. You\'ve been dying to tell somebody.', 'Ha! Yes. Just before midnight, a white flashlight went across the lobby towards the planetarium. Someone in a long coat.', 'Long coat, indoors, in June. That narrows it down, doesn\'t it?']);
-      set('juniper_clear'); toast('Juniper has an alibi');
+      set('juniper_clear'); (toast('Juniper has an alibi'), sfx('reveal'));
       res();
     }));
   }
@@ -568,6 +569,7 @@ async function finale() {
   await fade(async () => { S.phase = 'g'; save(); sync(); E.refresh(); }, 900);
   E.go('L1', { fade: true, look: [-4.2, 3.2] });
   await new Promise(r => setTimeout(r, 1400));
+  sfx('dawn');
   await think(['*Morning. Gala day. You set the Prism Crown back on its velvet, and Celeste nearly cries with relief.*',
     'Except something has been bothering me since the Star Room.',
     'When I lifted that crown, the star weighed nothing. An iron meteorite should feel like a fishing sinker. That felt like a boiled sweet.',
@@ -751,6 +753,7 @@ export function onRoom(room) {
   const first = !has('v_' + room);
   set('v_' + room);
   ambience(room === 'tunnel' || room === 'star' ? 'tunnel' : night() ? 'night' : 'day');
+  roomSound(room, night(), S.phase);
   if (ghostOn()) ghostVoice(true, room === 'plan' ? 1 : 0.5, room === 'plan');
   else ghostVoice(false);
   if (first && FIRST_VISIT[room]) setTimeout(() => think(FIRST_VISIT[room]), 700);

@@ -115,7 +115,7 @@ every clickable thing in view; the task list and Dot always say what's next; lor
 | `js/items.js` | `ITEMS` (inventory with SVG icons) and `DOCS` (letters, logs, emails, postcards, appraisal, song card...) |
 | `js/ui.js` | dialogue box (`say`, `choose`, `openTalk`; lines starting `N:` are Nova, `*...*` narration), panels, toasts, portraits, `PEOPLE` names/colours |
 | `js/state.js` | `S` (phase, flags, inv, docs), save key `novavale.aquadome.v1`, `checkpoint`/`secondChance` |
-| `js/tex.js`, `js/audio.js` | procedural textures; synthesised music/SFX/ghost voice |
+| `js/tex.js`, `js/audio.js` | procedural textures (`view()` paints window views); synthesised music/SFX/ghost voice, room sound beds (`roomSound`, `BEDS` per room: fountain, pool water and drips, projector hum, fridge and simmer, office fans and disk clicks, clock ticks, wind, birds/crickets, tunnel drips) on their own bus (plays with music off), footsteps by floor (`step`, called from main.js `footsteps()`), cues `reveal`/`night`/`dawn` |
 
 The terrace's Aquadome exterior matches the inside: wings sit where the lobby's doors lead (lobby door angle a ->
 terrace direction (-sin a, cos a) from the drum centre (0, 18)): Planetarium (copper dome, behind), Spa (glazed lantern),

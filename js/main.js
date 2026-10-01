@@ -8,7 +8,7 @@ import { prepareCast } from './people.js';
 import { FIG } from './figures.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
-import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic } from './audio.js';
+import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step } from './audio.js';
 import { ITEMS, icon } from './items.js';
 
 const EYE = 1.62, PITCH0 = -0.07;
@@ -446,6 +446,7 @@ function loop() {
     if (F.dir < 0 && F.t <= 0) { camera.position.copy(F.from.p); V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); }
   }
   camera.rotation.y = yaw; camera.rotation.x = pitch;
+  footsteps();
   update(dt, t, camera);
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); post.uniforms.uT.value = t; renderer.render(postScene, postCam);
@@ -480,6 +481,24 @@ canvas.addEventListener('webglcontextrestored', () => {
   try { rebuildEnv(renderer); } catch (e) { location.reload(); }
 }, false);
 addEventListener('visibilitychange', () => { if (document.hidden) { try { save(); } catch (e) { } } });
+
+// ---------- Footsteps: one every ~0.65 m walked or glided, sounding like the floor underfoot ----------
+const FLOOR = { lobby: 'marble', spa: 'tile', kitchen: 'tile', plan: 'carpet', tech: 'carpet', suite: 'carpet', wing: 'carpet', archive: 'wood', tunnel: 'concrete', star: 'wood' };
+let fpX = null, fpZ = 0, fpAcc = 0;
+function floorUnder(room, x, z) {
+  if (room !== 'terrace') return FLOOR[room] || 'marble';
+  if (Math.abs(x) < 9 && z > -4 && z < 8.5) return 'stone';               // the terrace paving
+  if (x > 1.4 && x < 4.2 && z < -12.5) return 'wood';                      // the dock
+  const r = Math.hypot(x, z - 18); if (r > 9.6 && r < 27 && z > 6) return 'gravel';   // the walk round the building
+  return 'grass';
+}
+function footsteps() {
+  const p = camera.position, R = roomOf();
+  if (fpX === null || V.focus || V.title || !R) { fpX = p.x; fpZ = p.z; return; }
+  const d = Math.hypot(p.x - fpX, p.z - fpZ); fpX = p.x; fpZ = p.z;
+  if (d > 1) { fpAcc = 0; return; }   // a jump (changing rooms), not a step
+  fpAcc += d; if (fpAcc > 0.65) { fpAcc = 0; step(floorUnder(R.id, p.x, p.z)); }
+}
 
 // ---------- Title ----------
 function title() {
