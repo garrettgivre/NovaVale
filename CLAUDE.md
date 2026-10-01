@@ -55,6 +55,10 @@ her as a stranger and reacts in character; each has a moment where they realise 
 Juniper at the oven log, Cherry on night one, Opal at the pin, Gus at the keys, Regent at the coat; Rashad guesses at once;
 Harper only ever suspects and Nova keeps the cover with her). Greetings (`hiLine`) warm up with story flags. Nobody calls
 her "detective" before they've worked it out.
+**Nova only says what she knows**: any line that uses a fact from another conversation, a document or a hotspot is
+gated on that flag (`lines: () => has(x) ? ... : ...`), e.g. Regent's coat talk only cites Harper's tape after `harper_alibi`,
+"Ranger Begay" only after `met_nate`, the door "under the building" only after `jojo_door`. Check this for every new line.
+Velvet Regent is nonbinary (they/them; "royalty", never "queen").
 
 **Suspects**: Vesper Vox (pop diva, secretly lip-syncing her comeback), Miss Cherry Pop (drag host of the Starfall Revue,
 secretly rehearsing a tribute to Vesper), Dex Halloway (tech, secretly built the singing "ghost" hologram), Juniper (chef,
