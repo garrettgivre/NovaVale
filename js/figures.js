@@ -27,7 +27,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610011223';
+export const ASSET_V = '202610011345';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -64,7 +64,9 @@ export function buildFigure(who, HIT) {
       const old = o.material;
       // matte: the painting already has its lighting; a standard material adds a Fresnel sheen at grazing angles,
       // which lit up the jagged hair outlines as grey-white specks
-      o.material = new THREE.MeshLambertMaterial({ map: old.map, emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.3 });
+      // the paintings carry their own lighting: mostly self-lit, with a gentle share of the room's light (rooms lit very
+      // differently made the same face look washed out in one and murky in another)
+      o.material = new THREE.MeshLambertMaterial({ map: old.map, color: 0x9c9c9c, emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.52 });
       // blended texturing: TEXCOORD_1/2 look up the side and back paintings, TEXCOORD_3 holds the weights (side, back;
       // the exporter flips V, so back = 1 - y); colour = mix(mix(front, back, wB), side, wS)
       // head sheet: the texture holds a much larger painting of the head below the body sheet. Wherever a lookup lands on

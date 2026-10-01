@@ -135,8 +135,8 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   tilt and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
   while Nova talks. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
   body, arms raised far look like a scarecrow, forearms brought forward show their edge.
-- Arms in the build: triangles bridging an arm and the body (a hand hanging a pixel from the hip) are cut and closed
-  (`armCut`), and each hand is found from the painting (pieces outside the legs below the wrist) and bound wholly to the
+- Arms in the build: triangles bridging an arm and the body across background in the painting (a hand hanging a
+  pixel from the hip; never where the arm overlaps the body, which left holes and bands) are cut and closed (`armCut`), and each hand is found from the painting (pieces outside the legs below the wrist) and bound wholly to the
   arm. Before this, moving an arm stretched a strip of hand colour to the hip and left fingertips behind.
   Debug: `userData.dbgRest` / `dbgOnly` ('upper'|'fore'|'hand') / `dbgAx` ('z'|'x') / `forceG` (a held gesture).
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
@@ -145,6 +145,8 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   opens from the notebook's People page.
 
 ## Testing
+- Look: figures are mostly self-lit (`emissiveIntensity` .52, diffuse grey .61) so rooms light them alike; bloom only
+  above 1.15 (lamps); the normal picture renders ~0.48 MP with a soft blur (hides seams in the painted models).
 - Raycasts use three-mesh-bvh (`vendor/three-mesh-bvh.js`, `accelerate()` in main.js builds a tree for every static room mesh after `buildWorld`; meshes added later get none). Walking rays use layer 2 (room meshes only, not people). Merged static meshes without a BVH made walking drop to 30 fps on the terrace.
 - Lost WebGL context (switching apps on a phone): index.html makes every 2D canvas `willReadFrequently` (memory-backed, survives backgrounding); main.js rebuilds the env maps on restore (`rebuildEnv`) and reloads into the save if a probe canvas was wiped. Test with `WEBGL_lose_context`.
 - Draw-call budget: views run ~150-430 calls/frame (`__dbg.renderer.info`); merge static meshes per material (`mergeGeometries`) and instance repeats when adding detail. `__dbg.view(node)` jumps to a camera spot instantly.

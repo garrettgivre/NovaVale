@@ -499,7 +499,11 @@ top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.s
 ARMB = [6, 7, 8, 10, 11, 12]
 armness = (Wt * np.isin(top4, ARMB)).sum(1)[:n]
 dA = armness[T].max(1) - armness[T].min(1)
-keepT = dA < cfg.get('armCut', 0.45)
+# sample the painting's coverage inside each triangle (centroid, edge midpoints): a bridge spans background
+tu, tv = U[T], V[T]
+smp_ = [(tu.mean(1), tv.mean(1))] + [(tu[:, a] * f + tu[:, b] * (1 - f), tv[:, a] * f + tv[:, b] * (1 - f)) for a, b in ((0, 1), (1, 2), (2, 0)) for f in (.25, .5, .75)]
+cover = np.min([ndimage.map_coordinates(A['front'], [vv, uu], order=1) for uu, vv in smp_], axis=0)
+keepT = (dA < cfg.get('armCut', 0.45)) | (cover > 0.85)
 if (~keepT).any():
     T = T[keepT]
     E = np.concatenate([T[:, [0, 1]], T[:, [1, 2]], T[:, [2, 0]]])

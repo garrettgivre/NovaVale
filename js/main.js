@@ -45,10 +45,10 @@ const post = new THREE.ShaderMaterial({
       if (uRetro < 0.5) {
         vec3 s = (texture2D(tD, uv + vec2(px.x, 0.)).rgb + texture2D(tD, uv - vec2(px.x, 0.)).rgb
                 + texture2D(tD, uv + vec2(0., px.y)).rgb + texture2D(tD, uv - vec2(0., px.y)).rgb) * 0.25;
-        c = mix(c, s, 0.3);
+        c = mix(c, s, 0.42);
       }
       vec3 glow = vec3(0.);
-      for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; glow += max(texture2D(tD, uv + vec2(cos(a), sin(a)) * px * (uRetro > 0.5 ? 3.0 : 7.0)).rgb - 0.9, 0.0); }
+      for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; glow += max(texture2D(tD, uv + vec2(cos(a), sin(a)) * px * (uRetro > 0.5 ? 3.0 : 7.0)).rgb - 1.15, 0.0); }   // lamps only (white clothes haloed)
       c += glow * 0.1;
       float l = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(vec3(l), c, 0.8);
@@ -79,8 +79,8 @@ function resize() {
     const k = 640 / Math.max(w, h), lw = Math.round(w * k), lh = Math.round(h * k);
     rt.setSize(lw, lh); post.uniforms.uRes.value.set(lw, lh);
   } else {
-    // about 0.9 megapixels at most: soft, like an 800x600 pre-rendered game
-    const pr = Math.min(devicePixelRatio || 1, Math.sqrt(900000 / (w * h)));
+    // about half a megapixel: soft, like a pre-rendered game at 800x600 (and it hides small seams in the painted models)
+    const pr = Math.min(devicePixelRatio || 1, Math.sqrt(480000 / (w * h)));
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h, false);
     const bw = Math.round(w * pr), bh = Math.round(h * pr);
