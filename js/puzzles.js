@@ -1,6 +1,8 @@
 // Puzzles. Each opens a panel and calls done() when solved.
 import { panel, closePanel, el, toast } from './ui.js';
-import { S, has, set, addDoc, hasItem } from './state.js';
+import { S, has, set, addDoc, hasItem, saveSoon } from './state.js';
+// a puzzle's unfinished settings live in the save, so closing it doesn't lose your work
+const mem = (k, init) => { S.pz = S.pz || {}; if (!Array.isArray(S.pz[k])) S.pz[k] = init; return S.pz[k]; };
 import { sfx } from './audio.js';
 import { DOCS, ITEMS, icon } from './items.js';
 
@@ -109,6 +111,8 @@ export function recipe(done) {
   const body = panel(`<div class="rc"><p>${junior() ? 'Swap each ingredient for a vegan one that does the same job.' : 'Make Nana Reyes\'s cake vegan.'}</p>
     ${rows.map((r, i) => `<label class="rc-row"><span>${r[0]}</span><select data-i="${i}"><option value="">choose…</option>${r[1].map(o => `<option>${o}</option>`).join('')}</select></label>`).join('')}
     <p class="rc-fixed">2 cups flour · 1 cup sugar · zest of 1 lemon</p><button class="btn" id="rcgo">Bake it</button></div>`, { cls: 'doc', title: 'Starfall Cake, vegan edition' });
+  const picks = mem('recipe', ['', '', '', '']);
+  body.querySelectorAll('select').forEach(sl => { sl.value = picks[+sl.dataset.i] || ''; sl.onchange = () => { picks[+sl.dataset.i] = sl.value; saveSoon(); }; });
   body.querySelector('#rcgo').onclick = () => {
     const ok = [...body.querySelectorAll('select')].every(s => rows[+s.dataset.i][2].includes(s.value));
     if (ok) { sfx('solve'); closePanel(true); done(); }
@@ -130,11 +134,12 @@ export function constellation(done) {
       ${STARS.map((p, i) => `<g class="st" data-i="${i}"><circle cx="${p[0]}" cy="${p[1]}" r="16" fill="transparent"/><circle class="gl" cx="${p[0]}" cy="${p[1]}" r="9" fill="url(#csg)"/><circle cx="${p[0]}" cy="${p[1]}" r="3.4" fill="#fff"/></g>`).join('')}
     </svg></div><button class="btn" id="csgo" ${sketch ? '' : 'disabled'}>Project</button></div>`, { cls: 'doc', title: 'Projector console' });
   if (!sketch) return;
-  const sel = new Set();
-  body.querySelectorAll('.st').forEach(g => g.onclick = () => {
+  const kept = mem('stars', []), sel = new Set(kept);
+  body.querySelectorAll('.st').forEach(g => { g.classList.toggle('on', sel.has(+g.dataset.i)); g.onclick = () => {
     sfx('click'); const i = +g.dataset.i;
     sel.has(i) ? sel.delete(i) : sel.add(i); g.classList.toggle('on', sel.has(i));
-  });
+    kept.length = 0; kept.push(...sel); saveSoon();
+  }; });
   body.querySelector('#csgo').onclick = () => {
     const ok = sel.size === 5 && WANT.every(i => sel.has(i));
     if (!ok) { shake(body.querySelector('.cs-sky')); return; }
@@ -147,10 +152,10 @@ export function constellation(done) {
 
 // ---------- Opal's drawer ----------
 export function drawerDial(done) {
-  const d = [0, 0, 0];
-  const body = panel(`<div class="dl"><p>${junior() ? 'A three-number combination.' : ''}</p><div class="dl-row">${d.map((_, i) => `<div class="dl-w"><button data-i="${i}" data-d="1">▲</button><b id="dw${i}">0</b><button data-i="${i}" data-d="-1">▼</button></div>`).join('')}</div><button class="btn" id="dlgo">Open</button></div>`, { cls: 'doc', title: 'Locked drawer' });
+  const d = mem('dial', [0, 0, 0]);
+  const body = panel(`<div class="dl"><p>${junior() ? 'A three-number combination.' : ''}</p><div class="dl-row">${d.map((_, i) => `<div class="dl-w"><button data-i="${i}" data-d="1">▲</button><b id="dw${i}">${d[i]}</b><button data-i="${i}" data-d="-1">▼</button></div>`).join('')}</div><button class="btn" id="dlgo">Open</button></div>`, { cls: 'doc', title: 'Locked drawer' });
   body.querySelectorAll('.dl-w button').forEach(b => b.onclick = () => {
-    sfx('click'); const i = +b.dataset.i; d[i] = (d[i] + +b.dataset.d + 10) % 10; body.querySelector('#dw' + i).textContent = d[i];
+    sfx('click'); const i = +b.dataset.i; d[i] = (d[i] + +b.dataset.d + 10) % 10; body.querySelector('#dw' + i).textContent = d[i]; saveSoon();
   });
   body.querySelector('#dlgo').onclick = () => {
     if (d.join('') === '729') { sfx('solve'); closePanel(true); done(); }
@@ -169,7 +174,7 @@ const SYM = {
 };
 const ORDER = ['ringed', 'moon', 'comet', 'sun', 'star', 'heart'];
 export function starDoor(done) {
-  const pos = [3, 4, 1]; // each ring's rotation step (0..5); a ring is right when its target symbol is at the top
+  const pos = mem('door', [3, 4, 1]); // each ring's rotation step (0..5); a ring is right when its target symbol is at the top
   const want = [0, 1, 2]; // outer ringed, middle moon, inner comet
   const radii = [118, 82, 46];
   const body = panel(`<div class="sd"><p>${junior() ? (hasItem('blueprint') ? 'Tap a ring to turn it. The blueprint says: outer ringed planet, middle moon, inner comet.' : 'Tap a ring to turn it. Something should sit at the top of each.') : ''}</p>
@@ -180,7 +185,7 @@ export function starDoor(done) {
   const draw = () => radii.forEach((r, i) => body.querySelector('#rs' + i).setAttribute('transform', `rotate(${-pos[i] * 60} 150 150)`));
   draw();
   body.querySelectorAll('.ring').forEach(g => g.onclick = () => {
-    const i = +g.dataset.i; pos[i] = (pos[i] + 1) % 6; sfx('switch'); draw();
+    const i = +g.dataset.i; pos[i] = (pos[i] + 1) % 6; sfx('switch'); draw(); saveSoon();
     if (pos.every((p, k) => p === want[k])) { sfx('solve'); setTimeout(() => { closePanel(true); done(); }, 700); }
   });
 }
@@ -222,13 +227,14 @@ export function tapeScrub(done) {
       <text x="206" y="190" fill="#e8e8d8" font-family="VT323, monospace" font-size="16">TUE 11:${mm}:${ss} PM</text>
       <rect width="320" height="200" fill="url(#tpscan)"/><defs><pattern id="tpscan" width="2" height="3" patternUnits="userSpaceOnUse"><rect width="2" height="1" fill="rgba(255,255,255,.04)"/></pattern></defs></svg>`;
   };
-  let f = 0;
+  const fm = mem('tape', [0]); let f = fm[0];
   const body = panel(`<div class="tp"><p>${junior() ? 'Step through the tape. Freeze it on the frame where the flashlight lights up the coat.' : 'Find the frame that shows the coat.'}</p>
     <div class="tp-scr" id="tpscr">${frame(0)}</div>
     <div class="tp-row"><button class="btn" id="tpb">◀ Frame</button><input type="range" min="0" max="${N - 1}" value="0" id="tpr"><button class="btn" id="tpf">Frame ▶</button></div>
     <button class="btn" id="tpgo">Freeze this frame</button></div>`, { cls: 'doc', title: 'Static Hour: Tuesday, 11:52' });
   const scr = body.querySelector('#tpscr'), r = body.querySelector('#tpr');
-  const show = () => { scr.innerHTML = frame(f); r.value = f; };
+  const show = () => { scr.innerHTML = frame(f); r.value = f; fm[0] = f; saveSoon(); };
+  show();
   r.oninput = () => { f = +r.value; show(); };
   body.querySelector('#tpb').onclick = () => { sfx('click'); f = Math.max(0, f - 1); show(); };
   body.querySelector('#tpf').onclick = () => { sfx('click'); f = Math.min(N - 1, f + 1); show(); };
@@ -243,7 +249,7 @@ const NOTES = [['Do', 'C'], ['Re', 'D'], ['Mi', 'E'], ['Fa', 'F'], ['Sol', 'G']]
 const TUNE = [2, 4, 4, 3, 1, 1];   // Mi Sol Sol | Fa Re Re
 export function musicBox(done) {
   const card = S.docs.includes('waltzcard');
-  const set_ = [-1, -1, -1, -1, -1, -1];
+  const set_ = mem('cylinder', [-1, -1, -1, -1, -1, -1]);
   const body = panel(`<div class="mb"><p>${!card ? 'A pinned brass cylinder in Stella\'s base, and a little crank. Pins can be moved, one per beat. Without the right tune it\'s just a very pretty lock.'
       : junior() ? 'Set one pin per beat to match Stella\'s song card. The cylinder is marked in letters; the card is in do-re-mi. (Do is C.)' : 'Set the pins to Stella\'s song.'}</p>
     <div class="mb-cyl">${NOTES.slice().reverse().map(([so, l], ri) => { const r = 4 - ri; return `<div class="mb-row"><i>${l}</i>${set_.map((_, c) => `<button class="mb-p" data-r="${r}" data-c="${c}"></button>`).join('')}</div>`; }).join('')}
@@ -251,7 +257,8 @@ export function musicBox(done) {
     <button class="btn" id="mbgo" ${card ? '' : 'disabled'}>Turn the crank</button></div>`, { cls: 'doc', title: 'Stella\'s cylinder' });
   if (!card) return;
   const draw = () => body.querySelectorAll('.mb-p').forEach(b => b.classList.toggle('on', set_[+b.dataset.c] === +b.dataset.r));
-  body.querySelectorAll('.mb-p').forEach(b => b.onclick = () => { const c = +b.dataset.c, r = +b.dataset.r; set_[c] = set_[c] === r ? -1 : r; sfx('click'); draw(); });
+  draw();
+  body.querySelectorAll('.mb-p').forEach(b => b.onclick = () => { const c = +b.dataset.c, r = +b.dataset.r; set_[c] = set_[c] === r ? -1 : r; sfx('click'); draw(); saveSoon(); });
   body.querySelector('#mbgo').onclick = async () => {
     const btn = body.querySelector('#mbgo'); btn.disabled = true;
     for (let c = 0; c < 6; c++) { if (set_[c] >= 0) sfx('switch'); await new Promise(r => setTimeout(r, 260)); }

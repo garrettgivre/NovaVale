@@ -28,6 +28,7 @@ const { chromium } = require('playwright');
           ui.closePanel(true); continue;
         }
         if (document.querySelector('#screen .end')) return 'end';
+        if (document.querySelector('#cine.on')) { document.querySelector('#cine.on').click(); continue; }
         const opts = [...document.querySelectorAll('#talkOpts button')];
         if (opts.length) {
           const texts = opts.map(o => o.textContent.trim());
@@ -48,7 +49,7 @@ const { chromium } = require('playwright');
     const tasks = () => story.tasks().filter(t => !t.d && !t.t.startsWith('Optional')).map(t => t.t);
     const ALL = ['vesper', 'cherry', 'dex', 'juniper', 'opal', 'regent', 'harper', 'kenji', 'priya', 'jojo', 'rashad', 'gus', 'silas', 'nate'];
     // close the opening letter and Nova's first thoughts
-    document.querySelector('#lgo')?.click(); await drive(20000);
+    document.querySelector('#lgo')?.click(); await w(1500); document.querySelector('#cine.on')?.click(); await drive(20000);
     // ---- Day 1
     await hot('case'); await hot('pin'); await hot('crewphoto'); await hot('books'); await hot('opalnote'); await hot('oven');
     flag('aqua_login', 'log_read', 'holo_mail', 'vesper_mail', 'memo_read'); doc('log', 'mail_holo', 'mail_vesper', 'memo');

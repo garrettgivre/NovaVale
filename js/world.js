@@ -3849,6 +3849,13 @@ const DAY = {
   gus: ['terrace', -3.4, -2.6], silas: ['terrace', 6.0, 0.6], nate: ['terrace', 4.4, -13.5],
 };
 const NIGHT1 = { cherry: ['plan', -1.7, -5.9, 0.5], silas: ['lobby', -2.8, -4.6], gus: ['wing', 0.9, -2.0], nate: ['terrace', 4.4, -13.5] };
+// gala night (the ending): the cast round the fountain, facing the terrace doors; [room, x, z, y, facing]
+const GALA = {
+  regent: ['lobby', 0, 3.2, 0, 0], celeste: ['lobby', -1.0, 3.5, 0, 0.15], vesper: ['lobby', -2.1, 2.7, 0, 0.3], cherry: ['lobby', 1.9, 3.0, 0, -0.25],
+  opal: ['lobby', -3.0, 1.6, 0, 0.5], kenji: ['lobby', 3.0, 1.7, 0, -0.5], dex: ['lobby', -3.7, 0.1, 0, 0.7], juniper: ['lobby', 3.6, 0.2, 0, -0.7],
+  priya: ['lobby', -3.2, -1.7, 0, 0.9], jojo: ['lobby', 3.2, -1.6, 0, -0.9], harper: ['lobby', -4.3, -1.0, 0, 1.1], rashad: ['lobby', 4.3, -0.9, 0, -1.1],
+};
+export const galaReady = () => Object.keys(GALA).every(w => figReady(w));
 export function whereIs(who) {
   const p = S.phase;
   if (p === 'd1' || p === 'd2' || p === 'g') {
@@ -3857,6 +3864,7 @@ export function whereIs(who) {
   }
   if (p === 'n1') return NIGHT1[who] || null;
   if (p === 'n2' && who === 'opal' && !has('finale_done')) return ['star', 1.6, -1.8];
+  if (p === 'end') return GALA[who] || null;
   return null;
 }
 
@@ -3867,10 +3875,18 @@ export function sync() {
   P.code.visible = has('const_done');
   A.sketch.visible = !has('sketch');
   X.crown.visible = !has('crown_back');
-  L.caseCrown.visible = has('crown_back');
+  L.caseCrown.visible = has('crown_back') && S.phase !== 'end';
+  // the winner of the Revue wears the crown on gala night
+  const rg = chars.regent;
+  if (rg && rg.userData.head && !rg.userData.crown && S.phase === 'end') {
+    rg.userData.crown = crown(rg.userData.head, 0, 0.045, -0.02, 0.62);
+    // polished silver reflects the dark room as black: let it catch the chandelier
+    rg.userData.crown.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.metalness = 0.6; o.material.roughness = 0.3; o.material.emissive = new THREE.Color(o.material.emissive && o.material.emissive.getHex() ? 0x6a4ab0 : 0x9a968c); o.material.emissiveIntensity = 0.55; } });
+  }
+  if (rg && rg.userData.crown) rg.userData.crown.visible = S.phase === 'end';
   for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
   rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0; rooms.terrace.bhGlass.emissiveIntensity = night() ? 1.3 : 0;   // someone's in the boathouse at night
-  for (const w in CAST) {
+  for (const w of new Set([...Object.keys(CAST), ...Object.keys(FIG)])) {
     const at = whereIs(w);
     if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync(), at[0] === curRoom);
     const ready = FIG[w] ? figReady(w) : castReady(w);
@@ -3883,7 +3899,7 @@ export function sync() {
     if (c.userData.baseAt !== at.join()) {   // their own facing (recomputed when they move somewhere else)
       c.userData.baseAt = at.join();   // roughly towards the middle of the room, a little off
       let h = 0; for (const ch of w) h = (h * 31 + ch.charCodeAt(0)) % 997;
-      c.userData.base = Math.atan2(-at[1], -at[2]) + ((h % 100) / 100 - 0.5) * 0.7;
+      c.userData.base = at[4] !== undefined ? at[4] : Math.atan2(-at[1], -at[2]) + ((h % 100) / 100 - 0.5) * 0.7;
       c.rotation.y = c.userData.base;
     }
   }

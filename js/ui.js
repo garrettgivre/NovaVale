@@ -93,7 +93,7 @@ export function toast(text) {
 let busy = false;
 export const talking = () => busy;
 // who is speaking right now (read by the character animation for lip-sync and nods)
-export const speech = { who: null, typing: false, focus: null };
+export const speech = { who: null, typing: false, focus: null, speed: 2, instant: false };   // speed: characters per tick (0 = all at once)
 
 export function openTalk(who, { pt = false } = {}) {
   busy = true;
@@ -134,8 +134,9 @@ export function say(who, lines) {
       box.innerHTML = `<b style="--c:${sp ? PEOPLE[sp].c : '#6a7a90'}">${sp ? PEOPLE[sp].n : ''}</b><span class="tx"></span><i class="nx">▼</i>`;
       const tx = box.querySelector('.tx');
       let k = 0;
+      if (speech.instant || !speech.speed) { tx.innerHTML = l; speech.typing = true; typing = 0; setTimeout(() => { if (full === l) speech.typing = false; }, 600); return; }
       typing = setInterval(() => {
-        k += 2; tx.textContent = l.slice(0, k);
+        k += speech.speed; tx.textContent = l.slice(0, k);
         if (k >= l.length) { clearInterval(typing); typing = 0; tx.innerHTML = l; speech.typing = false; }
       }, 16);
     };

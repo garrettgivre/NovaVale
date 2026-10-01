@@ -97,6 +97,15 @@ Suite 2 advances once `REST_NEED` is met.
 - Second Chance (checkpoints before risky choices) on every bad ending. Junior/Senior difficulty changes hints and task
   wording. Eight optional 2003 postcards, a newspaper clipping, the crew photo.
 
+**Bookends and quality of life (Oct 2026).** Cutscenes: `cine(node, keys, lines)` in main.js (camera keyframes, letterbox
+`#cine`, narration as captions, tap/Escape skips; `E.cine` from story.js). The arrival flies in over the lake to the portico
+after the letter; gala night (`galaNight`, phase 'end' counts as night) gathers the cast round the fountain (`GALA` in
+world.js, facing set per person), Regent wears the crown (built on the head bone in `sync`), before Celeste's letter.
+Three save slots (`SLOTS`, slot 1 keeps the old key; Continue = most recent, Load Game, New Game asks which slot when any
+exists and confirms overwrites), `S.play` seconds played, `S.pz` remembers unfinished puzzle settings (`mem()` in
+puzzles.js), "Previously" recap on continuing (`recap`, `MILESTONES`), Text speed Normal/Fast/Instant in the menu,
+topics heard before appear without typing (`speech.instant`).
+
 ## Design rules (from research into what Nancy Drew fans love and hate)
 Love: atmospheric places, suspects who each hide something, lore, Nancy's sass, phone friends, puzzles woven into the
 story, Second Chance. Hate: chores/padding, backtracking, unclear next steps, hard-to-find hotspots, repeated puzzles,

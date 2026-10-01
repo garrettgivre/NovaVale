@@ -403,3 +403,20 @@ body.touch .turn { width: 44px; height: 96px; }
 body.touch #caption { bottom: calc(var(--barH) + var(--sb) + 154px); }
 .tp-row .btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
 @media (max-width: 480px) { .tp-row { gap: 6px; } .tp-row .btn { padding-left: 8px; padding-right: 8px; font-size: 13px; } }
+
+/* cutscenes: letterbox bars, the HUD hidden, a quiet skip hint */
+#cine { position: fixed; inset: 0; z-index: 40; display: none; cursor: pointer; }
+#cine.on { display: block; }
+#cine .cb-t, #cine .cb-b { position: absolute; left: 0; right: 0; height: 11vh; background: #000; animation: cbin .8s ease-out both; }
+#cine .cb-t { top: 0; } #cine .cb-b { bottom: 0; }
+@keyframes cbin { from { height: 0; } }
+#cine .skip { position: absolute; right: 16px; bottom: calc(3.5vh + var(--sb, 0px)); font-family: var(--caps); font-size: 11px; letter-spacing: .14em; color: rgba(232,213,160,.55); text-transform: uppercase; }
+body.cine #bar, body.cine #corner, body.cine #joy, body.cine .turn, body.cine #near, body.cine #reveal { opacity: 0 !important; pointer-events: none !important; }
+body.cine #caption { bottom: calc(11vh + 18px); z-index: 41; }
+
+/* title: save slots */
+.tbtn.slot small { font-size: 12px; opacity: .85; }
+.tbtn.slot.sure small { color: #ffb48a; }
+.tbtn.slot:disabled { opacity: .45; }
+.tlink { margin-top: 6px; background: none; border: 0; color: rgba(232,213,160,.75); font-family: var(--caps); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; }
+.paper.recap ul { margin: 6px 0 12px; padding-left: 20px; } .paper.recap li { margin: 4px 0; }

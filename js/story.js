@@ -1,12 +1,12 @@
 // The case: tasks, hotspots, conversations, phone calls, days, endings, the map and postcards.
 // Nova's voice: a know-it-all who really does know it all. Bratty, never cruel; she calls people
 // out when the evidence lets her.
-import { S, has, set, hasItem, giveItem, addDoc, night, checkpoint, secondChance, save, PHASE_NAME } from './state.js';
-import { openTalk, closeTalk, say, choose, caption, panel, closePanel, fade, screen, closeScreen, toast, portrait, PEOPLE } from './ui.js';
+import { S, has, set, hasItem, giveItem, addDoc, night, checkpoint, secondChance, save, PHASE_NAME, deleteSlot, currentSlot } from './state.js';
+import { openTalk, closeTalk, say, choose, caption, panel, closePanel, fade, screen, closeScreen, toast, portrait, PEOPLE, speech } from './ui.js';
 import { ITEMS, DOCS, icon } from './items.js';
 import { aquaOS, switchboard, acrostic, recipe, constellation, drawerDial, starDoor, contradiction, musicBox, tapeScrub } from './puzzles.js';
 import { sfx, ghostVoice, ambience, roomSound } from './audio.js';
-import { whereIs, sync, POSTCARDS } from './world.js';
+import { whereIs, sync, POSTCARDS, galaReady } from './world.js';
 
 let E; // engine: { go(node, opts), room(), refresh(), focus(who), unfocus(), resume() }
 export function setEngine(e) { E = e; }
@@ -502,7 +502,8 @@ const TOPICS = {
 
 async function doTopic(who, t) {
   const lines = typeof t.lines === 'function' ? t.lines() : t.lines;
-  await say(who, lines);
+  speech.instant = !!S.asked[who + ':' + t.id];   // heard it before: no typing out
+  await say(who, lines); speech.instant = false;
   S.asked[who + ':' + t.id] = true;
   if (t.puzzle === 'tape') {
     await new Promise(res => tapeScrub(async () => {
@@ -614,6 +615,7 @@ async function kenjiFinale() {
   await say('kenji', ['N: Here\'s what happens. You tell Celeste everything. I tell her you\'re the reason the crown looks perfect, because your fake is better than most people\'s real. And then she finds out where that stone actually belongs.', '*Kenji laughs, startled, and wipes his glasses.*', 'You are a very strange detective, Miss Vale.', 'N: I\'m an extremely good detective. The strange is a bonus.']);
   set('g_done'); closeTalk(); E.unfocus(); sfx('solve');
   await call('celeste', ['Nova? Twice in one day, this is either wonderful or terrible.', 'N: Both. Sit down. Kenji has something to tell you, and then I have something to tell you about what you\'re going to do next.', '*A long, long phone call later.*', '...The crown wears Kenji\'s replica tonight. And on Monday, I\'m writing to the Morimoto family myself.', 'Nova, how do you do this?', 'N: I read everything, and I ask a lot of follow-up questions.']);
+  await galaNight();
   ending();
 }
 
@@ -631,6 +633,16 @@ export function badEnding(k) {
   s.querySelector('#tt').onclick = () => location.reload();
 }
 
+async function galaNight() {
+  // that evening: the cast round the fountain, Regent in the crown, the dome full of stars
+  S.phase = 'end'; save();
+  await fade(() => { E.place('L1'); sync(); E.refresh(); }, 900);
+  ambience('night'); sfx('dawn');
+  for (let i = 0; i < 40 && !galaReady(); i++) await new Promise(r => setTimeout(r, 250));   // everyone's model loaded (up to 10 s)
+  await new Promise(r => setTimeout(r, 600));
+  await E.cine('L1', [{ p: [0, 7, 9], l: [0, 1.4, 0], t: 0 }, { p: [0, 3.2, 8.2], l: [0, 1.6, 1.5], t: 6 }, { p: [0, 1.7, 6.6], l: [0, 1.75, 3.1], t: 11 }],
+    ['Saturday night. The Starfall Gala.', 'Velvet Regent won the Revue, and wore the crown like they were born in it.', 'The star in it is Kenji\'s replica. Nobody in this room will ever know, except the handful of us who do.']);
+}
 function ending() {
   S.phase = 'end'; save(); ambience('day');
   const mins = Math.max(1, Math.round((Date.now() - S.t0) / 60000)), pc = pcCount();
@@ -649,7 +661,7 @@ function ending() {
     <p class="ps">P.P.P.S. Gus still won't tell anyone what's in the boathouse. Ranger Begay has asked me to ask you to ask him. I suspect we'll be in touch.</p></div>
     <h1>Case Closed</h1><p class="sub">A Nova Vale Mystery · ${S.diff === 'senior' ? 'Senior' : 'Junior'} Detective · ${mins} min · Postcards ${pc}/${POSTCARDS.length}</p>
     <button class="btn big" id="again">Play again</button></div>`, 'sky');
-  s.querySelector('#again').onclick = () => { localStorage.removeItem('novavale.aquadome.v1'); location.reload(); };
+  s.querySelector('#again').onclick = () => { deleteSlot(currentSlot()); location.reload(); };
 }
 
 // ---------- Phone ----------
@@ -759,12 +771,38 @@ export function onRoom(room) {
   if (first && FIRST_VISIT[room]) setTimeout(() => think(FIRST_VISIT[room]), 700);
 }
 
+// ---------- Previously, on continuing a saved game ----------
+const MILESTONES = [
+  ['case_seen', 'The display case was opened with a code, not forced.'], ['pin', 'You found a brass star pin by the case.'],
+  ['log_read', 'The keypad log shows MAINT-0, the 2003 build crew\'s code, at 11:52 on Tuesday.'], ['pin_known', 'The pin belongs to the 2003 build crew. Opal\'s is missing.'],
+  ['switch_done', 'You silenced the singing at the switchboard: it came from the planetarium.'], ['holo_card', 'Under the projector: a hologram card marked D.H.'],
+  ['cherry_light', 'Cherry saw a flashlight and a long coat near the stage at midnight.'], ['dex_confess', 'Dex confessed: the ghost is his hologram show.'],
+  ['vesper_clear', 'Vesper is miming her comeback song. She was on a video call at 11:52.'], ['juniper_clear', 'Juniper was baking, and saw the long coat cross the lobby.'],
+  ['tape_pin', 'Silas\'s tape shows a lavender coat with a brass star pin.'], ['drawer_open', 'Opal\'s drawer held a service key and a blueprint for a hidden Star Room.'],
+  ['finale_done', 'In the Star Room, Opal admitted taking the crown. She swears she never touched the star.'], ['star_fake', 'The star in the crown is a fake.'],
+  ['appraisal_read', 'The insurers saw the real star on Monday at 13:40.'], ['kenji_caught', 'Kenji\'s Monday log and the keypad log can\'t both be true.'],
+  ['stella_open', 'Stella was hiding the real star, the Star\'s Tear, and a letter from Kenji.'],
+];
+export function recap() {
+  const got = MILESTONES.filter(([f]) => has(f)).map(([, t]) => t).slice(-4);
+  const next = taskList().find(x => !x.d && !x.t.startsWith('Optional'));
+  if (!got.length && !next) return;
+  panel(`<div class="paper recap"><p class="hand">${PHASE_NAME[S.phase]}${S.play ? ` · ${Math.max(1, Math.round(S.play / 60))} min played` : ''}</p>
+    ${got.length ? `<ul>${got.map(t => `<li>${t}</li>`).join('')}</ul>` : ''}
+    ${next ? `<p><b>Next:</b> ${next.t}</p>` : ''}<button class="btn" id="rcok">Back to the case</button></div>`, { cls: 'doc', title: 'Previously' })
+    .querySelector('#rcok').onclick = () => closePanel();
+}
+
 // ---------- Start ----------
 export async function intro() {
   addDoc('letter');
   panel(DOCS.letter.html + '<button class="btn big" id="lgo">Take the case</button>', { cls: 'doc', title: 'A letter arrives...', noClose: true })
     .querySelector('#lgo').onclick = async () => {
-      closePanel(true); sfx('door');
+      closePanel(true);
+      // arriving: in over the lake to the portico
+      await E.cine('E2', [{ p: [6, 3.6, -46], l: [0, 6, 18], t: 0 }, { p: [3, 2.4, -26], l: [0, 5.2, 18], t: 5 }, { p: [1.6, 1.75, -9], l: [0, 4, 14], t: 10 }, { p: [0, 1.62, 3.2], l: [0, 2.6, 10], t: 14 }],
+        ['The Aquadome. A glass dome on a stone drum, built out over the lake in 2003 and shut for the last nine years.', 'On Saturday it reopens with a gala. On Tuesday night, somebody walked off with the gala\'s crown.', 'Celeste Arden wants it back before anyone finds out it\'s gone. That\'s where I come in.']);
+      sfx('door'); await fade(() => { E.place('L1'); E.refresh(); onRoom('lobby'); }, 600);
       await think(['So this is the Aquadome. Nine years closed, and it still smells like chlorine and old money.', 'As far as anyone here knows, I\'m Celeste\'s summer intern. People say all sorts of things in front of the intern.', 'Marble floors, brass everywhere, and dust on the chandelier. Whoever cleaned for the relaunch skipped everything you have to look up to see. People always do.', 'The display case should be here in the lobby. Crime scenes don\'t investigate themselves.']);
     };
 }

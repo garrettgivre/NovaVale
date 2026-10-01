@@ -1,7 +1,7 @@
 // Engine: renderer + a period post-process (soft resolution, warm grade, grain, vignette),
 // the first-person camera at fixed spots, conversation close-ups, input, the main loop.
 import * as THREE from 'three';
-import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
+import { S, load, newGame, hasSave, save, PHASE_NAME, SLOTS, slotInfo, setSlot, latestSlot, currentSlot } from './state.js';
 import { computeBoundsTree, acceleratedRaycast } from '../vendor/three-mesh-bvh.js';
 import { buildWorld, rebuildEnv, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
@@ -383,12 +383,16 @@ $('#btnReveal').onclick = () => {
   clearTimeout(box._t); box._t = setTimeout(() => box.classList.remove('on'), 2600);
 };
 
+// dialogue text speed: Normal / Fast / Instant
+const TEXTS = [['Normal', 2], ['Fast', 5], ['Instant', 0]];
+let textSpeed = 0; try { textSpeed = +localStorage.getItem('novavale.text') || 0; } catch (e) { } if (!TEXTS[textSpeed]) textSpeed = 0; ui.speech.speed = TEXTS[textSpeed][1];
 function openMenu() {
   const b = ui.panel(`<div class="menu">
     <button class="mbtn" data-a="resume">Return to Game</button>
     <button class="mbtn" data-a="music">Music: ${isMusic() ? 'On' : 'Off'}</button>
     <button class="mbtn" data-a="sound">All sound: ${isMuted() ? 'Off' : 'On'}</button>
     <button class="mbtn" data-a="retro">Retro picture: ${RETRO ? 'On' : 'Off'}</button>
+    <button class="mbtn" data-a="text">Text: ${TEXTS[textSpeed][0]}</button>
     <button class="mbtn" data-a="title">Save and Quit</button>
     <p class="small">${S.diff === 'senior' ? 'Senior' : 'Junior'} Detective · your progress saves automatically</p></div>`, { cls: 'menu-p', title: 'Options' });
   b.querySelectorAll('[data-a]').forEach(x => x.onclick = () => {
@@ -397,6 +401,7 @@ function openMenu() {
     if (a === 'sound') { setMuted(!isMuted()); x.textContent = 'All sound: ' + (isMuted() ? 'Off' : 'On'); try { localStorage.setItem('novavale.mute', isMuted() ? '1' : ''); } catch (e) { } }
     if (a === 'music') { setMusic(!isMusic()); setPref('music', isMusic()); musicUI(); x.textContent = 'Music: ' + (isMusic() ? 'On' : 'Off'); }
     if (a === 'retro') { setRetro(!RETRO); x.textContent = 'Retro picture: ' + (RETRO ? 'On' : 'Off'); }
+    if (a === 'text') { textSpeed = (textSpeed + 1) % TEXTS.length; try { localStorage.setItem('novavale.text', textSpeed); } catch (e) { } ui.speech.speed = TEXTS[textSpeed][1]; x.textContent = 'Text: ' + TEXTS[textSpeed][0]; }
     if (a === 'title') { save(); location.reload(); }
   });
 }
@@ -432,7 +437,7 @@ function resume() {
   } catch (e) { /* private mode */ }
 }
 
-story.setEngine({ go, refresh, resume, focus, unfocus, room: () => roomOf() && roomOf().id });
+story.setEngine({ go, refresh, resume, focus, unfocus, cine, place: id => { showRoom(NODES[id].room); sync(); place(id); }, room: () => roomOf() && roomOf().id });
 
 // ---------- Loop ----------
 const clock = new THREE.Clock();
@@ -441,7 +446,8 @@ const ease = k => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, clock.getDelta()); t += dt;
-  if (V.title) V.yaw += dt * 0.05;
+  if (V.title) V.yaw += dt * 0.05; else if (V.node && !document.hidden) S.play = (S.play || 0) + dt;
+  cineStep(dt);
   walk(dt);
   if (V.move) {
     const m = V.move; m.t += dt / m.dur;
@@ -503,6 +509,33 @@ canvas.addEventListener('webglcontextrestored', () => {
 }, false);
 addEventListener('visibilitychange', () => { if (document.hidden) { try { save(); } catch (e) { } } });
 
+// ---------- Cutscenes: a camera move with letterbox bars and narration; tap to skip ----------
+// keys: [{ p: [x, y, z], l: [look x, y, z], t: seconds }, ...] (t cumulative); lines: narration shown as captions in turn
+function cine(node, keys, lines = []) {
+  return new Promise(res => {
+    const n = NODES[node]; showRoom(n.room); sync(); place(node);
+    document.body.classList.add('cine'); V.busy = true;
+    const T = keys[keys.length - 1].t, ov = $('#cine'); ov.className = 'on';
+    const each = T / Math.max(1, lines.length);
+    lines.forEach((l, i) => setTimeout(() => V.cine && ui.caption(l, each * 1000 - 300), (i * each + 0.4) * 1000));
+    const end = () => { if (!V.cine) return; V.cine = null; ov.className = ''; ui.hideCaption(); document.body.classList.remove('cine'); V.busy = false; res(); };
+    ov.onclick = end; V.cine = { keys, t: 0, end };
+  });
+}
+function cineStep(dt) {
+  const C = V.cine; if (!C) return false;
+  C.t += dt; const K = C.keys, T = K[K.length - 1].t;
+  if (C.t >= T + 0.6) { C.end(); return false; }
+  let i = 0; while (i < K.length - 2 && C.t > K[i + 1].t) i++;
+  const a = K[i], b = K[i + 1], u = Math.min(1, Math.max(0, (C.t - a.t) / (b.t - a.t))), k = u * u * (3 - 2 * u);
+  const L = (x, y) => x + (y - x) * k, p = a.p.map((v, j) => L(v, b.p[j])), l = a.l.map((v, j) => L(v, b.l[j]));
+  camera.position.set(p[0], p[1], p[2]);
+  const dx = l[0] - p[0], dy = l[1] - p[1], dz = l[2] - p[2];
+  V.yaw = Math.atan2(-dx, -dz); V.pitch = Math.atan2(dy, Math.hypot(dx, dz));
+  return true;
+}
+addEventListener('keydown', e => { if (V.cine && (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter')) V.cine.end(); });
+
 // ---------- Touch: a faint glint on things you can tap close by, once you've stood still a moment ----------
 let nearT = 0, nearAcc = 0, nearPos = '';
 function nearHints(dt) {
@@ -536,7 +569,9 @@ function footsteps() {
 // ---------- Title ----------
 function title() {
   V.title = true;
-  const cont = hasSave() && load() && S.phase !== 'end';
+  const ls = latestSlot(); if (ls) setSlot(ls);
+  const cont = !!ls && load() && S.phase !== 'end';
+  const anySave = SLOTS.some(n => slotInfo(n));
   if (cont) { showRoom(NODES[S.node] ? NODES[S.node].room : 'lobby'); sync(); place(NODES[S.node] ? S.node : 'L1'); }
   const s = ui.screen(`<div class="title">
     <div class="tmark">
@@ -546,19 +581,44 @@ function title() {
     </div>
     <div class="tbtns">
       ${cont ? `<button class="tbtn" id="tCont">Continue <small>${PHASE_NAME[S.phase]}</small></button>` : ''}
+      ${anySave ? '<button class="tbtn" id="tLoad">Load Game</button>' : ''}
       <button class="tbtn" id="tNew">New Game</button>
     </div>
     <p class="small">Click to look and talk · drag to look around · click the screen's edge to turn</p></div>`, 'title-s');
-  const start = diff => { initAudio(); ui.closeScreen(); newGame(diff); resume(); story.intro(); };
+  const start = (diff, slot) => { initAudio(); setSlot(slot); ui.closeScreen(); newGame(diff); resume(); story.intro(); };
+  // each save slot as a card: its day, level, time played and when it was last played
+  const slotCard = (n, id) => {
+    const i = slotInfo(n), when = i && i.last ? new Date(i.last).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    return `<button class="tbtn slot" data-s="${n}" id="${id}${n}">Save ${n}<small>${i ? (i.phase === 'end' ? 'Case closed' : PHASE_NAME[i.phase]) + ' · ' + (i.diff === 'senior' ? 'Senior' : 'Junior') + ' · ' + Math.max(1, Math.round((i.play || 0) / 60)) + ' min · ' + when : 'Empty'}</small></button>`;
+  };
+  const back = () => '<button class="tlink" id="tBack">Back</button>';
   s.querySelector('#tNew').onclick = () => {
     initAudio(); sfx('click');
     s.querySelector('.tbtns').innerHTML = `<p class="pick">Choose your level</p>
       <button class="tbtn" id="dJ">Junior Detective<small>A detailed task list and hints on every puzzle</small></button>
       <button class="tbtn" id="dS">Senior Detective<small>Vaguer tasks, and you're on your own</small></button>`;
-    s.querySelector('#dJ').onclick = () => start('junior');
-    s.querySelector('#dS').onclick = () => start('senior');
+    const pickSlot = diff => {
+      if (!anySave) return start(diff, 1);   // nothing saved yet: no need to ask
+      sfx('click');
+      s.querySelector('.tbtns').innerHTML = `<p class="pick">Save it where?</p>${SLOTS.map(n => slotCard(n, 'ns')).join('')}${back()}`;
+      s.querySelector('#tBack').onclick = () => { sfx('click'); title(); };
+      s.querySelectorAll('.slot').forEach(b => b.onclick = () => {
+        const n = +b.dataset.s;
+        if (slotInfo(n) && !b.classList.contains('sure')) { sfx('click'); b.classList.add('sure'); b.querySelector('small').textContent = 'Tap again to start over in this slot'; return; }
+        start(diff, n);
+      });
+    };
+    s.querySelector('#dJ').onclick = () => pickSlot('junior');
+    s.querySelector('#dS').onclick = () => pickSlot('senior');
   };
-  if (cont) s.querySelector('#tCont').onclick = () => { initAudio(); sfx('click'); ui.closeScreen(); resume(); };
+  if (anySave) s.querySelector('#tLoad').onclick = () => {
+    initAudio(); sfx('click');
+    s.querySelector('.tbtns').innerHTML = `<p class="pick">Load which game?</p>${SLOTS.map(n => slotCard(n, 'ls')).join('')}${back()}`;
+    s.querySelector('#tBack').onclick = () => { sfx('click'); title(); };
+    s.querySelectorAll('.slot').forEach(b => { const n = +b.dataset.s, i = slotInfo(n); if (!i || i.phase === 'end') { b.disabled = true; return; }
+      b.onclick = () => { sfx('click'); setSlot(n); load(); ui.closeScreen(); resume(); setTimeout(story.recap, 900); }; });
+  };
+  if (cont) s.querySelector('#tCont').onclick = () => { initAudio(); sfx('click'); ui.closeScreen(); resume(); setTimeout(story.recap, 900); };
 }
 
 // ---------- Boot ----------
@@ -568,7 +628,7 @@ if (RETRO) setRetro(true);
 resize();
 // sculpt the people in the saved room (or the lobby) first; everyone else follows in the background
 const ROOMCAST = { lobby: ['cherry', 'kenji', 'harper', 'silas'], spa: ['vesper'], tech: ['dex'], kitchen: ['juniper', 'jojo'], archive: ['opal'], plan: ['priya', 'regent', 'cherry'], wing: ['rashad', 'gus'], terrace: ['gus', 'silas', 'nate'], star: ['opal'] };
-const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novavale.aquadome.v1') || 'null'); const room = d && NODES[d.node] ? NODES[d.node].room : 'lobby'; return [...new Set([...(ROOMCAST[room] || []), 'cherry', 'kenji', 'harper'])]; } catch (e) { return ['cherry', 'kenji', 'harper']; } };
+const firstCast = () => { try { const n = latestSlot() || 1, d = JSON.parse(localStorage.getItem(n === 1 ? 'novavale.aquadome.v1' : 'novavale.aquadome.v1.s' + n) || 'null'); const room = d && NODES[d.node] ? NODES[d.node].room : 'lobby'; return [...new Set([...(ROOMCAST[room] || []), 'cherry', 'kenji', 'harper'])]; } catch (e) { return ['cherry', 'kenji', 'harper']; } };
 (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast(firstCast().filter(w => !FIG[w]), (i, n) => {
   document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';
 }, () => { if (V.node) sync(); }, Object.keys(FIG))).then(() => setTimeout(() => {
