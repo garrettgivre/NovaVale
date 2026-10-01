@@ -447,7 +447,7 @@ const TOPICS = {
   ],
   gus: [
     { id: 'keys', q: 'Do you have a key to everything?', lines: ['Every door, every cabinet, every drawer.', '*He looks at you sidelong.*', 'You\'re not here to carry boxes, are you. Fine. Celeste trusts you, I\'ll trust you.', '*He jingles the ring.*', 'Except the Service door behind the planetarium stage. Ms. Finch has the only key to that one. Always has. Said it was a "crew thing".'], after: () => set('gus_key') },
-    { id: 'tuesday', q: 'What does a night shift look like here? Tuesday, say.', lines: ['Rounds at ten, rounds at two. Asleep in between, like a sensible man.', 'N: With a flashlight, I suppose. It's dark out there.', 'It\'s a big dark building, miss. Everybody here\'s got a flashlight.'] },
+    { id: 'tuesday', q: 'What does a night shift look like here? Tuesday, say.', lines: ['Rounds at ten, rounds at two. Asleep in between, like a sensible man.', 'N: With a flashlight, I suppose. It is dark out there.', 'It\'s a big dark building, miss. Everybody here\'s got a flashlight.'] },
     { id: 'boathouse', q: 'Why is there a new padlock on the boathouse?', when: () => has('v_terrace'), lines: ['*Gus\'s face shuts like a door.*', 'Because I put one on it.', 'N: That isn\'t an answer.', 'It\'s the only one you\'re getting. It\'s got nothing to do with your crown. Leave it.', 'N: For now.'], after: () => set('boathouse_ask') },
     { id: 'rounds', q: 'What are you doing up here at this hour?', when: () => S.phase === 'n1', lines: ['Rounds. Somebody\'s been singing through the speakers all week and Celeste thinks it\'s me. It isn\'t me. The ghost has better range.'] },
     { id: 'pin', ...pinQ, lines: ['Crew pin. I wasn\'t crew. I came in \'05, after. They were a tight bunch.'] },
