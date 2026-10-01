@@ -189,6 +189,11 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   hidden by the new planetarium seats and moved into the aisle).
 
 ## Status and next steps
+Long-term goal (Garrett, Oct 2026): once the game is finished, publish it on Google Play (likely bundled with Capacitor so it
+works offline; needs a developer account, a closed test with testers, a privacy policy, no "Nancy Drew" in the listing,
+fonts bundled, and a phone performance pass first). Not now.
+Non-art ideas offered next: phone controls and feel, opening/ending cutscenes, save slots and quality of life, a phone
+performance pass (smaller model textures), the boathouse mini-case.
 Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
