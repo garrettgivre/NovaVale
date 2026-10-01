@@ -117,6 +117,11 @@ The terrace's Aquadome exterior matches the inside: wings sit where the lobby's 
 terrace direction (-sin a, cos a) from the drum centre (0, 18)): Planetarium (copper dome, behind), Spa (glazed lantern),
 Tech Office with the Guest Wing above (two storeys, dormers), Grand Staircase tower by the portico, Kitchen (chimney),
 Archive (hipped roof). Rooms are separate scenes at the origin; only this model shows how they fit together.
+Detail (Oct 2026): quoins, string courses, cornice grime and splash streaks (nine years closed), downpipes, iron ridge
+cresting, chimney pots; the spa is a glass pool pavilion with a barrel vault ("a sky you can swim under"); gold five-point
+stars on the planetarium's copper dome; Guest Wing shutters; ivy; scaffolding, ladder and paint at the kitchen (being
+readied for the gala); a GRAND REOPENING banner on the portico and an entrance sign; a gravel walk round the back,
+flower borders and box hedges, clipped cones and lamps, an armillary sphere on the lawn.
 
 Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin (Act 3 hooks) }`. To add a place: a
 `build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.

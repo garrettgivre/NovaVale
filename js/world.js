@@ -3435,7 +3435,7 @@ function buildTerrace() {
   const dome = new THREE.Group(); dome.position.set(0, 0, Z0); R.g.add(dome);
   struct(add(dome, new THREE.CylinderGeometry(9.85, 9.95, 0.6, 72), mStone, 0, 0.3, 0));
   struct(add(dome, new THREE.CylinderGeometry(RD, RD, 6.1, 72, 1, true), mAshlar, 0, 3.65, 0));
-  const mWin = M(0x2e3a42, 0.12, 0.5, { emissive: 0xffb860, emissiveIntensity: 0 }); R.winGlow = mWin;
+  const mWin = M(0x3c4c5a, 0.08, 0.6, { emissive: 0xffb860, emissiveIntensity: 0, envMapIntensity: 1.8 }); R.winGlow = mWin;
   for (let k = 0; k < 16; k++) {   // pilasters with bases and capitals
     const a = k / 16 * Math.PI * 2; if (Math.abs(a - Math.PI) < 0.5) continue;
     const [x, z] = px(a, RD + 0.14), [x1, z1] = px(a, RD + 0.2);
@@ -3494,7 +3494,8 @@ function buildTerrace() {
     const frame = (a, r) => { const [dx, dz] = dirOf(a); return { a, ry: Math.atan2(dx, dz), cx: C[0] + dx * r, cz: C[1] + dz * r, P(lx, lz) { const c = Math.cos(this.ry), s = Math.sin(this.ry); return [this.cx + lx * c + lz * s, this.cz - lx * s + lz * c]; } }; };
     const at = (F, lx, ly, lz, fn) => { const [x, z] = F.P(lx, lz); fn(x, ly, z); };
     // window on a face: face 'f' (outward, +z), 'l' (-x) or 'r' (+x); u = position along the face, y0 = sill height
-    const win = (F, face, half, u, y0, w, h, arched) => {
+    const mShutter = M(0x3d5a48, 0.6), mShutterD = M(0x2c4236, 0.7), mPot = M(0x9a5a40, 0.8), mPost = M(0x3a2a1c, 0.6), mTin = M(0x8a8a8a, 0.4, 0.8), mPaint = [M(0xe8e2d0, 0.5, 0.2), M(0x5f8f7c, 0.5, 0.2)];
+    const win = (F, face, half, u, y0, w, h, arched, shut = false) => {
       const ry = F.ry + (face === 'f' ? 0 : face === 'r' ? Math.PI / 2 : -Math.PI / 2);
       const lx = face === 'f' ? u : face === 'r' ? half : -half, lz = face === 'f' ? half : u * (face === 'r' ? -1 : 1);
       const n = 0.03, [x, z] = F.P(lx + (face === 'r' ? n : face === 'l' ? -n : 0), lz + (face === 'f' ? n : 0));
@@ -3507,13 +3508,46 @@ function buildTerrace() {
       b.box(0.04, h - (arched ? w / 2 : 0.05), 0.04, BRONZE, mx, y0 + (h - (arched ? w / 2 : 0)) / 2, mz, ry);
       b.box(w, 0.04, 0.04, BRONZE, mx, y0 + h * 0.45, mz, ry);
       b.box(w + 0.4, 0.1, 0.26, mTrim, x, y0 - 0.05, z, ry);
+      if (!arched) { b.box(w + 0.5, 0.14, 0.2, mTrim, x, y0 + h + 0.24, z, ry); const [kx, kz] = F.P(lx + (face === 'r' ? .1 : face === 'l' ? -.1 : 0), lz + (face === 'f' ? .1 : 0)); b.box(0.26, 0.3, 0.12, mTrim, kx, y0 + h + 0.12, kz, ry); }
+      if (shut) for (const sd of [-1, 1]) {
+        const off = sd * (w / 2 + 0.36), sx_ = face === 'f' ? off : 0, sz_ = face === 'f' ? 0 : off * (face === 'r' ? -1 : 1);
+        const [qx, qz] = F.P(lx + sx_ + (face === 'r' ? .06 : face === 'l' ? -.06 : 0), lz + sz_ + (face === 'f' ? .06 : 0));
+        b.box(0.5, h + 0.1, 0.05, mShutter, qx, y0 + h / 2, qz, ry);
+        for (let k = 1; k < 7; k++) b.box(0.46, 0.03, 0.06, mShutterD, qx, y0 + k * h / 7, qz, ry);
+      }
     };
     // a rectangular block: plinth, walls, cornice
-    const block = (F, w, d, h, wallM = mWall) => {
+    // weathering: nine years closed left grey streaks under every cornice and splash marks at the foot of the walls
+    const grimeT = once('tGrime', () => { const c = T.canvas(64, 128), g = c.getContext('2d'), r = T.rng(77);
+      const gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(40,38,32,.55)'); gr.addColorStop(.35, 'rgba(40,38,32,.18)'); gr.addColorStop(1, 'rgba(40,38,32,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 128);
+      for (let i = 0; i < 14; i++) { const x = r() * 64, w = 1 + r() * 3, l = 40 + r() * 80; const sg = g.createLinearGradient(0, 0, 0, l); sg.addColorStop(0, 'rgba(35,33,28,.35)'); sg.addColorStop(1, 'rgba(35,33,28,0)'); g.fillStyle = sg; g.fillRect(x, 0, w, l); }
+      const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t; });
+    const mGrime = new THREE.MeshBasicMaterial({ map: grimeT, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const grime = (F, w, d, h) => {
+      for (const [lx, lz, ry, len] of [[0, d / 2 + 0.012, 0, w], [0, -d / 2 - 0.012, Math.PI, w], [w / 2 + 0.012, 0, Math.PI / 2, d], [-w / 2 - 0.012, 0, -Math.PI / 2, d]]) {
+        const top = new THREE.PlaneGeometry(len, 1.6); terUV(top, len / 3, 1);
+        at(F, lx, h - 1.1, lz, (x, y, z) => b.add(top, mGrime, x, y, z, F.ry + ry));
+        const foot = new THREE.PlaneGeometry(len, 0.7); terUV(foot, len / 3, 1); foot.rotateZ(Math.PI);
+        at(F, lx, 0.95, lz, (x, y, z) => b.add(foot, mGrime, x, y, z, F.ry + ry));
+      }
+    };
+    const quoins = (F, w, d, h) => {
+      for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) for (let y = 0.75, i = 0; y < h - 0.5; y += 0.42, i++) {
+        const long = i % 2 ? 0.62 : 0.4;
+        at(F, sx * (w / 2 + 0.02) - sx * long / 2 + sx * 0.02, y, sz * (d / 2 + 0.03), (x, yy, z) => b.box(long, 0.36, 0.08, mTrim, x, yy, z, F.ry));
+        at(F, sx * (w / 2 + 0.03), y, sz * (d / 2 + 0.02) - sz * (i % 2 ? 0.4 : 0.62) / 2 + sz * 0.02, (x, yy, z) => b.box(0.08, 0.36, i % 2 ? 0.4 : 0.62, mTrim, x, yy, z, F.ry));
+      }
+    };
+    const pipes = (F, w, d, h) => { for (const sx of [-1, 1]) at(F, sx * (w / 2 - 0.35), h / 2, d / 2 + 0.1, (x, y, z) => { b.cyl(0.05, 0.05, h, mSlate, x, y, z, 6); b.box(0.2, 0.16, 0.2, mSlate, x, h - 0.2, z, F.ry); }); };
+    const block = (F, w, d, h, wallM = mWall, o = {}) => {
       at(F, 0, h / 2, 0, (x, y, z) => b.box(w, h, d, wallM, x, y, z, F.ry, 3.2));
       at(F, 0, 0.3, 0, (x, y, z) => b.box(w + 0.3, 0.6, d + 0.3, mStone, x, y, z, F.ry, 1.5));
+      at(F, 0, 0.66, 0, (x, y, z) => b.box(w + 0.18, 0.12, d + 0.18, mTrim, x, y, z, F.ry, 1.5));
       at(F, 0, h - 0.15, 0, (x, y, z) => b.box(w + 0.36, 0.3, d + 0.36, mTrim, x, y, z, F.ry, 1.5));
+      at(F, 0, h - 0.36, 0, (x, y, z) => b.box(w + 0.22, 0.1, d + 0.22, mTrim, x, y, z, F.ry, 1.5));
       at(F, 0, h + 0.06, 0, (x, y, z) => b.box(w + 0.5, 0.12, d + 0.5, mTrim, x, y, z, F.ry, 1.5));
+      if (!o.plain) { quoins(F, w, d, h - 0.4); grime(F, w, d, h); }
+      if (o.pipes) pipes(F, w, d, h);
     };
     // roofs: gable (ridge along local x), hip (square-based frustum) and a low glazed lantern
     const gable = (F, w, d, h, rise) => {
@@ -3522,6 +3556,8 @@ function buildTerrace() {
       const tri = new THREE.Shape(); tri.moveTo(-d / 2, 0); tri.lineTo(d / 2, 0); tri.lineTo(0, rise); tri.closePath();
       for (const s of [-1, 1]) at(F, s * (w / 2 + 0.02), h + 0.12, 0, (x, y, z) => b.add(new THREE.ExtrudeGeometry(tri, { depth: 0.2, bevelEnabled: false }), mTrim, x, y, z, F.ry + Math.PI / 2 * (s > 0 ? 1 : -1) + (s > 0 ? Math.PI : 0)));
       at(F, 0, h + 0.14 + rise, 0, (x, y, z) => b.box(w + 0.7, 0.12, 0.22, mSlate, x, y, z, F.ry));
+      for (let i = 0; i <= Math.round(w / 0.8); i++) at(F, -w / 2 + i * w / Math.round(w / 0.8), h + 0.38 + rise, 0, (x, y, z) => { b.cyl(0.012, 0.012, 0.36, IRON, x, y, z, 4); b.sph(0.035, IRON, x, y + 0.2, z, 1, 5); });
+      at(F, 0, h + 0.5 + rise, 0, (x, y, z) => b.box(w + 0.5, 0.025, 0.025, IRON, x, y, z, F.ry));
     };
     const hip = (F, w, d, h, rise, top = 0.12, m = mSlate) => {
       const g = new THREE.CylinderGeometry(top, Math.SQRT1_2, 1, 4, 1); g.rotateY(Math.PI / 4);
@@ -3545,19 +3581,39 @@ function buildTerrace() {
       }
       b.add(new THREE.SphereGeometry(PR + 0.3, 40, 14, 0, Math.PI * 2, 0, Math.PI / 2), mCopper, PC[0], 6.9, PC[1], 0, 0, 0, [1, 0.72, 1]);
       for (let k = 0; k < 16; k++) { const ph = k / 16 * Math.PI * 2, pts = []; for (let j = 0; j <= 10; j++) { const th = j / 10 * Math.PI / 2; pts.push([PC[0] + Math.sin(th) * Math.cos(ph) * (PR + 0.34), 6.9 + Math.cos(th) * (PR + 0.3) * 0.72, PC[1] + Math.sin(th) * Math.sin(ph) * (PR + 0.34)]); } b.add(terTube(pts, 0.06, 10, 4), mCopperD); }
+      const mGold = M(0xd8b060, 0.3, 0.9);
+      for (let k = 0; k < 46; k++) {
+        const th = 0.25 + rr() * 1.15, ph = rr() * Math.PI * 2, rS = PR + 0.33, sc = 0.13 + rr() * 0.14;
+        const g = new THREE.ExtrudeGeometry(starShape(sc, sc * 0.45), { depth: 0.02, bevelEnabled: false }); g.center();
+        b.add(g, mGold, PC[0] + Math.sin(th) * Math.sin(ph) * rS, 6.9 + Math.cos(th) * rS * 0.72, PC[1] + Math.sin(th) * Math.cos(ph) * rS, ph, th - Math.PI / 2 + 0.25 * Math.sin(th));
+      }
+      b.add(new THREE.TorusGeometry(PR + 0.32, 0.09, 6, 64), mGold, PC[0], 7.0, PC[1], 0, Math.PI / 2);
       const top = 6.9 + (PR + 0.3) * 0.72; b.cyl(0.55, 0.65, 0.7, mTrim, PC[0], top + 0.3, PC[1], 12); b.cyl(0.1, 0.62, 0.7, mCopperD, PC[0], top + 0.95, PC[1], 12); star3(R.g, 0.32, BRASS, PC[0], top + 1.55, PC[1], 0.06);
     }
     // Spa & Pools (north-east): a tall pool hall with arched windows and a glazed roof lantern over the pool
     {
       link(55, 3.6, RD - 0.4, RD + 1.6, 4);
+      // "a sky you can swim under": a glass pool pavilion in iron, on a stone base
       const F = frame(55, RD + 1.4 + 5.2), w = 14, d = 10.4, h = 5.2;
-      block(F, w, d, h);
-      for (let i = 0; i < 5; i++) win(F, 'f', d / 2, -5.4 + i * 2.7, 1.3, 1.6, 3.1, true);
-      for (const face of ['l', 'r']) for (let i = 0; i < 3; i++) win(F, face, w / 2, -3 + i * 3, 1.3, 1.6, 3.1, true);
-      hip(F, w, d, h, 1.5, 0.3);
-      at(F, 0, h + 1.75, 0, (x, y, z) => b.box(7, 0.9, 3.6, glassR, x, y, z, F.ry));
-      at(F, 0, h + 2.25, 0, (x, y, z) => b.box(7.3, 0.12, 3.9, BRONZE, x, y, z, F.ry));
-      for (let i = 0; i <= 6; i++) at(F, -3.5 + i * 7 / 6, h + 1.75, 1.81, (x, y, z) => b.box(0.06, 0.9, 0.06, BRONZE, x, y, z, F.ry));
+      block(F, w, d, h, mWall, { plain: 1 });
+      const bay = (face, half, u) => {   // a full-height glazed arched bay with iron glazing bars
+        const ry = F.ry + (face === 'f' ? 0 : face === 'r' ? Math.PI / 2 : -Math.PI / 2), lx = face === 'f' ? u : face === 'r' ? half : -half, lz = face === 'f' ? half : u * (face === 'r' ? -1 : 1);
+        const [x, z] = F.P(lx + (face === 'r' ? .04 : face === 'l' ? -.04 : 0), lz + (face === 'f' ? .04 : 0));
+        b.add(new THREE.ShapeGeometry(terArch(2.2, 4.0), 10), glassR, x, 0.9, z, ry);
+        for (let k = -2; k <= 2; k++) { const [bx, bz] = F.P(lx + (face === 'f' ? k * .44 : face === 'r' ? .07 : -.07), lz + (face === 'f' ? .07 : k * .44 * (face === 'r' ? -1 : 1))); b.box(0.04, 3.9 - Math.abs(k) * 0.25, 0.04, IRON, bx, 0.9 + (3.9 - Math.abs(k) * 0.25) / 2, bz, ry); }
+        for (const yy of [1.6, 2.5, 3.4]) { const [bx, bz] = F.P(lx + (face === 'r' ? .07 : face === 'l' ? -.07 : 0), lz + (face === 'f' ? .07 : 0)); b.box(2.2, 0.04, 0.04, IRON, bx, 0.9 + yy, bz, ry); }
+        const outer = terArch(2.5, 4.15); outer.holes.push(new THREE.Path(terArch(2.2, 4.0).getPoints(16)));
+        b.add(new THREE.ExtrudeGeometry(outer, { depth: 0.14, bevelEnabled: false, curveSegments: 8 }), mTrim, x, 0.9, z, ry);
+      };
+      for (let i = 0; i < 5; i++) bay('f', d / 2, -5.6 + i * 2.8);
+      for (const face of ['l', 'r']) for (let i = 0; i < 3; i++) bay(face, w / 2, -3.3 + i * 3.3);
+      // glass barrel vault along the hall, iron ribs, a cresting along the top
+      const VR = d / 2 - 0.3;
+      at(F, 0, h + 0.05, 0, (x, y, z) => { const g = new THREE.CylinderGeometry(VR, VR, w - 0.6, 28, 1, true, -Math.PI / 2, Math.PI); g.rotateZ(Math.PI / 2); g.scale(1, 0.55, 1); b.add(g, glassR, x, y, z, F.ry); });
+      for (let i = 0; i <= 8; i++) { const lx = -(w - 0.6) / 2 + i * (w - 0.6) / 8, pts = []; for (let j = 0; j <= 12; j++) { const a = -Math.PI / 2 + j / 12 * Math.PI; const [x, z] = F.P(lx, Math.sin(a) * (VR + 0.04)); pts.push([x, h + 0.05 + Math.cos(a) * (VR + 0.04) * 0.55, z]); } b.add(terTube(pts, 0.05, 12, 4), IRON); }
+      for (const sz of [-1, 0, 1]) { const a = sz * 0.9; at(F, 0, h + 0.05 + Math.cos(a) * (VR + 0.05) * 0.55, Math.sin(a) * (VR + 0.05), (x, y, z) => b.box(w - 0.6, 0.05, 0.05, IRON, x, y, z, F.ry)); }
+      for (let i = 0; i < 14; i++) at(F, -(w - 1) / 2 + i * (w - 1) / 13, h + 0.05 + VR * 0.55 + 0.2, 0, (x, y, z) => { b.cyl(0.015, 0.015, 0.35, IRON, x, y, z, 4); b.sph(0.05, BRASS, x, y + 0.2, z, 1, 6); });
+      at(F, 0, h + 0.05 + VR * 0.55 + 0.04, 0, (x, y, z) => b.box(w - 0.4, 0.06, 0.08, IRON, x, y, z, F.ry));
     }
     // Tech Office below, the Guest Wing above (west): two storeys, a slate gable roof with dormers
     {
@@ -3565,7 +3621,8 @@ function buildTerrace() {
       const F = frame(110, RD + 1.2 + 4.6), w = 16, d = 9.2, h = 7.4;
       block(F, w, d, h);
       at(F, 0, 3.7, 0, (x, y, z) => b.box(w + 0.16, 0.22, d + 0.16, mTrim, x, y, z, F.ry, 1.5));   // floor band
-      for (let i = 0; i < 6; i++) { win(F, 'f', d / 2, -6.25 + i * 2.5, 1.1, 1.1, 1.6, false); win(F, 'f', d / 2, -6.25 + i * 2.5, 4.5, 1.1, 1.9, false); }
+      for (let i = 0; i < 6; i++) { win(F, 'f', d / 2, -6.25 + i * 2.5, 1.1, 1.1, 1.6, false); win(F, 'f', d / 2, -6.25 + i * 2.5, 4.5, 1.1, 1.9, false, true); }
+      pipes(F, w, d, h);
       for (const face of ['l', 'r']) for (let i = 0; i < 2; i++) { win(F, face, w / 2, -2 + i * 4, 1.1, 1.1, 1.6, false); win(F, face, w / 2, -2 + i * 4, 4.5, 1.1, 1.9, false); }
       gable(F, w, d, h, 2.6);
       for (let i = 0; i < 3; i++) {   // dormers on the outer slope
@@ -3573,7 +3630,7 @@ function buildTerrace() {
         win(frame(110, RD + 1.2 + 4.6), 'f', d / 4 + 1.17, lx, h + 0.45, 0.8, 0.95, false);
         at(F, lx, h + 1.85, d / 4 + 0.35, (x, y, z) => b.box(1.75, 0.12, 1.9, mSlate, x, y, z, F.ry));
       }
-      for (const s of [-1, 1]) at(F, s * 5.5, h + 2.6, -1.3, (x, y, z) => { b.box(0.8, 1.8, 0.8, mWall, x, y, z, F.ry, 1.5); b.box(1.0, 0.15, 1.0, mTrim, x, y + 0.95, z, F.ry); });
+      for (const s of [-1, 1]) at(F, s * 5.5, h + 2.6, -1.3, (x, y, z) => { b.box(0.8, 1.8, 0.8, mWall, x, y, z, F.ry, 1.5); b.box(1.0, 0.15, 1.0, mTrim, x, y + 0.95, z, F.ry); for (const o of [-0.18, 0.18]) b.cyl(0.09, 0.11, 0.4, mPot, x + o, y + 1.2, z, 8); });
     }
     // Grand Staircase (by the portico): a tower with tall stair windows and a pointed slate roof
     {
@@ -3588,7 +3645,7 @@ function buildTerrace() {
     {
       link(250, 3.2, RD - 0.4, RD + 1.4, 3.8);
       const F = frame(250, RD + 1.2 + 4.1), w = 10.4, d = 8.2, h = 4.4;
-      block(F, w, d, h);
+      block(F, w, d, h, mWall, { pipes: 1 });
       for (let i = 0; i < 3; i++) win(F, 'f', d / 2, -3.2 + i * 3.2, 1.2, 1.3, 1.9, false);
       win(F, 'r', w / 2, -1.6, 1.2, 1.3, 1.9, false);
       at(F, -w / 2 - 0.03, 0.6, 1.5, (x, y, z) => { b.box(0.08, 2.2, 1.1, M(0x5a3a26, 0.7), x, y + 1.1, z, F.ry); b.box(0.5, 0.15, 1.6, mStone, x - 0.2, 0.62, z, F.ry); });
@@ -3599,10 +3656,77 @@ function buildTerrace() {
     {
       link(305, 3.2, RD - 0.4, RD + 1.4, 3.9);
       const F = frame(305, RD + 1.2 + 4.6), w = 9.6, d = 9.2, h = 4.8;
-      block(F, w, d, h);
+      block(F, w, d, h, mWall, { pipes: 1 });
       for (let i = 0; i < 3; i++) win(F, 'f', d / 2, -3 + i * 3, 1.0, 1.2, 2.6, true);
       for (const face of ['l', 'r']) for (let i = 0; i < 2; i++) win(F, face, w / 2, -1.8 + i * 3.6, 1.0, 1.2, 2.6, true);
       hip(F, w, d, h, 2.0);
+    }
+
+    // ---- grounds: a gravel walk round the building, box hedges and flower borders along the wings, lamps
+    const walk = new THREE.RingGeometry(RD + 0.5, 27, 64, 1, Math.PI - 0.45, Math.PI + 0.9); walk.rotateX(-Math.PI / 2);   // round the back and sides, not across the terrace terUV(walk, 14, 14);
+    b.add(walk, mGravel, C[0], 0.003, C[1]);
+    const boxM = M(0x3f5f34, 0.9, 0, { t: tex('tLeaf', terLeafTex), bump: 0.05 }), soilM = M(0x4a3626, 0.95);
+    const FL = [0xd8506a, 0xf0d060, 0xffffff, 0x9070c8, 0xf08848].map(c => M(c, 0.8));
+    const border = (a, r, len, u0 = 0) => {   // along the front of a wing: soil bed, flowers, clipped box behind
+      const F = frame(a, r);
+      at(F, u0, 0.08, 0, (x, y, z) => b.box(len, 0.16, 1.0, soilM, x, y, z, F.ry));
+      at(F, u0, 0.4, -0.35, (x, y, z) => b.box(len, 0.6, 0.45, boxM, x, y, z, F.ry, 1.2));
+      for (let i = 0; i < len * 4; i++) at(F, u0 - len / 2 + rr() * len, 0.22 + rr() * 0.08, 0.05 + rr() * 0.4, (x, y, z) => b.sph(0.06 + rr() * 0.04, FL[i % FL.length], x, y, z, 1, 5));
+    };
+    border(110, RD + 1.2 + 4.6 + 5.2, 14); border(250, RD + 1.2 + 4.1 + 4.7, 4.4, -2.7); border(305, RD + 1.2 + 4.6 + 5.2, 8.5); border(55, RD + 1.4 + 5.2 + 5.8, 12);
+    // a ring of clipped cones and lamp posts round the walk
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * 360 + 7; if (a > 120 && a < 240) continue;
+      const [dx, dz] = dirOf(a), x = C[0] + dx * 26.2, z = C[1] + dz * 26.2;
+      if (k % 2) { b.cyl(0.02, 0.55, 1.6, boxM, x, 0.95, z, 10); b.cyl(0.32, 0.36, 0.3, mStone, x, 0.15, z, 10); }
+      else { b.lathe([[0.001, 0], [0.16, 0], [0.12, 0.12], [0.06, 0.3], [0.045, 2.6], [0.06, 2.65], [0.001, 2.66]], IRON, x, 0, z, 10); b.box(0.24, 0.32, 0.24, lampM, x, 2.84, z); b.cyl(0.02, 0.2, 0.18, IRON, x, 3.08, z, 4); }
+    }
+    // an armillary sphere on the lawn: the planetarium's sign to anyone walking up from the lake
+    {
+      const ax = 13.5, az = 4.5, ay = 1.55, mG = M(0xb08a50, 0.35, 0.9);
+      b.lathe([[0.001, 0], [0.55, 0], [0.55, 0.18], [0.4, 0.24], [0.26, 0.4], [0.2, 1.0], [0.3, 1.08], [0.32, 1.14], [0.001, 1.14]], mStone, ax, 0, az, 20);
+      b.cyl(0.04, 0.06, 0.2, mG, ax, 1.22, az, 8);
+      for (const [rx, rz, r] of [[Math.PI / 2, 0, 0.4], [0, 0, 0.4], [0, Math.PI / 2, 0.4], [Math.PI / 2 - 0.41, 0, 0.36]]) b.add(new THREE.TorusGeometry(r, 0.018, 6, 40), mG, ax, ay, az, 0, rx, rz);
+      b.add(new THREE.CylinderGeometry(0.012, 0.012, 1.05, 6), mG, ax, ay, az, 0, 0.41, 0);
+      b.sph(0.07, BRASS, ax, ay, az, 1, 10);
+    }
+    // ivy: nine years closed, it has climbed the kitchen and archive walls and a corner of the west wing
+    const ivyT = once('tIvy', () => { const c = T.canvas(256, 256), g = c.getContext('2d'), r = T.rng(91);
+      for (let i = 0; i < 420; i++) { const y = 256 - Math.pow(r(), 0.7) * 256, x = 128 + (r() - .5) * (90 + (256 - y) * 0.7), s = 5 + r() * 7; g.fillStyle = ['#4f7a34', '#6a9440', '#3d6a2a', '#82a850', '#5a8a3a'][i % 5]; g.save(); g.translate(x, y); g.rotate(r() * 6); g.beginPath(); g.moveTo(0, -s); g.quadraticCurveTo(s, -s * .2, 0, s * .8); g.quadraticCurveTo(-s, -s * .2, 0, -s); g.fill(); g.restore(); }
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; });
+    const ivyM = new THREE.MeshStandardMaterial({ map: ivyT, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8 });
+    for (const [a, r, u, w, hh] of [[250, RD + 1.2 + 4.1 + 4.13, -4.4, 2.6, 4.2], [250, RD + 1.2 + 4.1 + 4.13, 4.6, 2.0, 3.0], [305, RD + 1.2 + 4.6 + 4.63, 3.8, 2.4, 4.4], [110, RD + 1.2 + 4.6 + 4.63, 7.2, 1.8, 5.5]]) {
+      const F = frame(a, r); at(F, u, hh / 2, 0, (x, y, z) => b.add(new THREE.PlaneGeometry(w, hh), ivyM, x, y, z, F.ry));
+    }
+    // being made ready for Saturday: scaffolding, a ladder and paint pots against the kitchen wing
+    {
+      const F = frame(250, RD + 1.2 + 4.1 + 4.75), tube = M(0x9a9ea4, 0.4, 0.8), plank = M(0x9a7a50, 0.85);
+      for (const u of [0.7, 3.7]) for (const zz of [-0.25, 0.55]) at(F, u, 2.3, zz, (x, y, z) => b.cyl(0.03, 0.03, 4.6, tube, x, y, z, 6));
+      for (const yy of [1.5, 3.0, 4.4]) { at(F, 2.2, yy, 0.15, (x, y, z) => b.box(3.2, 0.05, 0.9, plank, x, y, z, F.ry)); for (const zz of [-0.25, 0.55]) at(F, 2.2, yy + 0.5, zz, (x, y, z) => b.box(3.1, 0.04, 0.04, tube, x, y, z, F.ry)); }
+      for (const o of [-0.22, 0.22]) at(F, 4.4 + o, 1.5, 0.75, (x, y, z) => b.box(0.05, 3.1, 0.05, plank, x, y, z, F.ry, 0, -0.18));
+      for (let k = 0; k < 9; k++) at(F, 4.4, 0.25 + k * 0.32, 0.98 - k * 0.32 * 0.18, (x, y, z) => b.box(0.44, 0.04, 0.04, plank, x, y, z, F.ry));
+      for (const [u, c] of [[1.4, 0], [2.5, 1]]) at(F, u, 0.18, 0.9, (x, y, z) => { b.cyl(0.13, 0.12, 0.26, mPaint[c], x, y, z, 10); b.cyl(0.135, 0.135, 0.02, mTin, x, y + 0.14, z, 10); });
+    }
+    // the gala banner between the portico columns, and a sign at the foot of the steps
+    {
+      const banT = once('tBanner', () => T.textCanvas(512, 160, (g, w, h) => {
+        g.fillStyle = '#2a1e46'; g.fillRect(0, 0, w, h); g.strokeStyle = '#d8b060'; g.lineWidth = 6; g.strokeRect(10, 10, w - 20, h - 20);
+        g.fillStyle = '#e8d5a0'; g.textAlign = 'center'; g.font = '600 44px Cinzel, Georgia, serif'; g.fillText('GRAND REOPENING', w / 2, 72);
+        g.font = 'italic 30px "EB Garamond", Georgia, serif'; g.fillText('The Starfall Gala  ·  Saturday', w / 2, 122);
+      }));
+      const bm = new THREE.MeshLambertMaterial({ map: banT, side: THREE.DoubleSide });
+      const bg = new THREE.PlaneGeometry(2.6, 0.82, 12, 1), pa_ = bg.attributes.position; for (let i = 0; i < pa_.count; i++) pa_.setZ(i, Math.sin((pa_.getX(i) / 2.6 + .5) * Math.PI) * -0.06); bg.computeVertexNormals();
+      const ban = add(R.g, bg, bm, 0, 4.15, 6.05); ban.rotation.y = Math.PI; ban.userData.nocast = 1;
+      for (const sx of [-1.3, 1.3]) b.cyl(0.008, 0.008, 0.5, IRON, sx, 4.65, 6.05, 4);
+      const sgT = once('tEntrance', () => T.textCanvas(512, 256, (g, w, h) => {
+        g.fillStyle = '#efe6cf'; g.fillRect(0, 0, w, h); g.strokeStyle = '#3a2a18'; g.lineWidth = 5; g.strokeRect(14, 14, w - 28, h - 28);
+        g.fillStyle = '#2e2214'; g.textAlign = 'center'; g.font = '600 52px Cinzel, Georgia, serif'; g.fillText('THE AQUADOME', w / 2, 92);
+        g.font = 'italic 30px "EB Garamond", Georgia, serif'; g.fillText('Lakeshore Spa & Planetarium', w / 2, 146); g.font = '24px Cinzel, Georgia, serif'; g.fillText('EST. 2003', w / 2, 200);
+      }));
+      const sx = 5.6, sz = 4.6, sm = new THREE.MeshLambertMaterial({ map: sgT });
+      for (const o of [-0.75, 0.75]) b.box(0.1, 1.5, 0.1, mPost, sx + o, 0.75, sz);
+      const sg = add(R.g, new THREE.PlaneGeometry(1.5, 0.75), sm, sx, 1.1, sz - 0.06); sg.rotation.y = Math.PI; sg.userData.nocast = 1;
+      b.box(1.62, 0.84, 0.06, mPost, sx, 1.1, sz); b.box(1.8, 0.1, 0.16, mPost, sx, 1.56, sz);
     }
   }
   b.flush(R.g);
@@ -3742,7 +3866,7 @@ export function sync() {
   X.crown.visible = !has('crown_back');
   L.caseCrown.visible = has('crown_back');
   for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
-  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0;
+  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0;
   for (const w in CAST) {
     const at = whereIs(w);
     if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync(), at[0] === curRoom);
