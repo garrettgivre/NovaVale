@@ -1851,8 +1851,8 @@ function ixTechDress(R) {
   ixTube(N, [[3.3, 2.585, -3.78], [3.35, 2.58, -3.4], [3.35, 2.4, -2.9], [3.3, 2.15, -2.62]], 0.04, cBlack, 20);
   ixTube(N, [[3.36, 2.58, -3.3], [3.38, 2.4, -2.8], [3.4, 2.15, -2.5]], 0.025, cGrey, 20);
   // cable drop to the desk, behind it
-  ixTube(N, [[0.9, 2.58, -3.78], [0.92, 2.0, -3.9], [0.95, 1.2, -3.92], [0.95, 0.85, -3.92]], 0.012, cBlack, 20);
-  ixTube(N, [[-0.8, 2.58, -3.78], [-0.82, 1.8, -3.9], [-0.82, 0.9, -3.92]], 0.015, cGrey, 20);
+  ixTube(N, [[1.4, 2.58, -3.78], [1.42, 2.0, -3.9], [1.45, 1.2, -3.92], [1.45, 0.85, -3.92]], 0.012, cBlack, 20);
+  ixTube(N, [[-1.0, 2.58, -3.78], [-1.02, 1.8, -3.9], [-1.02, 0.9, -3.92]], 0.015, cGrey, 20);
   // --- floor cables and the power-strip tangle
   const strip = (x, z, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; N.add(g); box(g, 0.34, 0.035, 0.07, cWhite, 0, 0.018, 0); box(g, 0.03, 0.012, 0.03, cRed, -0.13, 0.04, 0); for (let i = 0; i < 5; i++) box(g, 0.035, 0.004, 0.04, ixMat('sock', 0x2a2a2a, 0.6), -0.04 + i * 0.055, 0.037, 0); return g; };
   strip(1.2, -3.15, 0.2); strip(1.9, -3.5, -0.4); strip(-1.5, -3.6, 0.1);
@@ -2135,13 +2135,13 @@ function buildTech() {
   cyl(oc, 0.025, 0.025, 0.36, M(0x6a6e72, 0.3, 0.8), 0, 0.26, 0, 10);
   box(oc, 0.48, 0.08, 0.46, blk, 0, 0.46, 0);
   box(oc, 0.44, 0.52, 0.06, blk, 0, 0.8, -0.24).rotation.x = -0.12;
-  const wb = add(R.g, new THREE.PlaneGeometry(1.5, 0.85), new THREE.MeshStandardMaterial({ roughness: 0.25, map: T.textCanvas(512, 290, (g, w, h) => {
+  const wb = add(R.g, new THREE.PlaneGeometry(1.5, 0.85), new THREE.MeshStandardMaterial({ roughness: 0.8, map: T.textCanvas(512, 290, (g, w, h) => {
     g.fillStyle = '#f2f2ee'; g.fillRect(0, 0, w, h);
     g.font = '30px "Segoe Print", "Comic Sans MS", cursive'; g.fillStyle = '#1a3a8a'; g.fillText('GALA A/V', 24, 44);
     g.fillStyle = '#2a2a2a'; ['lights — done', 'sound — done', 'projector — ??', 'ghost show v3 — SECRET'].forEach((l, i) => g.fillText(l, 36, 96 + i * 44));
     g.strokeStyle = '#b02020'; g.lineWidth = 3; g.beginPath(); g.ellipse(360, 228, 130, 26, 0, 0, 7); g.stroke();
-  }) }), 0, 1.95, -3.97);
-  box(R.g, 1.56, 0.03, 0.05, M(0x9a9ea2, 0.3, 0.8), 0, 1.51, -3.95);
+  }) }), 0, 1.95, -3.93);
+  box(R.g, 1.56, 0.03, 0.05, M(0x9a9ea2, 0.3, 0.8), 0, 1.51, -3.91);
   const cardboard = M(0xb89260, 0.9, 0, { t: T.concrete({ base: '#c09a68', seed: 7 }), bump: 0.01 });
   for (const [x, y, z, w, h, d, r] of [[-2.7, 0.2, -1.2, 0.6, 0.4, 0.45, 0.1], [-2.65, 0.6, -1.2, 0.5, 0.4, 0.4, -0.15], [-2.9, 0.18, -0.4, 0.45, 0.36, 0.4, 0.3]]) box(R.g, w, h, d, cardboard, x, y, z).rotation.y = r;
   lathe(R.g, [[0.001, 0], [0.14, 0], [0.17, 0.38], [0.165, 0.38], [0.135, 0.02], [0.001, 0.02]], M(0x3a3e42, 0.6, 0.3, { side: THREE.DoubleSide }), 1.6, 0, -2.8, 20);
