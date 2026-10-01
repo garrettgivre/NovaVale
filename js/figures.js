@@ -24,7 +24,7 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609302105';
+export const ASSET_V = '202609302157';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)

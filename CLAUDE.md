@@ -12,6 +12,9 @@ A first-person Nancy Drew-style mystery made by Garrett for his partner Beau (wh
 ## Nova's voice
 A know-it-all who really does know it all (Garrett: "Beau is like that"). Bratty, confident, funny, never cruel. She calls people out when the evidence lets her ("call-out" topics are starred and appear once she has proof: Vesper's backup track, Dex's 11pm email, Juniper's oven log, Opal's pin and coat). Nancy Drew's audacity is the model. Keep new lines in that voice.
 
+Cover story: Celeste picked Nova because her sister Mae (Lakeshore Public Library) saw her quietly catch a rare-map thief; police mean a public report and the papers, and a hired investigator would be spotted by Harper Vance (podcaster) in the building. So everyone meets Nova as Celeste's summer intern and starts as a stranger: guarded, dismissive or curious in character (Rashad sees through it at once; Nova keeps the cover with Harper). Greetings (`hiLine`) warm up with story flags. Nobody calls her "detective" before they've worked it out.
+Writing: avoid AI-ish constructions, especially "it's not X, it's Y" / "X isn't A, it's B", "Honestly? ...", "Also? ...", "There's a difference", stacked one-word fragments, and pithy aphorisms ("Ovens don't lie. People do.").
+
 ## Design rules from fan research (what Nancy Drew fans love and hate)
 - Love: atmospheric places with lots to explore, suspects who each hide something, lore to read, Nancy's sass, phone friends, puzzles woven into the story, Second Chance.
 - Hate: chores and padding, backtracking and slow travel, unclear next steps, hotspots that are hard to find, repeated puzzles, endgames stuffed with puzzles, long anticlimactic endings.

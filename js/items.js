@@ -41,11 +41,12 @@ export const DOCS = {
     html: `<div class="paper letter">
       <p class="lh">THE AQUADOME · Lakeshore Spa &amp; Planetarium</p>
       <p>Dear Miss Vale,</p>
-      <p>Your reputation reached me through a friend of a friend, and frankly I have run out of people to ask.</p>
-      <p>On Saturday the Aquadome reopens after nine years with a gala headlined by <b>Vesper Vox</b>. The centrepiece was to be the <b>Prism Crown</b>, a chrome crown set with a real meteorite star, worn by whoever wins the Starfall Revue.</p>
+      <p>My sister Mae runs the Lakeshore Public Library. Last spring she told me about a sixteen-year-old who worked out who had been cutting maps from the rare atlases, weeks before the police would have, without a word of it reaching the paper. I have thought about that a great deal this week.</p>
+      <p>On Saturday the Aquadome reopens after nine years with a gala headlined by <b>Vesper Vox</b>. The centrepiece was to be the <b>Prism Crown</b>, a silver crown set with a real meteorite star, worn by whoever wins the Starfall Revue.</p>
       <p>On Tuesday night it vanished from its locked case in the lobby. The case wasn't forced.</p>
       <p>There have been other things too: lights in the empty planetarium, and a voice singing over speakers that nobody switched on. My staff say the dome is haunted. I say someone wants this reopening to fail.</p>
-      <p>Please find the crown quietly. If this reaches the papers, the gala is finished.</p>
+      <p>I can't call the police: a report is public record, and my sponsors and insurer would hear about it within the hour. I can't hire an investigator either. There is a true-crime podcaster staying in the building, and she would spot one from the car park.</p>
+      <p>Nobody looks twice at a teenager helping out for the summer. I have told the staff and guests that you are my new intern for the relaunch. Your room is ready in the Guest Wing. Please find the crown before Saturday, quietly.</p>
       <p class="sig">Celeste Arden<br><small>Owner</small></p></div>`,
   },
   plaque: {
