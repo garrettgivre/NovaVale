@@ -129,7 +129,7 @@ export function say(who, lines) {
       let l = lines[i], sp = who;
       if (l.startsWith('N:')) { sp = 'nova'; l = l.slice(2).trim(); }
       else if (l.startsWith('*')) { sp = null; l = l.replace(/^\*|\*$/g, '').trim(); }
-      full = l; speech.who = sp; speech.typing = true;
+      full = l; speech.who = sp; speech.typing = true; speech.line = l; speech.n = (speech.n || 0) + 1;
       box.className = 'more' + (sp === 'nova' ? ' nova' : sp ? '' : ' narr');
       box.innerHTML = `<b style="--c:${sp ? PEOPLE[sp].c : '#6a7a90'}">${sp ? PEOPLE[sp].n : ''}</b><span class="tx"></span><i class="nx">▼</i>`;
       const tx = box.querySelector('.tx');

@@ -129,6 +129,11 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   painting when seen from the side or behind. Remaining: a slight smear under the jaw at exact profile (Jojo most).
 - Keep figure animation mostly in the picture plane: big turns towards or away from the camera show a painting-based
   mesh edge-on. Head turns are clamped (0.35 yaw / 0.18 pitch), gestures small.
+- Animation (`animateFigure`): per-character personality `PERS` (tempo, sway, gesture size, resting chin, how often
+  they look about, weighted idle habits) and habits `ACTS` (hand on hip, chin up, sigh, shrug, neck roll, look around/up/down,
+  fidget, bounce), springy head look, head and chest lead body turns, talking reacts to the line (`speech.line`: questions
+  tilt and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
+  while Nova talks. Keep new moves in the picture plane.
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
   you're within ~2.8 m (Garrett found everyone always facing the player eerie).
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`

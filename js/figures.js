@@ -27,7 +27,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610011105';
+export const ASSET_V = '202610011116';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -198,48 +198,138 @@ function pose(u, k, rot) {
 }
 
 const ease = (cur, tgt, rate, dt) => cur + (tgt - cur) * Math.min(1, dt * rate);
+// a soft spring (slightly under-damped): heads settle with a hint of follow-through instead of gliding to a stop
+function spring(s, tgt, k, dt) { const a = (tgt - s.x) * k * k - s.v * k * 1.6; s.v += a * dt; s.x += s.v * dt; return s.x; }
+const smooth = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+// a slow wandering value (sum of incommensurate sines): reads as living rather than metronomic
+const drift = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.7) * 0.3 + Math.sin(t * c + 4.1) * 0.2;
+
 // Talking gestures, kept mostly in the picture plane (these models come from paintings, so turning a forearm far
 // towards or away from the camera shows it edge-on): [side, lift (forward), open (out to the side), hold seconds]
 const GESTS = [['R', .35, .5, 1.3], ['L', .35, .5, 1.3], ['B', .3, .35, 1.1], ['R', .55, .25, 1], ['L', .55, .25, 1], ['B', .15, .6, 1.4], ['N', 0, 0, .9]];
 
+// Who moves how. tempo: how fast they breathe, sway and fidget; sway: how much they shift about; gest: size of their
+// talking gestures; chin: resting head pitch (- = chin up); every: seconds between idle habits; acts: their habits
+// (weighted); look: how often their eyes wander.
+const PERS = {
+  vesper: { tempo: .85, sway: .8, gest: 1.1, chin: -.05, every: 7, look: .8, acts: { hip: 3, chinUp: 2, sigh: 2, roll: 1, look: 1 } },
+  cherry: { tempo: 1.2, sway: 1.4, gest: 1.4, chin: -.02, every: 4.5, look: 1.2, acts: { hip: 3, shrug: 2, bounce: 2, look: 2, roll: 1 } },
+  dex: { tempo: 1.3, sway: .9, gest: .9, chin: .05, every: 3.5, look: 1.8, acts: { fidget: 4, look: 3, down: 2, shrug: 1, roll: 1 } },
+  juniper: { tempo: .85, sway: .9, gest: 1, chin: 0, every: 7, look: .8, acts: { sigh: 2, roll: 2, look: 2, hip: 1 } },
+  opal: { tempo: .7, sway: .5, gest: .7, chin: -.01, every: 8, look: .7, acts: { up: 3, look: 2, sigh: 2, down: 1 } },
+  regent: { tempo: .95, sway: .9, gest: 1.3, chin: -.06, every: 6, look: 1, acts: { hip: 3, chinUp: 3, roll: 1, look: 1 } },
+  harper: { tempo: 1, sway: 1, gest: 1.1, chin: -.02, every: 5.5, look: 1.3, acts: { hip: 2, look: 3, roll: 1, shrug: 1 } },
+  kenji: { tempo: .75, sway: .35, gest: .6, chin: .06, every: 9, look: .5, acts: { down: 4, roll: 1, sigh: 1 } },
+  priya: { tempo: .9, sway: .7, gest: .9, chin: -.02, every: 6.5, look: 1, acts: { up: 4, look: 2, sigh: 1, down: 1 } },
+  jojo: { tempo: 1.35, sway: 1.5, gest: 1.4, chin: -.01, every: 3.5, look: 1.5, acts: { bounce: 4, look: 2, shrug: 2, roll: 1 } },
+  rashad: { tempo: 1, sway: 1, gest: .9, chin: .04, every: 6, look: 1, acts: { down: 3, shrug: 2, look: 2, roll: 1 } },
+  gus: { tempo: .7, sway: .7, gest: .7, chin: .03, every: 8, look: .7, acts: { sigh: 3, roll: 3, look: 1 } },
+  silas: { tempo: 1.3, sway: 1.2, gest: 1.3, chin: 0, every: 3.5, look: 2, acts: { look: 4, fidget: 2, bounce: 1, shrug: 1 } },
+  nate: { tempo: .8, sway: .7, gest: .8, chin: 0, every: 7, look: 1, acts: { look: 3, roll: 1, sigh: 1 } },
+  celeste: { tempo: 1, sway: .8, gest: 1, chin: -.02, every: 6, look: 1, acts: { hip: 1, look: 2, sigh: 1 } },
+};
+const DEF = { tempo: 1, sway: 1, gest: 1, chin: 0, every: 6, look: 1, acts: { look: 2, roll: 1, sigh: 1 } };
+// Idle habits: a duration and an envelope-driven pose. e = 0..1..0 over the action (eased in and out); the pose is an
+// offset added on top of the standing pose: yaw/pitch/tilt of the head, chest lean, shoulders up, arm (R/L) out/bend.
+const ACTS = {
+  hip: { d: [4, 7], f: (e, s) => ({ arm: { [s.side]: { open: .42 * e, bend: 1.15 * e } }, tilt: .05 * e * (s.side === 'R' ? 1 : -1), sway: .5 * e * (s.side === 'R' ? -1 : 1) }) },
+  chinUp: { d: [2.5, 4], f: e => ({ pitch: -.08 * e, chest: -.02 * e }) },
+  sigh: { d: [2.2, 2.8], f: (e, s) => { const p = s.p; const inh = smooth(p / .4) * (1 - smooth((p - .45) / .45)); return { chest: -.05 * inh, sh: .06 * inh - .02 * smooth((p - .5) / .3) * (1 - smooth((p - .8) / .2)), pitch: .05 * smooth((p - .45) / .3) * e }; } },
+  shrug: { d: [1.1, 1.5], f: e => ({ sh: .12 * e, tilt: .06 * e, armBoth: { open: .12 * e, bend: .25 * e } }) },
+  roll: { d: [2.2, 3.2], f: (e, s) => ({ tilt: .13 * Math.sin(s.p * Math.PI * 2) * e, pitch: .04 * Math.sin(s.p * Math.PI * 4) * e, sh: .03 * Math.sin(s.p * Math.PI * 2 + 1) * e }) },
+  look: { d: [1.8, 3.2], f: (e, s) => ({ yaw: s.dir * .32 * e, pitch: s.dir2 * .06 * e, chestYaw: s.dir * .06 * e }) },
+  up: { d: [2.5, 4], f: (e, s) => ({ pitch: -.17 * e, yaw: s.dir * .1 * e, chest: -.015 * e }) },
+  down: { d: [2, 3.5], f: (e, s) => ({ pitch: .16 * e, yaw: s.dir * .05 * e, chest: .02 * e }) },
+  fidget: { d: [1.4, 2.2], f: (e, s) => ({ armBoth: { open: .05 * e, bend: (.35 + .12 * Math.sin(s.p * 37)) * e }, pitch: .08 * e }) },
+  bounce: { d: [1.2, 2], f: (e, s) => ({ bob: .018 * Math.abs(Math.sin(s.p * Math.PI * 3)) * e, tilt: .04 * Math.sin(s.p * Math.PI * 3) * e }) },
+};
+function pickAct(P) {
+  const ks = Object.keys(P.acts), tot = ks.reduce((a, k) => a + P.acts[k], 0);
+  let r = Math.random() * tot; for (const k of ks) { r -= P.acts[k]; if (r <= 0) return k; } return ks[0];
+}
+
 export function animateFigure(g, dt, cam, speech) {
-  const u = g.userData, t = (u.t += dt);
+  const u = g.userData, P = PERS[u.who] || DEF, t = (u.t += dt), T = t * P.tempo;
   const talking = speech.who === u.who && speech.typing, focused = speech.focus === u.who;
+  const listening = focused && !talking && speech.who === 'nova';
   u.talk = ease(u.talk, talking ? 1 : 0, 3, dt);
-  // look: at the camera when it matters, otherwise now and then somewhere else; small turns only
+  u.sp ??= { yaw: { x: 0, v: 0 }, pitch: { x: 0, v: 0 } };
+  // ---- the current line: questions tilt the head, exclamations get bigger beats, laughter shakes the shoulders
+  if (talking && speech.n !== u.lineN) {
+    u.lineN = speech.n; const l = speech.line || '';
+    u.q = /\?\s*$/.test(l) ? 1 : 0; u.ex = /!/.test(l) ? 1 : 0; u.laugh = /\b(ha|haha|hah)\b|laughs/i.test(l) ? 1 : 0;
+    u.qSide = Math.random() < .5 ? -1 : 1; u.gNext = 0;
+  }
+  if (!talking) { u.q = ease(u.q || 0, 0, 2, dt); u.ex = ease(u.ex || 0, 0, 2, dt); u.laugh = ease(u.laugh || 0, 0, 1.5, dt); }
+  // ---- idle habits (not while talking or being talked to)
+  u.actNext ??= 1 + Math.random() * P.every;
+  if (!u.act && !talking && !focused && (u.actNext -= dt) < 0) {
+    const k = pickAct(P), A = ACTS[k];
+    u.act = { k, t: 0, d: A.d[0] + Math.random() * (A.d[1] - A.d[0]), side: Math.random() < .5 ? 'R' : 'L', dir: Math.random() < .5 ? -1 : 1, dir2: Math.random() - .3 };
+  }
+  let O = {};
+  if (u.act) {
+    const a = u.act; a.t += dt; a.p = a.t / a.d;
+    if (talking || focused) a.t = Math.max(a.t, a.d * .85);   // wrap it up when someone needs them
+    const e = smooth(a.p / .25) * (1 - smooth((a.p - .75) / .25));
+    O = ACTS[a.k].f(e, a) || {};
+    if (a.p >= 1) { u.act = null; u.actNext = P.every * (0.6 + Math.random() * .8); }
+  }
+  // ---- turning: when the body turns (to face you), the head and chest lead and the feet shuffle
+  const rv = (u.rotPrev === undefined ? 0 : Math.atan2(Math.sin(g.rotation.y - u.rotPrev), Math.cos(g.rotation.y - u.rotPrev)) / Math.max(dt, 1e-3));
+  u.rotPrev = g.rotation.y; u.turn = ease(u.turn || 0, THREE.MathUtils.clamp(rv, -2, 2), 6, dt);
+  const lead = u.turn * 0.22, stepBob = Math.min(1, Math.abs(u.turn) * 1.5) * Math.abs(Math.sin(t * 9)) * 0.012;
+  // ---- look: at the camera when it matters, otherwise about their own business; small turns only
   u.head.getWorldPosition(va); vb.copy(cam.position).sub(va);
   g.getWorldQuaternion(qa); vb.applyQuaternion(qa.invert());
   let yaw = Math.atan2(vb.x, vb.z), pitch = Math.atan2(-vb.y, Math.hypot(vb.x, vb.z));
-  if ((u.glNext -= dt) < 0) { u.gl = focused || talking ? 0 : (Math.random() < .6 ? 1.6 : 0); u.glance.set((Math.random() - .5) * .6, (Math.random() - .3) * .2); u.glNext = 3 + Math.random() * 5; }
-  if (!u.near && !focused && !talking) { yaw = 0; pitch = 0.05; }   // not paying you any attention: look about their own business
-  if (!u.near && u.gl <= 0 && Math.random() < dt * 0.25) { u.gl = 2; u.glance.set((Math.random() - .5) * .7, (Math.random() - .4) * .2); }
+  if ((u.glNext -= dt) < 0) { u.gl = focused || talking ? 0 : (Math.random() < .6 ? 1.6 : 0); u.glance.set((Math.random() - .5) * .6, (Math.random() - .3) * .2); u.glNext = (3 + Math.random() * 5) / P.look; }
+  if (!u.near && !focused && !talking) { yaw = 0; pitch = 0.05; }   // not paying you any attention
+  if (!u.near && u.gl <= 0 && Math.random() < dt * 0.25 * P.look) { u.gl = 2; u.glance.set((Math.random() - .5) * .7, (Math.random() - .4) * .2); }
   if (u.gl > 0) { u.gl -= dt; yaw += u.glance.x; pitch += u.glance.y; }
-  yaw = THREE.MathUtils.clamp(yaw, -0.35, 0.35); pitch = THREE.MathUtils.clamp(pitch, -0.18, 0.18);
-  u.look.x = ease(u.look.x, yaw, 3.5, dt); u.look.y = ease(u.look.y, pitch, 3.5, dt);
-  // weight on one leg, then the other; the spine and head counter the hips
-  if ((u.wNext -= dt) < 0) { u.wT = u.wT > 0 ? -1 : 1; u.wNext = 5 + Math.random() * 6; }
-  u.w = ease(u.w, u.wT, 0.9, dt);
-  const br = Math.sin(t * 1.35), br2 = Math.sin(t * 1.35 - .6), sw = Math.sin(t * .37) * .3 + u.w;
-  const nod = u.talk * (0.035 * Math.sin(t * 6.3) + 0.02 * Math.sin(t * 2.3)) + (focused && !talking ? 0.015 * Math.sin(t * 1.1) : 0);
-  if (u.bones.hips) u.bones.hips.position.x = (u.hipX ??= u.bones.hips.position.x) + sw * 0.01;
+  // while talking they glance away now and then to think, and come back to you
+  if (talking && (u.thNext = (u.thNext ?? 2) - dt) < 0) { u.th = 0.9; u.thDir = Math.random() < .5 ? -1 : 1; u.thNext = 3 + Math.random() * 4; }
+  if (u.th > 0) { u.th -= dt; yaw += u.thDir * .18 * smooth(u.th / .9); pitch -= .05 * smooth(u.th / .9); }
+  yaw += (O.yaw || 0) + lead; pitch += P.chin + (O.pitch || 0);
+  yaw = THREE.MathUtils.clamp(yaw, -0.38, 0.38); pitch = THREE.MathUtils.clamp(pitch, -0.2, 0.2);
+  u.look.x = spring(u.sp.yaw, yaw, 5.5, dt); u.look.y = spring(u.sp.pitch, pitch, 5.5, dt);
+  // ---- weight on one leg, then the other; the spine and head counter the hips
+  if ((u.wNext -= dt) < 0) { u.wT = u.wT > 0 ? -1 : 1; u.wNext = (5 + Math.random() * 6) / P.tempo; }
+  u.w = ease(u.w, u.wT, 0.9 * P.tempo, dt);
+  const br = Math.sin(T * 1.35), br2 = Math.sin(T * 1.35 - .6);
+  const sw = (drift(T, .37, .23, .61) * .3 + u.w) * P.sway + (O.sway || 0);
+  // talking: nods on the beat, bigger on exclamations; a tilt on questions; a listening nod now and then
+  if (listening && (u.lnNext = (u.lnNext ?? 1.5) - dt) < 0) { u.ln = 0.7; u.lnNext = 1.8 + Math.random() * 2.5; }
+  u.ln = Math.max(0, (u.ln || 0) - dt);
+  const nod = u.talk * (0.035 * Math.sin(t * 6.3) + 0.02 * Math.sin(t * 2.3)) * (1 + .6 * (u.ex || 0))
+    + (u.ln > 0 ? 0.05 * Math.sin((0.7 - u.ln) / 0.7 * Math.PI) : 0) + (focused && !talking ? 0.012 * Math.sin(t * 1.1) : 0);
+  const qTilt = (u.q || 0) * .09 * (u.qSide || 1) + (listening ? .04 * Math.sin(t * .4) : 0);
+  const laugh = (u.laugh || 0) * u.talk;
+  const lShake = laugh * 0.025 * Math.sin(t * 17) * (0.6 + 0.4 * Math.sin(t * 2.1));
+  if (u.bones.hips) { const hp = u.bones.hips.position; hp.x = (u.hipX ??= hp.x) + sw * 0.01; hp.y = (u.hipY ??= hp.y) + (O.bob || 0) + stepBob; }
   pose(u, 'hips', [[Zax, sw * 0.02]]);
-  pose(u, 'spine', [[Zax, -sw * 0.028], [X, -0.008 * br]]);
-  pose(u, 'chest', [[Zax, -sw * 0.012], [X, -0.012 * br], [Y, u.look.x * 0.12]]);
+  pose(u, 'spine', [[Zax, -sw * 0.028], [X, -0.008 * br + (O.chest || 0) * .5], [Y, lead * .3]]);
+  pose(u, 'chest', [[Zax, -sw * 0.012], [X, -0.012 * br + (O.chest || 0) - laugh * .03], [Y, u.look.x * 0.12 + (O.chestYaw || 0) + lead * .4]]);
   pose(u, 'neck', [[Y, u.look.x * 0.35], [X, u.look.y * 0.35]]);
-  pose(u, 'head', [[Y, u.look.x * 0.5], [X, u.look.y * 0.55 + nod], [Zax, sw * 0.02 + 0.025 * Math.sin(t * 0.31) + u.talk * 0.025 * Math.sin(t * 1.9)]]);
-  // talking: pick a gesture now and then and ease into it
-  if (talking && (u.gNext -= dt) < 0) { u.gNow = GESTS[Math.floor(Math.random() * GESTS.length)]; u.gNext = u.gNow[3] * (0.8 + Math.random() * .5); }
+  pose(u, 'head', [[Y, u.look.x * 0.5], [X, u.look.y * 0.55 + nod + lShake * .5],
+    [Zax, sw * 0.02 + 0.025 * drift(T, .31, .17, .53) + u.talk * 0.025 * Math.sin(t * 1.9) + qTilt + (O.tilt || 0)]]);
+  // talking: pick a gesture now and then and ease into it (questions open the hands, exclamations go bigger)
+  if (talking && (u.gNext -= dt) < 0) { u.gNow = GESTS[Math.floor(Math.random() * GESTS.length)]; u.gNext = u.gNow[3] * (0.8 + Math.random() * .5) / Math.sqrt(P.tempo); }
   if (!talking) u.gNow = null;
+  const gk = P.gest * (1 + .35 * (u.ex || 0));
   for (const s of ['R', 'L']) {
     const G = u.gNow, on = G && (G[0] === s || G[0] === 'B') ? 1 : 0;
-    u.G[s].x = ease(u.G[s].x, on * (G ? G[1] : 0), 4, dt); u.G[s].y = ease(u.G[s].y, on * (G ? G[2] : 0), 4, dt);
+    const qOpen = (u.q || 0) * u.talk * .15;
+    u.G[s].x = ease(u.G[s].x, on * (G ? G[1] : 0) * gk, 4, dt); u.G[s].y = ease(u.G[s].y, on * (G ? G[2] : 0) * gk + qOpen, 4, dt);
     u.G[s].z = ease(u.G[s].z, on, 4, dt);
     const side = s === 'R' ? 1 : -1, lift = u.G[s].x, open = u.G[s].y, act = u.G[s].z;
-    const R = u.relax[s], idle = 0.012 * Math.sin(t * 0.6 + side);
-    pose(u, 'shoulder' + s, [[Zax, side * 0.015 * br2]]);
+    const A = (O.arm && O.arm[s]) || O.armBoth || {}, aOpen = A.open || 0, aBend = A.bend || 0;
+    const R = u.relax[s], idle = 0.012 * drift(T + side * 3, .6, .41, .87) * P.sway;
+    const shUp = (O.sh || 0) + laugh * 0.02 * Math.abs(Math.sin(t * 17));
+    pose(u, 'shoulder' + s, [[Zax, side * (0.015 * br2 + shUp)]]);
     // relaxed: arm down (in the picture plane), a little forward; talking: out to the side and forward
-    pose(u, 'upper' + s, [[Zax, side * (R * (1 - act * .35) - open * 0.35 + idle)], [X, -0.06 - lift * 0.3]]);
-    pose(u, 'fore' + s, [[X, -0.1 - lift * 0.4 - act * 0.15 - act * 0.05 * Math.sin(t * 4.1 + side)], [Zax, side * (0.04 - open * 0.35)]]);
-    pose(u, 'hand' + s, [[X, -0.03 - act * 0.08 * Math.sin(t * 3.3 + side)], [Zax, -side * open * 0.12]]);
+    pose(u, 'upper' + s, [[Zax, side * (R * (1 - act * .35) - open * 0.35 - aOpen + idle)], [X, -0.06 - lift * 0.3]]);
+    pose(u, 'fore' + s, [[X, -0.1 - lift * 0.4 - act * 0.15 - act * 0.05 * Math.sin(t * 4.1 + side)], [Zax, side * (0.04 - open * 0.35 + aBend)]]);
+    pose(u, 'hand' + s, [[X, -0.03 - act * 0.08 * Math.sin(t * 3.3 + side)], [Zax, -side * (open * 0.12 + aBend * .2)]]);
   }
 }
