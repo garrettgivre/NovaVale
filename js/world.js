@@ -8,6 +8,7 @@ import * as T from './tex.js';
 import { buildPerson, CAST, animatePerson, castReady } from './people.js';
 import { FIG, figReady, loadFigure, buildFigure, animateFigure } from './figures.js';
 import { speech } from './ui.js';
+import { mergeGeometries } from '../vendor/utils/BufferGeometryUtils.js';
 
 export const rooms = {};
 export const chars = {};
@@ -23,7 +24,7 @@ export const NODES = {
   S1: { room: 'spa', p: [0, 3.4], look: [0, -4], exits: ['S2'] },
   S2: { room: 'spa', p: [3, 1.3], look: [4.6, -0.8], exits: ['S1'] },
   P1: { room: 'plan', p: [0, 5.8], look: [0, 0], exits: ['P2'] },
-  P2: { room: 'plan', p: [1.6, -4.1], look: [3.3, -7.3], exits: ['P1'] },
+  P2: { room: 'plan', p: [2.0, -3.4], look: [3.0, -7.3], exits: ['P1'] },
   K1: { room: 'kitchen', p: [0, 2.6], look: [0, -3], exits: [] },
   T1: { room: 'tech', p: [0.6, 2.4], look: [0, -3.5], exits: ['T2'] },
   T2: { room: 'tech', p: [-1.6, 0.6], look: [-4, 0.6], exits: ['T1'] },
@@ -446,52 +447,197 @@ function buildSpa() {
   return R;
 }
 
+// ---------- Planetarium, tunnel and star room helpers (dark-rooms pass) ----------
+// A transformed copy of a geometry, for merging many parts into one mesh.
+const dkMat4 = new THREE.Matrix4(), dkQ = new THREE.Quaternion(), dkE = new THREE.Euler(), dkV = new THREE.Vector3(), dkS = new THREE.Vector3();
+function dkG(geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+  const g = geo.clone();
+  dkQ.setFromEuler(dkE.set(rx, ry, rz));
+  g.applyMatrix4(dkMat4.compose(dkV.set(x, y, z), dkQ, dkS.set(sx, sy, sz)));
+  return g;
+}
+const dkBox = (w, h, d, ...r) => dkG(new THREE.BoxGeometry(w, h, d), ...r);
+const dkCyl = (rt, rb, h, seg, ...r) => dkG(new THREE.CylinderGeometry(rt, rb, h, seg), ...r);
+function dkMerge(parent, list, m, nocast = true) {
+  const o = new THREE.Mesh(mergeGeometries(list), m); parent.add(o); if (nocast) o.userData.nocast = 1; return o;
+}
+// Soft radial glow texture (white in the middle), for light-pool decals and glow planes.
+const dkGlowTex = () => once('dkGlow', () => T.textCanvas(128, 128, (g, w) => {
+  const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.4, 'rgba(255,255,255,.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, w);
+}));
+function dkPool(p, x, y, z, w, d, color, op, ry = 0, flat = true) {
+  const m = new THREE.MeshBasicMaterial({ map: dkGlowTex(), color, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
+  const o = add(p, new THREE.PlaneGeometry(w, d), m, x, y, z); o.userData.nocast = 1; o.renderOrder = 2;
+  if (flat) o.rotation.x = -Math.PI / 2; o.rotation.y = flat ? 0 : ry; return o;
+}
+const dkExitTex = () => once('dkExit', () => T.textCanvas(256, 96, (g, w, h) => {
+  g.fillStyle = '#0c4a22'; g.fillRect(0, 0, w, h); g.strokeStyle = '#7fe8a0'; g.lineWidth = 5; g.strokeRect(5, 5, w - 10, h - 10);
+  g.fillStyle = '#d8ffe0'; g.font = 'bold 60px Arial, Helvetica, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('EXIT', w / 2, h / 2 + 3);
+}));
+function dkExitSign(p, x, y, z, ax, az) {
+  const g = new THREE.Group(); g.position.set(x, y, z); faceTo(g, ax, az); p.add(g);
+  box(g, 0.5, 0.2, 0.06, M(0x1a1a1a, 0.6), 0, 0, 0);
+  const f = add(g, new THREE.PlaneGeometry(0.44, 0.165), new THREE.MeshBasicMaterial({ map: dkExitTex() }), 0, 0, 0.032); f.userData.nocast = 1;
+  return g;
+}
+// Painted theatre-wall texture: fluted acoustic panels in dusty plum.
+const dkFlute = () => once('dkFlute', () => {
+  const r = T.rng(21), N = T.fbm(256, 256, { scale: 4, oct: 4, seed: 5 });
+  return T.done(T.pix(256, 256, (x, y) => {
+    const f = Math.sin(x / 32 * Math.PI * 2), k = 0.78 + f * 0.2 + (N[y * 256 + x] - 0.5) * 0.18;
+    const wear = 1 - Math.max(0, N[(y * 7 % 256) * 256 + x] - 0.62) * 0.5;
+    return [78 * k * wear, 60 * k * wear, 96 * k * wear, 0.5 + f * 0.4];
+  }), null);
+});
+
 function buildPlanetarium() {
   const R = mkRoom('plan', { p: [0, 7, 3], t: [0, 0, -2], s: 9, day: [0xa0acd0, 0.9], night: [0x9aa6cc, 0.8] });
   R.dark = true;
-  struct(add(R.g, new THREE.CircleGeometry(8, 64), M(0xffffff, 0.95, 0, { t: TX.carpetBlue(), rep: [6, 6], bump: 0.01 }), 0, 0, 0)).rotation.x = -Math.PI / 2;
-  const wl = M(0x3a3048, 0.9, 0, { t: TX.velvet(), rep: [30, 3] }); wl.side = THREE.BackSide;
-  struct(add(R.g, new THREE.CylinderGeometry(8, 8, 2.6, 64, 1, true), wl, 0, 1.3, 0));
-  struct(add(R.g, new THREE.SphereGeometry(8, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ map: T.starDome(false), side: THREE.BackSide }), 0, 2.6, 0));
-  struct(add(R.g, new THREE.TorusGeometry(7.95, 0.06, 6, 64), BRASS, 0, 2.6, 0)).rotation.x = Math.PI / 2;
-  const seat = M(0x6a1420, 0.9, 0, { t: TX.velvet() }), frame = M(0x1a1a1c, 0.5, 0.4);
-  for (const r of [4.2, 5.6, 7]) for (let k = 0; k < 18; k++) {
-    const a = (k / 18) * Math.PI * 2; if (Math.abs(Math.sin(a)) < 0.55) continue;
-    const s = new THREE.Group(); s.position.set(Math.sin(a) * r, 0, -Math.cos(a) * r); faceTo(s, 0, 0); R.g.add(s);
-    box(s, 0.56, 0.12, 0.52, seat, 0, 0.42, 0);
-    box(s, 0.56, 0.78, 0.1, seat, 0, 0.82, -0.3).rotation.x = -0.5;
-    for (const q of [-1, 1]) box(s, 0.05, 0.62, 0.55, frame, q * 0.3, 0.33, -0.02);
+  const PI = Math.PI;
+  struct(add(R.g, new THREE.CircleGeometry(8, 64), M(0xffffff, 0.95, 0, { t: TX.carpetBlue(), rep: [6, 6], bump: 0.01 }), 0, 0, 0)).rotation.x = -PI / 2;
+  // walls: fluted acoustic panels between mahogany pilasters, brass cornice
+  const wl = M(0xffffff, 0.9, 0, { t: dkFlute(), rep: [16, 1], bump: 0.025 }); wl.side = THREE.BackSide;
+  struct(add(R.g, new THREE.CylinderGeometry(8, 8, 2.6, 96, 1, true), wl, 0, 1.3, 0));
+  struct(add(R.g, new THREE.SphereGeometry(8, 64, 32, 0, PI * 2, 0, PI / 2), new THREE.MeshBasicMaterial({ map: T.starDome(false), side: THREE.BackSide }), 0, 2.6, 0));
+  struct(add(R.g, new THREE.TorusGeometry(7.95, 0.06, 6, 64), BRASS, 0, 2.6, 0)).rotation.x = PI / 2;
+  const wood = mat.mahog();
+  { // pilasters, dado rail, skirting, wall uplights
+    const pl = [], br = [], up = [];
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * PI * 2, x = Math.sin(a) * 7.93, z = -Math.cos(a) * 7.93;
+      pl.push(dkBox(0.22, 2.55, 0.14, x, 1.275, z, 0, -a, 0));
+      br.push(dkBox(0.28, 0.1, 0.18, x, 0.12, z, 0, -a, 0), dkBox(0.28, 0.08, 0.18, x, 2.45, z, 0, -a, 0));
+      if (i % 2) up.push(dkCyl(0.07, 0.04, 0.2, 10, Math.sin(a) * 7.8, 1.75, -Math.cos(a) * 7.8, 0, 0, 0));
+    }
+    dkMerge(R.g, pl, wood, false).userData.struct = 1; dkMerge(R.g, br, BRASS);
+    dkMerge(R.g, up, M(0xffe8c0, 0.4, 0, { emissive: 0xffd090, emissiveIntensity: 0.9 }));
+    struct(add(R.g, new THREE.CylinderGeometry(7.96, 7.96, 0.3, 64, 1, true), reTex(wood, 40, 1), 0, 0.15, 0)).material.side = THREE.BackSide;
+    struct(add(R.g, new THREE.CylinderGeometry(7.94, 7.94, 0.05, 64, 1, true), BRASS, 0, 1.0, 0)).material.side = THREE.BackSide;
   }
-  // Zeiss-style star projector: two star balls on a truss
+  // cove light round the base of the dome, plus a wash up the wall
+  const coveM = M(0xe8dcff, 0.4, 0, { emissive: 0xb09cff, emissiveIntensity: 2.2 });
+  add(R.g, new THREE.TorusGeometry(7.84, 0.035, 6, 96), coveM, 0, 2.55, 0).rotation.x = PI / 2;
+  const gradTex = once('dkGrad', () => T.textCanvas(8, 128, (g, w, h) => { const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); }));
+  const washM = (c, o) => new THREE.MeshBasicMaterial({ map: gradTex, color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide });
+  add(R.g, new THREE.CylinderGeometry(7.975, 7.975, 1.1, 64, 1, true), washM(0x8a78e8, 0.11), 0, 3.15, 0).userData.nocast = 1;
+  const wash2 = add(R.g, new THREE.CylinderGeometry(7.972, 7.972, 1.0, 64, 1, true), washM(0xffb878, 0.1), 0, 2.0, 0); wash2.rotation.x = PI; wash2.userData.nocast = 1;
+  // seats: reclining theatre seats in rows round the projector (instanced)
+  const seatV = [dkBox(0.52, 0.14, 0.52, 0, 0.45, 0.04), dkBox(0.5, 0.82, 0.13, 0, 0.9, -0.27, -0.32), dkBox(0.34, 0.2, 0.12, 0, 1.38, -0.4, -0.32), dkBox(0.08, 0.1, 0.4, -0.3, 0.7, 0.02), dkBox(0.08, 0.1, 0.4, 0.3, 0.7, 0.02)];
+  const seatD = [dkBox(0.06, 0.6, 0.5, -0.3, 0.3, 0.0), dkBox(0.06, 0.6, 0.5, 0.3, 0.3, 0.0), dkBox(0.62, 0.05, 0.1, 0, 0.1, -0.24), dkBox(0.06, 0.04, 0.46, -0.3, 0.74, 0.02), dkBox(0.06, 0.04, 0.46, 0.3, 0.74, 0.02)];
+  const seatPts = [], edge = [];
+  for (const r of [4.2, 5.5, 6.8]) {
+    const n = Math.round(PI * 2 * r / 0.68); let prev = false;
+    const keep = k => Math.abs(Math.sin((k / n) * PI * 2)) >= 0.66;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * PI * 2; if (!keep(k)) continue;
+      seatPts.push([Math.sin(a) * r, -Math.cos(a) * r, a]);
+      if (!keep((k + 1) % n) || !keep((k + n - 1) % n)) edge.push([Math.sin(a) * (r - 0.3), -Math.cos(a) * (r - 0.3), a]);
+    }
+  }
+  const seatVM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, map: TX.velvet().map, emissive: 0x2a0a10, emissiveIntensity: 1 });
+  const seatDM = M(0x5a3420, 0.45, 0.1, { emissive: 0x120804, emissiveIntensity: 1 });
+  const sv = new THREE.InstancedMesh(mergeGeometries(seatV), seatVM, seatPts.length), sd = new THREE.InstancedMesh(mergeGeometries(seatD), seatDM, seatPts.length);
+  const dum = new THREE.Object3D(), col = new THREE.Color();
+  seatPts.forEach(([x, z, a], i) => {
+    dum.position.set(x, 0, z); dum.rotation.set(0, Math.atan2(-x, -z), 0); dum.updateMatrix();
+    sv.setMatrixAt(i, dum.matrix); sd.setMatrixAt(i, dum.matrix);
+    sv.setColorAt(i, col.setScalar(0.9 + ((i * 37) % 11) / 55));
+  });
+  sv.userData.nocast = 1; sd.userData.nocast = 1; R.g.add(sv, sd);
+  { // aisle step lights at the ends of each row, and a ring of floor lights along the wall
+    const bars = edge.map(([x, z, a]) => dkBox(0.04, 0.02, 0.22, x, 0.015, z, 0, -a, 0));
+    for (let i = 0; i < 36; i++) { const a = i / 36 * PI * 2; bars.push(dkBox(0.22, 0.02, 0.04, Math.sin(a) * 7.7, 0.015, -Math.cos(a) * 7.7, 0, -a, 0)); }
+    dkMerge(R.g, bars, M(0xffe0b0, 0.4, 0, { emissive: 0xffc070, emissiveIntensity: 1.2 }));
+  }
+  // Zeiss-style star projector: cast base, column, azimuth circle, fork and a tilted dumbbell of lens-studded balls
   const pj = new THREE.Group(); R.g.add(pj);
-  const dm = M(0x22242a, 0.45, 0.6);
-  cyl(pj, 0.45, 0.6, 0.35, dm, 0, 0.175, 0); cyl(pj, 0.12, 0.16, 1.2, dm, 0, 0.95, 0, 16);
-  const arm = new THREE.Group(); arm.position.y = 1.6; arm.rotation.z = 0.5; pj.add(arm);
-  cyl(arm, 0.09, 0.09, 1.6, dm, 0, 0, 0, 12);
-  const holeM = M(0xffffff, 0.3, 0, { emissive: 0xfff4d8, emissiveIntensity: 1.4 });
-  const r = T.rng(4);
-  for (const s of [-1, 1]) {
-    sph(arm, 0.34, dm, 0, s * 0.85, 0, 28);
-    for (let i = 0; i < 26; i++) { const v = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize().multiplyScalar(0.34); sph(arm, 0.018, holeM, v.x, s * 0.85 + v.y, v.z, 6); }
+  const dm = M(0x24262b, 0.42, 0.7), gun = M(0x6e7176, 0.34, 0.95), cast = M(0x1a1b1f, 0.5, 0.6);
+  lathe(pj, [[0.001, 0], [0.78, 0], [0.8, 0.05], [0.7, 0.12], [0.55, 0.3], [0.42, 0.46], [0.001, 0.46]], cast, 0, 0, 0, 12);
+  add(pj, new THREE.TorusGeometry(0.62, 0.03, 8, 48), BRASS, 0, 0.14, 0).rotation.x = PI / 2;
+  lathe(pj, [[0.001, 0.4], [0.26, 0.4], [0.2, 0.62], [0.17, 0.9], [0.17, 1.35], [0.24, 1.42], [0.24, 1.5], [0.001, 1.5]], dm, 0, 0, 0, 20);
+  add(pj, new THREE.TorusGeometry(0.34, 0.025, 8, 40), BRASS, 0, 0.62, 0).rotation.x = PI / 2;
+  add(pj, new THREE.TorusGeometry(0.22, 0.02, 8, 32), gun, 0, 1.0, 0).rotation.x = PI / 2;
+  const fork = [];
+  for (const s of [-1, 1]) fork.push(dkBox(0.1, 0.55, 0.14, s * 0.6, 1.8, 0), dkBox(0.1, 0.12, 0.26, s * 0.6, 2.1, 0));
+  fork.push(dkBox(1.3, 0.12, 0.2, 0, 1.55, 0), dkCyl(0.1, 0.1, 1.4, 14, 0, 2.0, 0, 0, 0, PI / 2));
+  dkMerge(pj, fork, dm);
+  const arm = new THREE.Group(); arm.position.y = 2.0; arm.rotation.z = 0.5; pj.add(arm);
+  cyl(arm, 0.07, 0.07, 2.0, gun, 0, 0, 0, 12);
+  cyl(arm, 0.22, 0.22, 0.4, dm, 0, 0, 0, 20);
+  add(arm, new THREE.TorusGeometry(0.24, 0.025, 8, 28), BRASS, 0, 0.12, 0).rotation.x = PI / 2;
+  add(arm, new THREE.TorusGeometry(0.24, 0.025, 8, 28), BRASS, 0, -0.12, 0).rotation.x = PI / 2;
+  add(arm, new THREE.TorusGeometry(0.62, 0.018, 6, 48), gun, 0, 0, 0).rotation.y = 0.3;
+  const ball = new THREE.SphereGeometry(0.36, 28, 20);
+  const barrel = new THREE.CylinderGeometry(0.03, 0.036, 0.11, 8).translate(0, 0.055, 0);
+  const capG = new THREE.CircleGeometry(0.024, 8).rotateX(-PI / 2).translate(0, 0.112, 0);
+  const lens = [];
+  for (const s of [-1, 1]) { sph(arm, 0.36, dm, 0, s * 0.95, 0, 28); add(arm, new THREE.TorusGeometry(0.2, 0.03, 8, 24), BRASS, 0, s * 0.62, 0).rotation.x = PI / 2;
+    const N = 64;
+    for (let i = 0; i < N; i++) { // fibonacci spiral over the ball, skipping the pole where the rod enters
+      const yy = 1 - (i + 0.5) / N * 2, rr = Math.sqrt(1 - yy * yy), th = i * 2.399963;
+      const d = new THREE.Vector3(Math.cos(th) * rr, yy, Math.sin(th) * rr); if (d.y * -s > 0.86) continue;
+      lens.push([d, s * 0.95]);
+    }
   }
+  const bm = new THREE.InstancedMesh(barrel, gun, lens.length), cm = new THREE.InstancedMesh(capG, M(0xffffff, 0.3, 0, { emissive: 0xfff0c8, emissiveIntensity: 1.6 }), lens.length);
+  lens.forEach(([d, oy], i) => {
+    dum.position.set(d.x * 0.35, oy + d.y * 0.35, d.z * 0.35); dum.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d); dum.scale.setScalar(1 + (i % 5 === 0) * 0.5); dum.updateMatrix(); bm.setMatrixAt(i, dum.matrix); cm.setMatrixAt(i, dum.matrix);
+  });
+  bm.userData.nocast = cm.userData.nocast = 1; arm.add(bm, cm);
   updaters.push((dt, t) => { pj.rotation.y = t * 0.04; });
-  // console
+  // console: slanted mahogany desk with gauges, toggles, a big dial and a green-shaded lamp
   const cn = new THREE.Group(); cn.position.set(-1.3, 0, 2.0); faceTo(cn, 0, 6); R.g.add(cn);
-  box(cn, 1.2, 0.9, 0.55, mat.mahog(), 0, 0.45, 0);
-  box(cn, 1.22, 0.05, 0.66, M(0x2a2c30, 0.4, 0.6, { t: TX.steel(), bump: 0.004 }), 0, 0.95, 0.04).rotation.x = 0.35;
+  box(cn, 1.2, 0.9, 0.55, wood, 0, 0.45, 0);
+  box(cn, 1.28, 0.04, 0.6, BRASS, 0, 0.9, 0.02);
+  const deck = box(cn, 1.22, 0.05, 0.66, M(0x2a2c30, 0.4, 0.6, { t: TX.steel(), bump: 0.004 }), 0, 0.95, 0.04); deck.rotation.x = 0.35;
+  const gaugeT = once('dkGauge', () => T.textCanvas(128, 128, (g, w) => {
+    g.fillStyle = '#e8e0c8'; g.beginPath(); g.arc(64, 64, 62, 0, 7); g.fill(); g.strokeStyle = '#222'; g.lineWidth = 2;
+    for (let i = 0; i <= 10; i++) { const a = PI * (0.8 + i * 0.14); g.beginPath(); g.moveTo(64 + Math.cos(a) * 44, 64 + Math.sin(a) * 44); g.lineTo(64 + Math.cos(a) * 56, 64 + Math.sin(a) * 56); g.stroke(); }
+    g.lineWidth = 3; g.beginPath(); g.moveTo(64, 70); g.lineTo(64 + Math.cos(PI * 1.35) * 46, 70 + Math.sin(PI * 1.35) * 46); g.stroke();
+  }));
+  const gm = new THREE.MeshStandardMaterial({ map: gaugeT, roughness: 0.4 });
+  for (const gx of [-0.46, -0.28]) { const g = new THREE.Group(); g.position.set(gx, 0.99, -0.14); g.rotation.x = 0.35; cn.add(g); cyl(g, 0.065, 0.065, 0.03, BRASS, 0, 0, 0, 20); add(g, new THREE.CircleGeometry(0.052, 20), gm, 0, 0.0155, 0).rotation.x = -PI / 2; }
   const cols = [0xc83a2a, 0xe8c050, 0x40a060, 0xe8e0d0];
-  for (let i = 0; i < 12; i++) box(cn, 0.06, 0.035, 0.06, M(cols[i % 4], 0.4, 0, { emissive: cols[i % 4], emissiveIntensity: 0.35 }), -0.42 + (i % 6) * 0.17, 1.0 - Math.floor(i / 6) * 0.05, -0.06 + Math.floor(i / 6) * 0.16).rotation.x = 0.35;
-  for (let i = 0; i < 3; i++) cyl(cn, 0.05, 0.05, 0.02, BRASS, -0.3 + i * 0.3, 0.9, 0.24, 16).rotation.x = 0.35 + Math.PI / 2;
+  for (let i = 0; i < 12; i++) box(cn, 0.06, 0.035, 0.06, M(cols[i % 4], 0.4, 0, { emissive: cols[i % 4], emissiveIntensity: 0.5 }), -0.12 + (i % 6) * 0.1, 1.0 - Math.floor(i / 6) * 0.05, -0.06 + Math.floor(i / 6) * 0.16).rotation.x = 0.35;
+  { const tg = []; for (let i = 0; i < 6; i++) tg.push(dkCyl(0.012, 0.012, 0.07, 6, -0.42 + i * 0.07, 1.03, 0.2, 0.35 - 0.5, 0, 0), dkCyl(0.02, 0.02, 0.02, 8, -0.42 + i * 0.07, 1.0, 0.2)); dkMerge(cn, tg, STEEL); }
+  for (let i = 0; i < 3; i++) cyl(cn, 0.05, 0.05, 0.03, M(0x101010, 0.35, 0.2), 0.0 + i * 0.2, 0.93, 0.26, 16).rotation.x = 0.35 + PI / 2;
+  for (let i = 0; i < 3; i++) box(cn, 0.012, 0.012, 0.05, BRASS, i * 0.2, 0.95, 0.265).rotation.x = 0.35;
   const cl = new THREE.Group(); cl.position.set(0.5, 0.97, -0.15); cn.add(cl);
-  cyl(cl, 0.005, 0.005, 0.3, BRASS, 0, 0.15, 0, 6); sph(cl, 0.035, M(0xfff0d0, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1 }), 0, 0.3, 0.02, 10);
+  cyl(cl, 0.005, 0.005, 0.3, BRASS, 0, 0.15, 0, 6); cyl(cl, 0.06, 0.07, 0.03, BRASS, 0, 0.01, 0, 12);
+  lathe(cl, [[0.02, 0.3], [0.09, 0.26], [0.1, 0.22], [0.08, 0.22]], M(0x1f6a46, 0.4, 0, { side: THREE.DoubleSide, emissive: 0x0a2a18, emissiveIntensity: 0.6 }), 0, 0, 0.0, 16);
+  sph(cl, 0.03, M(0xfff0d0, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1.4 }), 0, 0.25, 0, 10);
+  box(cn, 0.3, 0.004, 0.2, M(0xe8e0c8, 0.8), -0.1, 1.0, 0.14).rotation.x = 0.35;
+  dkPool(cn, 0.5, 0.97, -0.05, 0.9, 0.7, 0xffb868, 0.35);
   tag(cn, 'console', 'Projector console');
-  // stage + velvet curtains
-  const st = new THREE.Group(); st.position.set(0, 0, -6.3); R.g.add(st);
-  add(st, new THREE.CylinderGeometry(3.2, 3.2, 0.5, 48, 1, false, Math.PI / 2, Math.PI), mat.oak([6, 1]), 0, 0.25, -0.4);
-  for (let i = 0; i < 16; i++) { const a = Math.PI / 2 + (i / 15) * Math.PI; sph(st, 0.035, M(0xffffff, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1 }), Math.sin(a) * 3.2, 0.45, Math.cos(a) * 3.2 - 0.4, 8); }
-  curtain(st, 6.4, 3.2, M(0x7a1020, 0.8, 0, { t: TX.velvet(), rep: [2, 4] }), 0, 2.1, -1.4, 0, 12);
-  box(st, 6.6, 0.4, 0.1, M(0x7a1020, 0.8), 0, 3.5, -1.3);
+  // the stage: a raised apron with brass edge, footlights, steps, a gathered velvet curtain and valance
+  const stageS = new THREE.Shape(); stageS.moveTo(-2.6, 5.4); stageS.lineTo(2.6, 5.4); stageS.quadraticCurveTo(3, 5.4, 3, 5.8); stageS.lineTo(3, 8.2); stageS.lineTo(-3, 8.2); stageS.lineTo(-3, 5.8); stageS.quadraticCurveTo(-3, 5.4, -2.6, 5.4);
+  const sg = new THREE.ExtrudeGeometry(stageS, { depth: 0.5, bevelEnabled: false, curveSegments: 6 }); sg.rotateX(-PI / 2);
+  const stage = struct(new THREE.Mesh(sg, [mat.oak([0.32, 0.32]), mat.mahog([2, 1])])); R.g.add(stage);
+  { const tr = []; tr.push(dkBox(5.2, 0.05, 0.06, 0, 0.47, -5.43), dkBox(5.2, 0.05, 0.06, 0, 0.06, -5.43)); dkMerge(R.g, tr, BRASS);
+    const fl = []; for (let i = 0; i < 14; i++) fl.push(dkG(new THREE.SphereGeometry(0.032, 8, 6), -2.6 + i * 0.4, 0.54, -5.55));
+    dkMerge(R.g, fl, M(0xffffff, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1.8 }));
+    box(R.g, 5.4, 0.04, 0.1, M(0x1a1a1c, 0.5, 0.5), 0, 0.52, -5.55).userData.nocast = 1;
+    dkPool(R.g, 0, 0.505, -6.7, 5.6, 3.2, 0xffa860, 0.45); }
+  for (let i = 0; i < 2; i++) box(R.g, 0.9, 0.17 + i * 0.17, 0.34, mat.oak([0.5, 0.5]), -3.5, (0.17 + i * 0.17) / 2, -5.6 - i * 0.34);
+  { const cg = new THREE.CylinderGeometry(7.55, 7.55, 2.05, 96, 1, true, PI - 0.42, 0.84), pa = cg.attributes.position, cc = [];
+    for (let i = 0; i < pa.count; i++) { const a = Math.atan2(pa.getX(i), pa.getZ(i)), f = Math.sin(a * 40) * 0.1; pa.setX(i, pa.getX(i) * (1 - f / 7.55)); pa.setZ(i, pa.getZ(i) * (1 - f / 7.55)); cc.push(0.62 + 0.38 * (Math.sin(a * 40) * 0.5 + 0.5)); }
+    cg.setAttribute('color', new THREE.Float32BufferAttribute(cc.flatMap(v => [v, v, v]), 3));
+    cg.computeVertexNormals();
+    const cmat = M(0x7a1020, 0.8, 0, { t: TX.velvet(), rep: [6, 2], side: THREE.DoubleSide, vertexColors: true });
+    add(R.g, cg, cmat, 0, 1.55, 0);
+    const vg = new THREE.CylinderGeometry(7.5, 7.5, 0.5, 96, 1, true, PI - 0.46, 0.92), va = vg.attributes.position;
+    for (let i = 0; i < va.count; i++) { const a = Math.atan2(va.getX(i), va.getZ(i)); if (va.getY(i) < 0) { const s = 0.5 + 0.5 * Math.abs(Math.cos(a * 11)); va.setY(i, va.getY(i) - s * 0.3); } }
+    vg.computeVertexNormals(); add(R.g, vg, cmat, 0, 2.38, 0);
+    add(R.g, new THREE.CylinderGeometry(7.52, 7.52, 0.05, 64, 1, true, PI - 0.46, 0.92), M(0xc9a15a, 0.32, 1, { side: THREE.DoubleSide }), 0, 2.58, 0);
+  }
+  // spare light pool where the curtain meets the wall
   door(R, 3.3, -7.25, 'Service', 'hatch', [0, 0], { metal: 1 });
+  dkExitSign(R.g, 3.3, 3.2, -7.2, 0, 0);
+  dkExitSign(R.g, 0, 3.2, 7.8, 0, 0);
+  dkPool(R.g, 3.3, 0.01, -6.4, 2.4, 1.8, 0xffd8a0, 0.3);
+  dkPool(R.g, 0, 1.4, -7.4, 6, 2.6, 0xff9050, 0.2, 0, false);
   // Dex's hologram card (night 1)
   const hc = new THREE.Group(); hc.position.set(0.55, 0.01, -0.7); R.g.add(hc);
   box(hc, 0.09, 0.006, 0.06, M(0x2a4a5a, 0.3, 0.3, { emissive: 0x3aa0c0, emissiveIntensity: 0.9 }), 0, 0, 0).rotation.y = 0.5;
@@ -510,7 +656,7 @@ function buildPlanetarium() {
   }), 0, 6.4, -4.4);
   code.lookAt(0, 1.6, 2); code.userData.nocast = 1; R.code = code;
   door(R, 0, 7.9, 'Lobby', 'exit_plan', [0, 0]);
-  lamps(R, [0, 2.4, 2, 0xb0b8e0, 16, 14], [0, 2.6, -5.5, 0xffb070, 14, 9]);
+  lamps(R, [0, 2.4, 2, 0xb0b8e0, 22, 14], [0, 2.6, -5.5, 0xffb070, 16, 9]);
   return R;
 }
 
@@ -727,33 +873,282 @@ function buildSuite() {
   return R;
 }
 
+// ---------- Tunnel helpers (dark-rooms pass) ----------
+// Poured-concrete service wall, 4 m wide x 2.6 m high: formwork seams and tie holes, a painted green-grey lower band
+// that is peeling, water streaks down from the ceiling, and a damp tide line low on the wall.
+const tunWallTex = () => once('tunWall', () => {
+  const W = 512, H = 320, N = T.fbm(W / 2, H / 2, { scale: 4, oct: 5, seed: 31 }), St = T.fbm(W / 2, H / 2, { scale: 12, oct: 3, seed: 33, sx: 1, sy: 0.07 }), Pl = T.fbm(W / 2, H / 2, { scale: 6, oct: 4, seed: 35 });
+  const band = H * (1 - 1.15 / 2.6);   // y where the painted band starts
+  return T.done(T.pix(W, H, (x, y) => {
+    const i = (y >> 1) * (W / 2) + (x >> 1), n = N[i], st = St[i], pl = Pl[i];
+    let r = 128, g = 124, b = 116, h = 0.5 + n * 0.3;
+    const k = 0.72 + n * 0.5; r *= k; g *= k; b *= k;
+    if (y > band + (n - 0.5) * 8) {   // painted band
+      const peel = pl > 0.58 ? Math.min(1, (pl - 0.58) * 9) : 0;
+      const k2 = 0.8 + n * 0.4;
+      r = r * peel + 74 * k2 * (1 - peel); g = g * peel + 90 * k2 * (1 - peel); b = b * peel + 80 * k2 * (1 - peel);
+      h = 0.62 + n * 0.1 - peel * 0.25;
+      const e = y - band; if (e < 4) { r *= 0.6; g *= 0.6; b *= 0.6; }
+    }
+    const streak = Math.max(0, st - 0.5) * 2.4 * (1 - y / H * 0.35); r *= 1 - streak * 0.55; g *= 1 - streak * 0.5; b *= 1 - streak * 0.4;
+    if (y > H * 0.84) { const d = (y - H * 0.84) / (H * 0.16) * 0.35; r *= 1 - d; g *= 1 - d; b *= 1 - d * 0.8; }
+    const sv = x % 256 < 2, sh = Math.abs(y - 70) < 1.5 || Math.abs(y - 190) < 1.5;
+    if (sv || sh) { r *= 0.5; g *= 0.5; b *= 0.5; h = 0.15; }
+    const tx = (x + 128) % 256 - 128, ty1 = y - 30, ty2 = y - 130;
+    if ((tx * tx + ty1 * ty1 < 18 || tx * tx + ty2 * ty2 < 18) && Math.abs(tx) < 64) { r *= 0.4; g *= 0.4; b *= 0.4; h = 0.1; }
+    return [r, g, b, h];
+  }), null);
+});
+const tunFloorTex = () => once('tunFloor', () => {
+  const S = 512, N = T.fbm(S, S, { scale: 3, oct: 6, seed: 41 }), D = T.fbm(S, S, { scale: 8, oct: 4, seed: 43 });
+  return T.done(T.pix(S, S, (x, y) => {
+    const n = N[y * S + x], d = D[y * S + x], k = 0.62 + n * 0.5, wet = Math.max(0, d - 0.6) * 1.6;
+    const sx = x % 256 < 2 || y % 256 < 2;   // expansion joints
+    let c = k * (1 - wet * 0.45); if (sx) c *= 0.45;
+    return [100 * c, 96 * c, 88 * c, sx ? 0.1 : 0.5 + n * 0.3];
+  }), null);
+});
+const tunPipeTex = () => once('tunPipe', () => {
+  const S = 128, N = T.fbm(S, S, { scale: 6, oct: 4, seed: 51, sx: 1, sy: 0.4 }), M2 = T.fbm(S, S, { scale: 16, oct: 3, seed: 53 });
+  return T.done(T.pix(S, S, (x, y) => {
+    const n = N[y * S + x], m = M2[y * S + x], k = 0.8 + n * 0.3, rust = Math.max(0, m - 0.56) * 4;
+    const r = 255 * k * (1 - rust) + 170 * rust, g = 250 * k * (1 - rust) + 96 * rust, b = 245 * k * (1 - rust) + 52 * rust;
+    return [r, g, b, 0.5 + n * 0.3 - rust * 0.2];
+  }), null);
+});
+const tunStencil = (text, w, h, fg, size) => T.textCanvas(w, h, (g, W, H) => {
+  g.clearRect(0, 0, W, H); g.fillStyle = fg; g.font = `bold ${size}px Arial, Helvetica, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.82;
+  g.fillText(text, W / 2, H / 2);
+  const r = T.rng(text.length * 7 + 3);   // worn paint: knock out flecks
+  for (let i = 0; i < 400; i++) { const x = r() * W | 0, y = r() * H | 0; g.clearRect(x, y, 2 + r() * 4, 1 + r() * 2); }
+});
+function tunShell(R, x0, x1, z0, z1, h) {
+  const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, wall = M(0xffffff, 0.92, 0, { t: tunWallTex(), bump: 0.05 });
+  const flr = M(0xffffff, 0.55, 0, { t: tunFloorTex(), rep: [w / 2, d / 2], bump: 0.03 });
+  struct(add(R.g, new THREE.PlaneGeometry(w, d), flr, cx, 0, cz)).rotation.x = -Math.PI / 2;
+  struct(add(R.g, new THREE.PlaneGeometry(w, d), M(0xffffff, 0.95, 0, { t: TX.concrete(), rep: [w / 2, d / 2], bump: 0.04 }), cx, h, cz)).rotation.x = Math.PI / 2;
+  for (const [len, x, z, ry] of [[w, cx, z0, 0], [w, cx, z1, Math.PI], [d, x0, cz, Math.PI / 2], [d, x1, cz, -Math.PI / 2]]) {
+    struct(add(R.g, new THREE.PlaneGeometry(len, h), reTex(wall, len / 4, 1), x, h / 2, z)).rotation.y = ry;
+    aoRun(R.g, len, x, z, ry, h);
+  }
+}
+// A cage bulkhead lamp: base plate, bulb, guard wires. Returns the bulb mesh; guard geometry is pushed to `iron`.
+function tunLamp(R, iron, x, y, z) {
+  iron.push(dkCyl(0.1, 0.1, 0.03, 12, x, y + 0.12, z), dkG(new THREE.TorusGeometry(0.1, 0.008, 5, 14), x, y + 0.02, z, Math.PI / 2), dkG(new THREE.TorusGeometry(0.1, 0.008, 5, 14), x, y - 0.1, z, Math.PI / 2));
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; iron.push(dkCyl(0.007, 0.007, 0.26, 4, x + Math.cos(a) * 0.1, y, z + Math.sin(a) * 0.1)); }
+  const b = sph(R.g, 0.065, M(0xffffff, 0.3, 0, { emissive: 0xffc890, emissiveIntensity: 1.8 }), x, y - 0.01, z, 12); b.userData.nocast = 1; return b;
+}
+function tunValve(parts, brassParts, x, y, z, side) {
+  parts.push(dkBox(0.2, 0.2, 0.24, x, y, z), dkBox(0.26, 0.06, 0.3, x, y, z), dkCyl(0.025, 0.025, 0.26, 6, x, y + 0.2, z));
+  brassParts.push(dkG(new THREE.TorusGeometry(0.11, 0.014, 6, 16), x, y + 0.33, z, Math.PI / 2), dkBox(0.22, 0.014, 0.014, x, y + 0.33, z), dkBox(0.014, 0.014, 0.22, x, y + 0.33, z));
+}
+function tunCrate(parts, x, y, z, w, h, d, ry) {
+  parts.push(dkBox(w, h, d, x, y + h / 2, z, 0, ry, 0));
+}
+
 function buildTunnel() {
   const R = mkRoom('tunnel', { p: [0, 6, -4], t: [0, 0, -6], s: 10, day: [0xffd0a0, 0.8], night: [0xffd0a0, 0.8] });
   R.dark = true;
-  rectRoom(R, -1.4, 1.4, -15, 2, 2.6, { floor: M(0xffffff, 0.85, 0, { t: T.concrete({ base: '#5a5852', seed: 4 }), rep: [2, 10], bump: 0.03 }), wall: M(0xffffff, 0.9, 0, { t: TX.concrete(), bump: 0.04 }), ceil: M(0xffffff, 0.9, 0, { t: TX.concrete(), rep: [2, 8] }) });
-  const pipeA = M(0x5a6a5a, 0.5, 0.6), pipeB = M(0x8a5a3a, 0.4, 0.9);
-  for (const [x, y, m, r] of [[-1.2, 2.2, pipeA, 0.1], [-1.25, 1.8, pipeB, 0.06], [1.2, 2.3, pipeB, 0.08], [1.25, 0.5, pipeA, 0.12]]) cyl(R.g, r, r, 17, m, x, y, -6.5, 16).rotation.x = Math.PI / 2;
-  const bulbs = [];
-  for (let z = 0; z > -15; z -= 3) {
-    const b = sph(R.g, 0.06, M(0xffffff, 0.3, 0, { emissive: 0xffc890, emissiveIntensity: 1.6 }), 0, 2.45, z, 12); b.userData.nocast = 1;
-    add(R.g, new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshStandardMaterial({ color: 0x222222, wireframe: true }), 0, 2.45, z).userData.nocast = 1;
-    bulbs.push(b);
+  const PI = Math.PI;
+  tunShell(R, -1.4, 1.4, -15, 2, 2.6);
+  // pipe runs: rust-streaked, with flanges at the joints, wall brackets, valves and ID plates
+  const pipeTex = tunPipeTex();
+  const pm = c => M(c, 0.55, 0.55, { t: pipeTex, rep: [1, 8], bump: 0.02 });
+  const pipes = [[-1.2, 2.2, 0x6a7a68, 0.1], [-1.25, 1.8, 0x9a5a36, 0.06], [1.2, 2.3, 0x9a5a36, 0.08], [1.25, 0.5, 0x6a7a68, 0.12]];
+  const flange = [], brackets = [], valves = [], wheels = [];
+  for (const [x, y, c, r] of pipes) {
+    cyl(R.g, r, r, 17, pm(c), x, y, -6.5, 14).rotation.x = PI / 2;
+    for (let z = 1.5; z > -15; z -= 3) flange.push(dkG(new THREE.TorusGeometry(r + 0.012, 0.022, 6, 14), x, y, z, 0, PI / 2, 0, 1, 1, 1.5));
+    for (let z = 0.6; z > -15; z -= 1.8) {
+      const wx = x < 0 ? -1.4 : 1.4, mid = (x + wx) / 2;
+      brackets.push(dkBox(Math.abs(wx - x) + 0.04, 0.035, 0.05, mid, y + r + 0.02, z), dkG(new THREE.TorusGeometry(r + 0.012, 0.012, 5, 14, PI * 1.4), x, y, z, 0, 0, PI * 0.8 - PI / 2));
+      brackets.push(dkBox(0.07, 0.07, 0.06, wx + (x < 0 ? 0.03 : -0.03), y + r + 0.02, z));
+    }
   }
-  updaters.push((dt, t) => { bulbs.forEach((b, i) => { b.material.emissiveIntensity = Math.sin(t * 17 + i * 5) > 0.97 ? 0.2 : 1.6; }); });
+  tunValve(valves, wheels, -1.2, 2.2, -4.6); tunValve(valves, wheels, -1.25, 1.8, -9.4); tunValve(valves, wheels, 1.2, 2.3, -7.4);
+  dkMerge(R.g, flange, M(0x4a4e4a, 0.5, 0.7)); dkMerge(R.g, brackets, IRON);
+  dkMerge(R.g, valves, M(0x3a3c3a, 0.5, 0.8)); dkMerge(R.g, wheels, M(0x9a2a1e, 0.5, 0.4));
+  // wall plates and stencils
+  const plate = (txt, x, y, z, ry, w = 0.5, h = 0.14, fg = '#ece4c8') => { const o = add(R.g, new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tunStencil(txt, 256, 72, fg, 40), transparent: true, roughness: 0.8, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }), x, y, z); o.rotation.y = ry; o.userData.nocast = 1; return o; };
+  plate('COLD WTR', -1.395, 1.55, -3.6, PI / 2, 0.5, 0.14, '#b8d0e0'); plate('STEAM  2', -1.395, 1.55, -8.2, PI / 2, 0.5, 0.14, '#e8d0a0');
+  plate('DRAIN', 1.395, 1.1, -5.0, -PI / 2, 0.4, 0.12); plate('T-3', 1.395, 1.3, -11.4, -PI / 2, 0.3, 0.14, '#e8d870');
+  plate('SERVICE TUNNEL', -1.395, 1.0, -1.2, PI / 2, 0.9, 0.18); plate('NO ADMITTANCE', -1.395, 1.0, -13.3, PI / 2, 0.9, 0.16, '#e0d6b8');
+  // cable run along the ceiling: three sagging bundles on clips
+  { const cab = [], zs = []; for (let z = 1.5; z > -15; z -= 1.8) zs.push(z);
+    for (const [cx0, cy0] of [[-0.62, 2.52], [-0.52, 2.55], [-0.72, 2.55]]) {
+      const pts = []; zs.forEach((z, i) => { pts.push(new THREE.Vector3(cx0, cy0, z)); if (i < zs.length - 1) pts.push(new THREE.Vector3(cx0, cy0 - 0.05 - (cx0 === -0.52 ? 0.02 : 0), z - 0.9)); });
+      cab.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), pts.length * 4, 0.014, 5));
+    }
+    const m = dkMerge(R.g, cab, M(0x141414, 0.55, 0.2));
+    const clips = zs.map(z => dkBox(0.26, 0.02, 0.03, -0.62, 2.585, z));
+    dkMerge(R.g, clips, IRON);
+    // a junction box with conduit
+    const jb = []; jb.push(dkBox(0.3, 0.3, 0.14, 1.34, 1.5, -6.0), dkBox(0.24, 0.24, 0.02, 1.34, 1.5, -5.93), dkCyl(0.02, 0.02, 0.5, 6, 1.34, 1.88, -6.0), dkCyl(0.02, 0.02, 0.6, 6, 1.34, 1.05, -6.0));
+    dkMerge(R.g, jb, M(0x5a6258, 0.55, 0.6));
+    add(R.g, new THREE.BoxGeometry(0.16, 0.1, 0.02), M(0xe8c040, 0.5, 0.1, { emissive: 0x3a2a00, emissiveIntensity: 0.4 }), 1.34, 1.54, -5.915).userData.nocast = 1;
+  }
+  // caged bulbs + their pools of light (all pools are merged into one additive mesh)
+  const bulbs = [], iron = [], pools = [];
+  const poolG = (w, d, x, y, z, rx, ry) => dkG(new THREE.PlaneGeometry(w, d), x, y, z, rx, ry, 0);
+  for (let z = 0; z > -15; z -= 3) {
+    bulbs.push(tunLamp(R, iron, 0, 2.47, z));
+    pools.push(poolG(3.4, 3.4, 0, 0.012, z, -PI / 2, 0), poolG(3, 2.2, 0, 2.595, z, PI / 2, 0), poolG(3.6, 2.2, -1.395, 1.4, z, 0, PI / 2), poolG(3.6, 2.2, 1.395, 1.4, z, 0, -PI / 2));
+  }
+  dkMerge(R.g, iron, IRON);
+  { const pm2 = new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffb070, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false });
+    const o = dkMerge(R.g, pools, pm2); o.renderOrder = 2; }
+  updaters.push((dt, t) => { bulbs.forEach((b, i) => { b.material.emissiveIntensity = Math.sin(t * 17 + i * 5) > 0.97 ? 0.2 : 1.8; }); });
+  // puddles with reflections: glossy dark patches on the floor under the lamps
+  { const pud = M(0x14130f, 0.04, 0.2, { transparent: true, opacity: 0.92, polygonOffset: true, polygonOffsetFactor: -4 });
+    for (const [x, z, sx, sz] of [[-0.35, -2.6, 0.7, 0.45], [0.45, -6.4, 0.55, 0.9], [-0.5, -9.6, 0.8, 0.5], [0.3, -12.2, 0.6, 0.7], [0.55, -0.9, 0.35, 0.5]]) {
+      const o = add(R.g, new THREE.CircleGeometry(0.5, 20), pud, x, 0.006, z); o.rotation.x = -PI / 2; o.scale.set(sx, sz, 1); o.userData.nocast = 1; o.renderOrder = 1;
+    }
+    // a gutter drain down the middle with grating every few metres
+    const gr = []; for (let z = 0.5; z > -14.5; z -= 3) for (let i = 0; i < 6; i++) gr.push(dkBox(0.34, 0.015, 0.02, 0, 0.012, z - 0.4 + i * 0.16));
+    dkMerge(R.g, gr, IRON); }
+  // old crates, a barrel and a lantern against the left wall (clear of the walking line)
+  { const wd = M(0x7a5a38, 0.85, 0, { t: TX.oak(), rep: [1, 1], bump: 0.03 }), cr = [], slat = [];
+    tunCrate(cr, -1.0, 0, -6.9, 0.7, 0.5, 0.55, 0.1); tunCrate(cr, -1.0, 0.5, -6.85, 0.55, 0.45, 0.5, -0.2); tunCrate(cr, -1.05, 0, -7.7, 0.6, 0.4, 0.5, 0.0);
+    dkMerge(R.g, cr, wd, false);
+    for (const [x, y, z, ry] of [[-1.0, 0.25, -6.9, 0.1], [-1.0, 0.725, -6.85, -0.2], [-1.05, 0.2, -7.7, 0]]) for (let i = -1; i <= 1; i += 2) slat.push(dkBox(0.74, 0.04, 0.6, x, y + i * 0.15, z, 0, ry, 0));
+    dkMerge(R.g, slat, M(0x4a3420, 0.9, 0));
+    // barrel
+    lathe(R.g, [[0.001, 0], [0.22, 0], [0.26, 0.2], [0.28, 0.45], [0.26, 0.7], [0.22, 0.9], [0.001, 0.9]], M(0x4a5a6a, 0.6, 0.6, { t: pipeTex, rep: [1, 1] }), 1.0, 0, -9.2, 16);
+    const bands = [0.18, 0.7].map(y => dkG(new THREE.TorusGeometry(y === 0.18 ? 0.255 : 0.255, 0.012, 5, 16), 1.0, y, -9.2, PI / 2)); dkMerge(R.g, bands, IRON);
+    // kerosene lantern on the crate
+    const L = new THREE.Group(); L.position.set(-1.0, 0.95, -6.85); R.g.add(L);
+    const lp = [dkCyl(0.07, 0.08, 0.03, 10, 0, 0.015, 0), dkCyl(0.05, 0.07, 0.02, 10, 0, 0.23, 0), dkG(new THREE.TorusGeometry(0.06, 0.008, 5, 12, PI), 0, 0.27, 0), dkCyl(0.006, 0.006, 0.2, 4, 0.065, 0.12, 0), dkCyl(0.006, 0.006, 0.2, 4, -0.065, 0.12, 0)];
+    dkMerge(L, lp, IRON);
+    add(L, new THREE.CylinderGeometry(0.052, 0.06, 0.2, 10, 1, true), new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffa040, emissiveIntensity: 1.1, transparent: true, opacity: 0.6, side: THREE.DoubleSide }), 0, 0.12, 0).userData.nocast = 1;
+    const fl = sph(L, 0.025, M(0xffffff, 0.3, 0, { emissive: 0xffb050, emissiveIntensity: 2.4 }), 0, 0.1, 0, 8); fl.scale.y = 1.8;
+    const lpool = add(R.g, new THREE.PlaneGeometry(1.8, 1.8), new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffa050, transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }), -0.9, 0.013, -6.85); lpool.rotation.x = -PI / 2; lpool.userData.nocast = 1; lpool.renderOrder = 2;
+    updaters.push((dt, t) => { fl.scale.y = 1.7 + Math.sin(t * 9) * 0.12 + Math.sin(t * 23) * 0.06; });
+  }
+  // the vault door: a heavy round door in a thick frame, hinges, bolt housings, locking bars, handle and dial
   const vd = new THREE.Group(); vd.position.set(0, 1.25, -14.9); R.g.add(vd);
-  cyl(vd, 1.1, 1.1, 0.15, M(0x8a8e92, 0.35, 0.9, { t: TX.steel(), bump: 0.004 }), 0, 0, 0.05, 48).rotation.x = Math.PI / 2;
-  for (let i = 0; i < 3; i++) add(vd, new THREE.TorusGeometry(0.3 + i * 0.27, 0.045, 8, 40), [BRASS, STEEL, BRASS][i], 0, 0, 0.14);
-  star3(vd, 0.13, BRASS, 0, 0, 0.16, 0.04);
-  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; sph(vd, 0.035, STEEL, Math.cos(a) * 1.02, Math.sin(a) * 1.02, 0.12, 8); }
+  const steel = M(0x7c8084, 0.4, 0.9, { t: TX.steel(), rep: [2, 2], bump: 0.006 }), dark = M(0x34383c, 0.55, 0.85, { t: TX.steel(), rep: [1, 1], bump: 0.006 });
+  add(vd, new THREE.TorusGeometry(1.15, 0.12, 10, 56), dark, 0, 0, 0.09);   // frame casting
+  add(vd, new THREE.CylinderGeometry(1.1, 1.1, 0.3, 56), M(0x1a1a1c, 0.8, 0.3), 0, 0, -0.02).rotation.x = PI / 2;   // dark recess
+  cyl(vd, 1.0, 1.0, 0.3, steel, 0, 0, 0.12, 56).rotation.x = PI / 2;
+  add(vd, new THREE.TorusGeometry(1.0, 0.045, 8, 56), steel, 0, 0, 0.27);
+  for (let i = 0; i < 3; i++) add(vd, new THREE.TorusGeometry(0.3 + i * 0.27, 0.04, 8, 40), [BRASS, steel, BRASS][i], 0, 0, 0.29);
+  { const bars = [], rivets = [], hous = [];
+    for (let i = 0; i < 8; i++) { const a = i / 8 * PI * 2 + PI / 8; bars.push(dkBox(0.22, 0.09, 0.05, Math.cos(a) * 0.9, Math.sin(a) * 0.9, 0.3, 0, 0, a), dkBox(0.14, 0.14, 0.08, Math.cos(a - PI / 8) * 1.15, Math.sin(a - PI / 8) * 1.15, 0.1, 0, 0, a - PI / 8));
+      hous.push(dkCyl(0.05, 0.05, 0.2, 8, Math.cos(a - PI / 8) * 1.06, Math.sin(a - PI / 8) * 1.06, 0.16, PI / 2, 0, 0)); }
+    for (let i = 0; i < 28; i++) { const a = i / 28 * PI * 2; rivets.push(dkG(new THREE.SphereGeometry(0.03, 6, 4), Math.cos(a) * 0.93, Math.sin(a) * 0.93, 0.32)); }
+    dkMerge(vd, bars, dark); dkMerge(vd, rivets, STEEL); dkMerge(vd, hous, dark);
+    // three heavy hinges on the left
+    const hg = []; for (const y of [-0.65, 0, 0.65]) hg.push(dkCyl(0.07, 0.07, 0.34, 10, -1.12, y, 0.2), dkBox(0.34, 0.2, 0.08, -0.98, y, 0.3), dkBox(0.34, 0.2, 0.08, -1.25, y, 0.2));
+    dkMerge(vd, hg, dark); }
+  // handle bar (right), pressure gauge and combination dial
+  box(vd, 0.5, 0.07, 0.07, BRASS, 0.5, 0.0, 0.38); cyl(vd, 0.06, 0.06, 0.12, BRASS, 0.7, 0.0, 0.34, 10).rotation.x = PI / 2; cyl(vd, 0.06, 0.06, 0.12, BRASS, 0.3, 0.0, 0.34, 10).rotation.x = PI / 2;
+  { const dial = new THREE.Group(); dial.position.set(0.0, -0.62, 0.3); vd.add(dial); cyl(dial, 0.17, 0.17, 0.06, dark, 0, 0, 0, 24).rotation.x = PI / 2; cyl(dial, 0.13, 0.13, 0.04, BRASS, 0, 0, 0.04, 24).rotation.x = PI / 2;
+    const tk = []; for (let i = 0; i < 24; i++) { const a = i / 24 * PI * 2; tk.push(dkBox(0.01, i % 6 ? 0.03 : 0.05, 0.01, Math.cos(a) * 0.1, Math.sin(a) * 0.1, 0.065, 0, 0, a + PI / 2)); } dkMerge(dial, tk, IRON);
+    box(dial, 0.015, 0.1, 0.012, M(0x8a1a14, 0.5), 0, 0.05, 0.07); }
+  star3(vd, 0.15, BRASS, 0, 0, 0.32, 0.04);
   tag(vd, 'stardoor', 'Round vault door');
+  { const dp = add(R.g, new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffb070, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 1.3, -14.7); dp.userData.nocast = 1; dp.renderOrder = 2; }
   door(R, 0, 1.95, null, 'exit_tunnel', [0, -5], { metal: 1 });
   lamps(R, [0, 2.2, -2, 0xffc890, 9, 10], [0, 2.2, -12, 0xffc890, 9, 10]);
   return R;
 }
 
+// ---------- Star Room helpers (dark-rooms pass) ----------
+// Blueprint sheets: white line on blue, folded, stained. kind 0 = dome plan, 1 = section, 2 = floor plan.
+const starBlue = (kind) => once('starBlue' + kind, () => T.textCanvas(512, 384, (g, w, h) => {
+  const PI = Math.PI, r = T.rng(kind * 5 + 2);
+  const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#2b5ca2'); gr.addColorStop(1, '#1b4079'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(225,238,255,.1)'; g.lineWidth = 1;
+  for (let x = 0; x < w; x += 16) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  for (let y = 0; y < h; y += 16) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.strokeStyle = 'rgba(238,246,255,.9)'; g.fillStyle = 'rgba(238,246,255,.92)'; g.lineWidth = 2; g.strokeRect(14, 14, w - 28, h - 28); g.lineWidth = 1.4;
+  const arrow = (x1, y1, x2, y2, txt) => {
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+    const a = Math.atan2(y2 - y1, x2 - x1);
+    for (const [x, y, s] of [[x1, y1, 1], [x2, y2, -1]]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + s * Math.cos(a - 0.4) * 9, y + s * Math.sin(a - 0.4) * 9); g.moveTo(x, y); g.lineTo(x + s * Math.cos(a + 0.4) * 9, y + s * Math.sin(a + 0.4) * 9); g.stroke(); }
+    g.font = '11px "Courier New", monospace'; g.textAlign = 'center'; g.fillText(txt, (x1 + x2) / 2, (y1 + y2) / 2 - 5);
+  };
+  if (kind === 0) {
+    const cx = 220, cy = 175;
+    for (const rr of [128, 120, 56, 48]) { g.beginPath(); g.arc(cx, cy, rr, 0, PI * 2); g.stroke(); }
+    for (let i = 0; i < 24; i++) { const a = i / 24 * PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * 56, cy + Math.sin(a) * 56); g.lineTo(cx + Math.cos(a) * 120, cy + Math.sin(a) * 120); g.stroke(); }
+    g.beginPath(); g.moveTo(cx - 150, cy); g.lineTo(cx + 150, cy); g.moveTo(cx, cy - 150); g.lineTo(cx, cy + 150); g.stroke();
+    arrow(cx - 128, cy + 148, cx + 128, cy + 148, '16000'); arrow(cx + 150, cy - 56, cx + 150, cy + 56, '8000');
+    g.beginPath(); g.arc(cx, cy, 20, 0, PI * 2); g.stroke(); g.font = '11px "Courier New", monospace'; g.fillText('STAR RM', cx, cy + 4);
+  } else if (kind === 1) {
+    const cx = 250, by = 300;
+    g.beginPath(); g.arc(cx, by, 170, PI, PI * 2); g.stroke(); g.beginPath(); g.arc(cx, by, 160, PI, PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(cx - 190, by); g.lineTo(cx + 190, by); g.lineTo(cx + 190, by + 40); g.lineTo(cx - 190, by + 40); g.closePath(); g.stroke();
+    g.strokeRect(cx - 60, by + 4, 120, 32); g.beginPath(); g.arc(cx, by + 36, 60, PI, PI * 2); g.stroke();
+    for (let i = -4; i <= 4; i++) { g.beginPath(); g.moveTo(cx, by); g.lineTo(cx + Math.sin(i * 0.38) * 165, by - Math.cos(i * 0.38) * 165); g.stroke(); }
+    arrow(cx - 170, by - 60, cx + 170, by - 60, '16000'); g.font = '11px "Courier New", monospace'; g.fillText('SECTION A-A', cx, by + 60);
+  } else {
+    g.strokeRect(50, 50, 200, 120); g.strokeRect(250, 50, 120, 80); g.strokeRect(250, 130, 120, 100); g.strokeRect(50, 170, 130, 130); g.strokeRect(180, 170, 70, 130);
+    g.beginPath(); g.arc(370, 270, 60, 0, PI * 2); g.stroke(); g.beginPath(); g.arc(370, 270, 30, 0, PI * 2); g.stroke();
+    g.font = '11px "Courier New", monospace'; g.textAlign = 'center'; g.fillText('SPA', 150, 115); g.fillText('LOBBY', 310, 95); g.fillText('KITCHEN', 115, 240); g.fillText('DOME', 370, 273);
+    arrow(50, 320, 250, 320, '12000');
+  }
+  g.strokeRect(w - 214, h - 76, 196, 58); g.beginPath(); g.moveTo(w - 214, h - 54); g.lineTo(w - 18, h - 54); g.moveTo(w - 214, h - 36); g.lineTo(w - 18, h - 36); g.stroke();
+  g.font = 'bold 12px "Courier New", monospace'; g.textAlign = 'left';
+  g.fillText('AQUADOME - ' + ['DOME PLAN', 'SECTION', 'GROUND FLOOR'][kind], w - 208, h - 60); g.font = '10px "Courier New", monospace';
+  g.fillText('SHEET ' + [7, 9, 2][kind] + ' OF 12   SCALE 1:50', w - 208, h - 42); g.fillText('O. FINCH, ARCH.   MAR 2003', w - 208, h - 24);
+  g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.stroke();
+  for (let i = 0; i < 4; i++) { const x = r() * w, y = r() * h, rr = 30 + r() * 60, s = g.createRadialGradient(x, y, 0, x, y, rr); s.addColorStop(0, 'rgba(60,40,10,.18)'); s.addColorStop(1, 'rgba(60,40,10,0)'); g.fillStyle = s; g.fillRect(x - rr, y - rr, rr * 2, rr * 2); }
+}));
+// A framed star chart on parchment, with Cygnus drawn heavier.
+const starChartTex = () => once('starChart', () => T.textCanvas(512, 512, (g, w, h) => {
+  const PI = Math.PI, r = T.rng(77);
+  g.fillStyle = '#e6d8b2'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 30; i++) { const x = r() * w, y = r() * h, rr = 30 + r() * 80, s = g.createRadialGradient(x, y, 0, x, y, rr); s.addColorStop(0, 'rgba(120,80,30,.12)'); s.addColorStop(1, 'rgba(120,80,30,0)'); g.fillStyle = s; g.fillRect(x - rr, y - rr, rr * 2, rr * 2); }
+  g.strokeStyle = '#3a2a18'; g.fillStyle = '#3a2a18'; g.lineWidth = 2; g.strokeRect(10, 10, w - 20, h - 20);
+  g.beginPath(); g.arc(256, 268, 214, 0, PI * 2); g.stroke(); g.lineWidth = 1; g.beginPath(); g.arc(256, 268, 196, 0, PI * 2); g.stroke();
+  for (let i = 0; i < 72; i++) { const a = i / 72 * PI * 2; g.beginPath(); g.moveTo(256 + Math.cos(a) * 196, 268 + Math.sin(a) * 196); g.lineTo(256 + Math.cos(a) * (i % 6 ? 205 : 214), 268 + Math.sin(a) * (i % 6 ? 205 : 214)); g.stroke(); }
+  g.strokeStyle = 'rgba(58,42,24,.35)'; for (const rr of [60, 120, 170]) { g.beginPath(); g.arc(256, 268, rr, 0, PI * 2); g.stroke(); }
+  g.beginPath(); g.moveTo(256, 72); g.lineTo(256, 464); g.moveTo(60, 268); g.lineTo(452, 268); g.stroke();
+  for (let i = 0; i < 170; i++) { const a = r() * PI * 2, d = Math.sqrt(r()) * 188; g.beginPath(); g.arc(256 + Math.cos(a) * d, 268 + Math.sin(a) * d, 0.8 + r() * r() * 2.6, 0, 7); g.fill(); }
+  g.strokeStyle = '#3a2a18'; g.lineWidth = 2.4;
+  const line = (pts, close) => { g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); if (close) g.closePath(); g.stroke(); pts.forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 4.5, 0, 7); g.fill(); }); };
+  line([[256, 150], [256, 205], [256, 300], [256, 372]]); line([[188, 215], [256, 205], [326, 215]]);
+  g.lineWidth = 1.4; line([[360, 130], [392, 150], [384, 190], [352, 180]], true); line([[120, 150], [150, 176], [140, 214], [172, 250], [162, 292]]);
+  g.font = 'bold 15px Georgia, serif'; g.textAlign = 'center'; g.fillText('CYGNUS', 256, 400); g.font = '12px Georgia, serif'; g.fillText('LYRA', 372, 118); g.fillText('DRACO', 118, 136);
+  g.font = 'bold 13px Georgia, serif'; g.fillText('THE NORTHERN SKY', 256, 36); g.font = '11px Georgia, serif'; g.fillText('AS SEEN FROM THE AQUADOME, 21 JUNE 2003', 256, 496);
+}));
+const starCorkTex = () => once('starCork', () => T.textCanvas(384, 256, (g, w, h) => {
+  const r = T.rng(9);
+  g.fillStyle = '#a8794a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1400; i++) { g.fillStyle = r() < 0.5 ? 'rgba(90,55,25,.35)' : 'rgba(220,170,110,.3)'; g.fillRect(r() * w, r() * h, 1 + r() * 3, 1 + r() * 2); }
+  const note = (x, y, nw, nh, rot, col, txt) => {
+    g.save(); g.translate(x, y); g.rotate(rot); g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(3, 4, nw, nh); g.fillStyle = col; g.fillRect(0, 0, nw, nh);
+    g.fillStyle = 'rgba(40,40,50,.8)'; g.font = '11px "Courier New", monospace'; g.textAlign = 'left'; txt.forEach((t, i) => g.fillText(t, 7, 18 + i * 14));
+    g.fillStyle = '#b02a22'; g.beginPath(); g.arc(nw / 2, 7, 4, 0, 7); g.fill(); g.restore();
+  };
+  note(24, 26, 104, 76, -0.05, '#efe8cf', ['CREW 2003', 'O.F. / M.O.', 'R.A. / G.H.', 'keys: 4']); note(150, 18, 92, 100, 0.04, '#f2e07a', ['DOME SEAL', 'check hatch', 'Fri 9 am']);
+  note(262, 30, 96, 70, -0.03, '#efe8cf', ['TIME CAPSULE', 'lid: 4 bolts', 'open 2053']); note(40, 130, 120, 90, 0.03, '#d9e4ee', ['Sheet 7 rev. C', 'ribs +2', '(see O.F.)']);
+  note(190, 144, 90, 80, -0.06, '#efe8cf', ['lamp bulbs', 'candles?', 'ask Gus']);
+}));
+const starWebTex = () => once('starWeb', () => T.textCanvas(256, 256, (g, w) => {
+  g.clearRect(0, 0, w, w); g.strokeStyle = 'rgba(240,238,230,.8)'; g.lineWidth = 1;
+  const r = T.rng(4), spokes = 7;
+  for (let i = 0; i < spokes; i++) { const a = (i / (spokes - 1)) * Math.PI / 2 + (r() - 0.5) * 0.1; g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 250, Math.sin(a) * 250); g.stroke(); }
+  for (let k = 1; k < 9; k++) { const rr = k * 28; g.beginPath(); for (let i = 0; i < spokes; i++) { const a = (i / (spokes - 1)) * Math.PI / 2, x = Math.cos(a) * rr * (0.85 + r() * 0.2), y = Math.sin(a) * rr * (0.85 + r() * 0.2); i ? g.quadraticCurveTo((px + x) / 2 * 0.9, (py + y) / 2 * 0.9, x, y) : g.moveTo(x, y); var px = x, py = y; } g.stroke(); }
+}));
+const dkShadowTex = () => once('dkShadow', () => T.textCanvas(128, 128, (g, w) => {
+  const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.55, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, w);
+}));
+function starFrame(p, tex, w, h, th, y, ry, o = {}) {
+  const x = Math.sin(th) * 3.93, z = -Math.cos(th) * 3.93, g = new THREE.Group(); g.position.set(x, y, z); faceTo(g, 0, 0); g.userData.nocast = 1; p.add(g);
+  const fr = o.brass ? BRASS : mat.mahog(), t = 0.07;
+  dkMerge(g, [dkBox(w + 2 * t, t, 0.05, 0, h / 2 + t / 2, 0), dkBox(w + 2 * t, t, 0.05, 0, -h / 2 - t / 2, 0), dkBox(t, h, 0.05, -w / 2 - t / 2, 0, 0), dkBox(t, h, 0.05, w / 2 + t / 2, 0, 0), dkBox(w + 0.02, h + 0.02, 0.01, 0, 0, -0.005)], fr);
+  add(g, new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7, metalness: 0, color: o.dim || 0xffffff }), 0, 0, 0.012).userData.nocast = 1;
+  if (o.light) { dkMerge(g, [dkBox(0.5, 0.025, 0.04, 0, h / 2 + t + 0.14, 0.12), dkBox(0.015, 0.015, 0.2, 0, h / 2 + t + 0.14, 0.04)], BRASS); const lt = box(g, 0.44, 0.02, 0.03, M(0xfff0d0, 0.3, 0, { emissive: 0xffd090, emissiveIntensity: 1.6 }), 0, h / 2 + t + 0.1, 0.12); lt.userData.nocast = 1; }
+  return g;
+}
+
 function buildStarRoom() {
   const R = mkRoom('star', { p: [0, 4, 1], t: [0, 0, -1], s: 4, day: [0xffd8b0, 1.1], night: [0xffd8b0, 1.1] });
   R.dark = true;
+  const PI = Math.PI, WH = 2.3;
   const floorT = T.textCanvas(512, 512, (g, w) => {
     const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2); gr.addColorStop(0, '#4a3020'); gr.addColorStop(1, '#2a1a10'); g.fillStyle = gr; g.fillRect(0, 0, w, w);
     g.strokeStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i < 40; i++) { g.beginPath(); g.moveTo(0, i * 13); g.lineTo(w, i * 13 + 4); g.stroke(); }
@@ -761,16 +1156,30 @@ function buildStarRoom() {
     for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 80 : 190; const x = w / 2 + Math.cos(a) * r, y = w / 2 + Math.sin(a) * r; i ? g.lineTo(x, y) : g.moveTo(x, y); }
     g.closePath(); g.stroke();
   });
-  struct(add(R.g, new THREE.CircleGeometry(4, 48), new THREE.MeshStandardMaterial({ map: floorT, roughness: 0.45 }), 0, 0, 0)).rotation.x = -Math.PI / 2;
-  const wn = M(0xffffff, 0.5, 0, { t: TX.panel(), rep: [12, 1], bump: 0.02 }); wn.side = THREE.BackSide;
-  struct(add(R.g, new THREE.CylinderGeometry(4, 4, 1.6, 48, 1, true), wn, 0, 0.8, 0));
-  struct(add(R.g, new THREE.TorusGeometry(3.96, 0.05, 6, 48), BRASS, 0, 1.6, 0)).rotation.x = Math.PI / 2;
-  struct(add(R.g, new THREE.SphereGeometry(4, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ map: T.starDome(true), side: THREE.BackSide }), 0, 1.6, 0));
+  struct(add(R.g, new THREE.CircleGeometry(4, 48), new THREE.MeshStandardMaterial({ map: floorT, roughness: 0.45 }), 0, 0, 0)).rotation.x = -PI / 2;
+  const wn = M(0xffffff, 0.5, 0, { t: TX.panel(), rep: [16, 1], bump: 0.02 }); wn.side = THREE.BackSide;
+  struct(add(R.g, new THREE.CylinderGeometry(4, 4, WH, 64, 1, true), wn, 0, WH / 2, 0));
+  struct(add(R.g, new THREE.TorusGeometry(3.96, 0.05, 6, 48), BRASS, 0, WH, 0)).rotation.x = PI / 2;
+  struct(add(R.g, new THREE.SphereGeometry(4, 48, 24, 0, PI * 2, 0, PI / 2), new THREE.MeshBasicMaterial({ map: T.starDome(true), side: THREE.BackSide }), 0, WH, 0));
+  { // wainscot: raised panels between pilasters, chair rail, skirting, cornice
+    const wood = mat.mahog(), pl = [], pn = [];
+    for (let i = 0; i < 16; i++) {
+      const a = i / 16 * PI * 2, x = Math.sin(a) * 3.94, z = -Math.cos(a) * 3.94; pl.push(dkBox(0.2, WH - 0.1, 0.1, x, WH / 2, z, 0, -a, 0));
+      const a2 = a + PI / 16, x2 = Math.sin(a2) * 3.97, z2 = -Math.cos(a2) * 3.97; pn.push(dkBox(1.2, 0.7, 0.04, x2, 0.62, z2, 0, -a2, 0));
+    }
+    dkMerge(R.g, pl, wood, false).userData.struct = 1; dkMerge(R.g, pn, mat.panel([1, 1]), false).userData.struct = 1;
+    const rm = reTex(wood, 30, 1); rm.side = THREE.BackSide;
+    dkMerge(R.g, [dkG(new THREE.CylinderGeometry(3.9, 3.9, 0.08, 64, 1, true), 0, 1.02, 0), dkG(new THREE.CylinderGeometry(3.93, 3.93, 0.2, 64, 1, true), 0, 0.1, 0), dkG(new THREE.CylinderGeometry(3.88, 3.88, 0.14, 64, 1, true), 0, WH - 0.1, 0)], rm, false).userData.struct = 1;
+  }
+  // a faded round rug under the desk corner
+  { const rug = add(R.g, new THREE.CircleGeometry(1, 32), M(0xffffff, 0.95, 0, { t: TX.carpetSuite(), rep: [1.2, 1.2], bump: 0.01, polygonOffset: true, polygonOffsetFactor: -2 }), 2.85, 0.006, -1.1); rug.rotation.x = -PI / 2; rug.scale.set(1.15, 1.45, 1); rug.userData.nocast = 1; }
+  // crown pedestal
   const pd = new THREE.Group(); pd.position.set(0, 0, -0.8); R.g.add(pd);
   lathe(pd, [[0.001, 0], [0.4, 0], [0.4, 0.1], [0.3, 0.18], [0.24, 0.9], [0.34, 0.96], [0.34, 1.02], [0.001, 1.02]], M(0xffffff, 0.25, 0, { t: TX.marbleTop(), bump: 0.005 }), 0, 0, 0, 32);
   cyl(pd, 0.22, 0.22, 0.05, M(0x4a0f18, 0.95, 0, { t: TX.velvet() }), 0, 1.045, 0);
   R.crown = crown(pd, 0, 1.07, 0, 1.4);
   tag(pd, 'crown', 'The Prism Crown');
+  // orrery
   const or = new THREE.Group(); or.position.set(-2, 0, -1.6); R.g.add(or);
   lathe(or, [[0.001, 0], [0.25, 0], [0.2, 0.06], [0.05, 0.12], [0.03, 1.1], [0.001, 1.1]], BRASS, 0, 0, 0, 20);
   sph(or, 0.13, M(0xe8c060, 0.3, 0.6, { emissive: 0x8a5a10, emissiveIntensity: 0.6 }), 0, 1.25, 0);
@@ -781,14 +1190,81 @@ function buildStarRoom() {
   });
   updaters.push((dt, t) => { arms.forEach((a, i) => { a.rotation.y = t * (0.5 - i * 0.12); }); });
   tag(or, 'orrery', 'Orrery');
+  // candle stands (stands and wax merged; the flames flicker)
+  const flames = [], poolPts = [], shadowPts = [], stand = [], wax = [];
   for (const [x, z] of [[2.6, -2.4], [-2.6, 1.5], [2.4, 1.8]]) {
-    const c = new THREE.Group(); c.position.set(x, 0, z); R.g.add(c);
-    lathe(c, [[0.001, 0], [0.15, 0], [0.05, 0.1], [0.03, 1.0], [0.1, 1.05], [0.001, 1.05]], BRASS, 0, 0, 0, 16);
-    cyl(c, 0.03, 0.03, 0.18, M(0xf0e8d8, 0.7), 0, 1.14, 0, 10);
-    sph(c, 0.018, M(0xffffff, 0.3, 0, { emissive: 0xffa040, emissiveIntensity: 2 }), 0, 1.25, 0, 8).userData.nocast = 1;
+    stand.push(dkG(new THREE.LatheGeometry([[0.001, 0], [0.15, 0], [0.05, 0.1], [0.03, 1.0], [0.1, 1.05], [0.001, 1.05]].map(([r, h]) => new THREE.Vector2(r, h)), 16), x, 0, z));
+    wax.push(dkCyl(0.03, 0.03, 0.18, 10, x, 1.14, z));
+    const f = sph(R.g, 0.018, M(0xffffff, 0.3, 0, { emissive: 0xffa040, emissiveIntensity: 2 }), x, 1.25, z, 8); f.userData.nocast = 1; f.scale.y = 1.6; flames.push(f);
+    poolPts.push(dkG(new THREE.PlaneGeometry(2.4, 2.4), x, 0.011, z, -PI / 2, 0, 0));
   }
+  dkMerge(R.g, stand, BRASS, false); dkMerge(R.g, wax, M(0xf0e8d8, 0.7));
+  updaters.push((dt, t) => { flames.forEach((f, i) => { f.scale.y = 1.5 + Math.sin(t * 8 + i * 2) * 0.15 + Math.sin(t * 21 + i) * 0.08; }); });
+  // ---- the 2003 secret: Opal's drafting desk, chair, capsule, boxes, charts (small clutter: no shadow casting) ----
+  const props = new THREE.Group(); props.userData.nocast = 1; R.g.add(props);
+  const wd = mat.mahog(), oak = mat.oak([1, 1]), paper = M(0xefe6cf, 0.9);
+  const blob = (x, z, w, d, ry = 0, op = 0.55) => shadowPts.push(dkG(new THREE.PlaneGeometry(w, d), x, 0.009, z, -PI / 2, 0, ry));
+  { // desk against the east wall, facing the middle
+    const d = new THREE.Group(); d.position.set(3.2, 0, -1.1); d.rotation.y = -PI / 2; props.add(d);
+    box(d, 1.5, 0.05, 0.75, wd, 0, 0.76, 0);
+    dkMerge(d, [dkBox(0.42, 0.7, 0.66, -0.52, 0.37, 0), dkBox(0.42, 0.7, 0.66, 0.52, 0.37, 0), dkBox(0.7, 0.4, 0.03, 0, 0.5, -0.3)], wd);
+    const kn = []; for (const sx of [-0.52, 0.52]) for (const y of [0.18, 0.4, 0.62]) kn.push(dkG(new THREE.SphereGeometry(0.02, 6, 4), sx, y, 0.34), dkBox(0.12, 0.012, 0.01, sx, y + 0.06, 0.335));
+    dkMerge(d, kn, BRASS);
+    dkMerge(d, [dkBox(1.46, 0.005, 0.7, 0, 0.788, 0), dkBox(0.7, 0.004, 0.46, 0.0, 0.791, 0.04)], M(0x1c3a2a, 0.8));   // green leather blotter
+    const L = new THREE.Group(); L.position.set(-0.55, 0.785, -0.15); d.add(L);   // banker's lamp
+    lathe(L, [[0.001, 0], [0.08, 0], [0.07, 0.03], [0.02, 0.06], [0.02, 0.3], [0.001, 0.3]], BRASS, 0, 0, 0, 16);
+    lathe(L, [[0.02, 0.36], [0.1, 0.33], [0.14, 0.29], [0.13, 0.28], [0.02, 0.33]], M(0x1f6a46, 0.35, 0.1, { side: THREE.DoubleSide, emissive: 0x2a8a50, emissiveIntensity: 0.9 }), 0, 0, 0, 16);
+    sph(L, 0.03, M(0xfff0d0, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1.6 }), 0, 0.31, 0, 8);
+    poolPts.push(dkG(new THREE.PlaneGeometry(1.8, 1.8), 3.35, 0.8, -1.65, -PI / 2, 0, 0), dkG(new THREE.PlaneGeometry(3, 3), 3.0, 0.012, -1.4, -PI / 2, 0, 0));
+    // open ledger, loose sheets, rolled drawings
+    const cv = [dkBox(0.42, 0.015, 0.3, 0.15, 0.805, 0.12)], pp = [dkBox(0.2, 0.004, 0.27, 0.05, 0.815, 0.12), dkBox(0.2, 0.004, 0.27, 0.26, 0.815, 0.12), dkBox(0.3, 0.003, 0.22, -0.1, 0.8, -0.1, 0, 0.2, 0), dkBox(0.26, 0.003, 0.2, -0.05, 0.803, 0.2, 0, -0.3, 0)];
+    dkMerge(d, cv, M(0x4a2a1a, 0.7)); dkMerge(d, pp, paper);
+    dkMerge(d, [dkCyl(0.035, 0.035, 0.55, 10, 0.6, 0.835, -0.15, 0, 0.1, PI / 2), dkCyl(0.035, 0.035, 0.55, 10, 0.62, 0.835, -0.05, 0, -0.08, PI / 2)], M(0x6a8ab8, 0.8));
+    blob(3.3, -1.1, 1.3, 2.1, 0);
+  }
+  { // wooden desk chair
+    const c = new THREE.Group(); c.position.set(2.4, 0, -1.15); c.rotation.y = PI / 2 + 0.25; props.add(c);
+    const lg = []; for (const [x, z] of [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]]) lg.push(dkBox(0.04, 0.45, 0.04, x, 0.225, z));
+    lg.push(dkBox(0.4, 0.03, 0.03, 0, 0.18, -0.19), dkBox(0.4, 0.03, 0.03, 0, 0.18, 0.19), dkBox(0.04, 0.5, 0.04, -0.19, 0.7, -0.2), dkBox(0.04, 0.5, 0.04, 0.19, 0.7, -0.2), dkBox(0.42, 0.06, 0.03, 0, 0.98, -0.2), dkBox(0.38, 0.05, 0.02, 0, 0.78, -0.2), dkBox(0.38, 0.05, 0.02, 0, 0.64, -0.2));
+    dkMerge(c, lg, wd); box(c, 0.46, 0.06, 0.46, M(0x5a2e1a, 0.6, 0, { t: TX.velvet(), bump: 0.01 }), 0, 0.48, 0);
+    blob(2.4, -1.15, 0.85, 0.85, 0);
+  }
+  { // time capsule: a brass cylinder on two wooden cradles, with a plaque
+    const cap = new THREE.Group(); cap.position.set(-1.35, 0, -2.75); cap.rotation.y = 0.35; props.add(cap);
+    dkMerge(cap, [dkBox(0.08, 0.2, 0.5, -0.3, 0.1, 0), dkBox(0.08, 0.2, 0.5, 0.3, 0.1, 0)], oak);
+    const tcg = [dkCyl(0.19, 0.19, 0.95, 20, 0, 0.36, 0, 0, 0, PI / 2)];
+    for (const s of [-1, 1]) tcg.push(dkG(new THREE.SphereGeometry(0.19, 14, 10), s * 0.475, 0.36, 0, 0, 0, 0, 0.5, 1, 1), dkG(new THREE.TorusGeometry(0.19, 0.016, 6, 20), s * 0.4, 0.36, 0, 0, PI / 2, 0));
+    dkMerge(cap, tcg, M(0xb48a46, 0.35, 0.9, { t: TX.steel(), bump: 0.004 }));
+    const bl = []; for (let i = 0; i < 8; i++) { const a = i / 8 * PI * 2; bl.push(dkG(new THREE.SphereGeometry(0.014, 6, 4), -0.5, 0.36 + Math.cos(a) * 0.12, Math.sin(a) * 0.12)); } dkMerge(cap, bl, STEEL);
+    add(cap, new THREE.PlaneGeometry(0.42, 0.14), new THREE.MeshStandardMaterial({ map: T.plaque('TIME CAPSULE  2003', { w: 512, h: 170, size: 0.2, fg: '#2a1a08' }), metalness: 0.6, roughness: 0.4 }), 0, 0.36, 0.192);
+    blob(-1.35, -2.75, 1.6, 0.9, 0.35 + PI / 2);
+  }
+  { // archive boxes and a steamer trunk
+    const bx = M(0xb59a6c, 0.9, 0, { t: TX.oak(), rep: [1, 1], bump: 0.01 });
+    const bg = new THREE.Group(); bg.position.set(-2.9, 0, -2.55); bg.rotation.y = 0.25; props.add(bg);
+    dkMerge(bg, [dkBox(0.5, 0.32, 0.36, 0, 0.16, 0, 0, 0.1, 0), dkBox(0.5, 0.32, 0.36, 0.02, 0.48, 0.01, 0, -0.08, 0), dkBox(0.5, 0.32, 0.36, 0.7, 0.16, 0.05, 0, 0.3, 0)], bx);
+    for (const [x, y, z, ry, t2] of [[0, 0.16, 0.19, 0.1, 'CREW 2003'], [0.02, 0.48, 0.2, -0.08, 'DRAWINGS']]) { const lb = add(bg, new THREE.PlaneGeometry(0.3, 0.1), new THREE.MeshStandardMaterial({ map: T.plaque(t2, { w: 256, h: 84, bg: '#e6dcc0', fg: '#3a2a18', font: 'Arial', size: 0.4 }), roughness: 0.9 }), x - 0.02, y, z); lb.rotation.y = ry; }
+    blob(-2.6, -2.5, 1.7, 1.0, 0.25);
+    const tr = new THREE.Group(); tr.position.set(-3.3, 0, 0.35); tr.rotation.y = PI / 2 - 0.15; props.add(tr);
+    dkMerge(tr, [dkBox(0.95, 0.5, 0.52, 0, 0.25, 0), dkCyl(0.26, 0.26, 0.95, 16, 0, 0.5, 0, 0, 0, PI / 2)], M(0x4a3a2a, 0.75, 0, { t: TX.oak(), rep: [1, 1], bump: 0.03 }));
+    const tb = []; for (const x of [-0.4, 0.4]) tb.push(dkBox(0.06, 0.78, 0.55, x, 0.4, 0)); tb.push(dkBox(0.96, 0.05, 0.54, 0, 0.1, 0), dkBox(0.12, 0.12, 0.02, 0, 0.45, 0.27)); dkMerge(tr, tb, M(0x6a4a24, 0.4, 0.8));
+    blob(-3.3, 0.35, 1.0, 1.5, 0);
+  }
+  { const sm = new THREE.MeshBasicMaterial({ map: dkShadowTex(), color: 0x000000, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }); dkMerge(R.g, shadowPts, sm).renderOrder = 1; }
+  // framed blueprints, the star chart and a pin board on the walls
+  starFrame(props, starBlue(0), 0.78, 0.58, -0.8, 1.4, 0); starFrame(props, starBlue(1), 0.78, 0.58, -0.38, 1.4, 0);
+  starFrame(props, starChartTex(), 1.1, 1.1, 0.0, 1.4, 0, { brass: 1, light: 1, dim: 0xa89c88 });
+  starFrame(props, starBlue(2), 0.78, 0.58, 0.4, 1.4, 0); starFrame(props, starCorkTex(), 0.9, 0.6, 0.82, 1.35, 0);
+  { const webs = []; // cobwebs where the wall meets the dome
+    for (const [th, y, flip] of [[-0.55, 2.0, 1], [0.58, 2.05, -1], [-1.3, 2.0, 1]]) {
+      const x = Math.sin(th) * 3.88, z = -Math.cos(th) * 3.88; webs.push(dkG(new THREE.PlaneGeometry(0.8, 0.8), x, y, z, 0, Math.atan2(-x, -z), 0, flip, 1, 1));
+    }
+    dkMerge(R.g, webs, new THREE.MeshBasicMaterial({ map: starWebTex(), transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide })); }
+  // warm light pools (candles, desk lamp, the crown), all in one additive mesh
+  poolPts.push(dkG(new THREE.PlaneGeometry(3, 3), 0, 0.011, -0.8, -PI / 2, 0, 0));
+  { const o = dkMerge(R.g, poolPts, new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffa860, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })); o.renderOrder = 2; }
   door(R, 0, 3.9, null, 'exit_star', [0, 0], { metal: 1 });
-  lamps(R, [0, 2.4, 0.5, 0xffc890, 12, 9], [0, 1.6, -0.8, 0xffd8a0, 5, 4]);
+  lamps(R, [0, 2.4, 0.5, 0xffc890, 14, 9], [0, 1.6, -0.8, 0xffd8a0, 5, 4]);
   return R;
 }
 
