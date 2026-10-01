@@ -24,7 +24,7 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609301850';
+export const ASSET_V = '202609301933';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 export function loadFigure(who, onReady) {
@@ -49,6 +49,28 @@ export function buildFigure(who, HIT) {
       // matte: the painting already has its lighting; a standard material adds a Fresnel sheen at grazing angles,
       // which lit up the jagged hair outlines as grey-white specks
       o.material = new THREE.MeshLambertMaterial({ map: old.map, emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.3 });
+      // blended texturing: TEXCOORD_1/2 look up the side and back paintings, TEXCOORD_3 holds the weights (side, back;
+      // the exporter flips V, so back = 1 - y); colour = mix(mix(front, back, wB), side, wS)
+      if (o.geometry.attributes.uv3) o.material.onBeforeCompile = sh => {
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', `#include <common>
+attribute vec2 uv1;
+attribute vec2 uv2;
+attribute vec2 uv3;
+varying vec2 vUvS;
+varying vec2 vUvB;
+varying vec2 vW;`)
+          .replace('#include <uv_vertex>', `#include <uv_vertex>
+vUvS = uv1; vUvB = uv2; vW = uv3;`);
+        sh.fragmentShader = sh.fragmentShader
+          .replace('#include <common>', `#include <common>
+varying vec2 vUvS;
+varying vec2 vUvB;
+varying vec2 vW;`)
+          .replace('#include <map_fragment>', `vec4 fcol = mix(mix(texture2D(map, vMapUv), texture2D(map, vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), texture2D(map, vUvS), clamp(vW.x, 0.0, 1.0));
+diffuseColor *= fcol;`)
+          .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= fcol.rgb;');
+      };
       o.castShadow = true; o.frustumCulled = false;
     }
   });

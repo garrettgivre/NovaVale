@@ -14,7 +14,11 @@ V = np.stack([P[:, 0], -P[:, 2], P[:, 1]], 1)
 me.vertices.add(len(V)); me.vertices.foreach_set('co', V.ravel())
 me.loops.add(F.size); me.loops.foreach_set('vertex_index', F.ravel())
 me.polygons.add(len(F)); me.polygons.foreach_set('loop_start', np.arange(0, F.size, 3)); me.polygons.foreach_set('loop_total', np.full(len(F), 3))
-me.uv_layers.new(name='UVMap').data.foreach_set('uv', UV.ravel())
+if 'vF' in Z.files:   # blended texturing: four UV maps (front, side, back, weights) per vertex
+    for nm, arr in (('UVMap', Z['vF']), ('UVSide', Z['vS']), ('UVBack', Z['vB']), ('UVW', Z['WTS'])):
+        me.uv_layers.new(name=nm).data.foreach_set('uv', arr[F.ravel()].ravel())
+else:
+    me.uv_layers.new(name='UVMap').data.foreach_set('uv', UV.ravel())
 me.update(); me.validate()
 me.polygons.foreach_set('use_smooth', np.ones(len(F), bool))
 ob = bpy.data.objects.new(name, me); sc.collection.objects.link(ob)
@@ -22,6 +26,17 @@ m = bpy.data.materials.new(name); m.use_nodes = True
 nt = m.node_tree; bs = nt.nodes['Principled BSDF']
 tx = nt.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(os.path.join(D, name + '_tex.png')); tx.interpolation = 'Cubic'
 nt.links.new(tx.outputs['Color'], bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.7
+if 'vF' in Z.files:
+    def samp(uvname):
+        t = nt.nodes.new('ShaderNodeTexImage'); t.image = tx.image; t.interpolation = 'Cubic'
+        u = nt.nodes.new('ShaderNodeUVMap'); u.uv_map = uvname; nt.links.new(u.outputs['UV'], t.inputs['Vector']); return t
+    uf = nt.nodes.new('ShaderNodeUVMap'); uf.uv_map = 'UVMap'; nt.links.new(uf.outputs['UV'], tx.inputs['Vector'])
+    ts, tb = samp('UVSide'), samp('UVBack')
+    uw = nt.nodes.new('ShaderNodeUVMap'); uw.uv_map = 'UVW'; sep = nt.nodes.new('ShaderNodeSeparateXYZ'); nt.links.new(uw.outputs['UV'], sep.inputs['Vector'])
+    m1 = nt.nodes.new('ShaderNodeMix'); m1.data_type = 'RGBA'; nt.links.new(sep.outputs['Y'], m1.inputs['Factor']); nt.links.new(tx.outputs['Color'], m1.inputs['A']); nt.links.new(tb.outputs['Color'], m1.inputs['B'])
+    # back weight was stored as an absolute share; convert to a mix factor of the front/back pair
+    m2 = nt.nodes.new('ShaderNodeMix'); m2.data_type = 'RGBA'; nt.links.new(sep.outputs['X'], m2.inputs['Factor']); nt.links.new(m1.outputs['Result'], m2.inputs['A']); nt.links.new(ts.outputs['Color'], m2.inputs['B'])
+    nt.links.new(m2.outputs['Result'], bs.inputs['Base Color'])
 ob.data.materials.append(m)
 # armature
 bones = json.loads(str(Z['bones']))

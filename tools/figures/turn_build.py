@@ -385,6 +385,45 @@ useBack = (~useSide) & (nrm[:, 2] < 0)
 k = np.repeat(np.where(useSide, 2, np.where(useBack, 1, 0)), 3)
 uv = np.where((k == 2)[:, None], uvS, np.where((k == 1)[:, None], uvB, uvF))
 UV = np.stack([uv[:, 0] / (SW - 1), 1 - uv[:, 1] / (SH - 1)], 1).astype(np.float32)
+# ---- blended texturing (per vertex): coordinates into the front, back and side paintings plus weights, mixed in the
+# shader. Front fades into side over a band of facing angles and into back across the rim, so there are no hard seams.
+vn = np.zeros_like(P); fa = np.cross(P[F[:, 1]] - P[F[:, 0]], P[F[:, 2]] - P[F[:, 0]])
+for c in range(3): np.add.at(vn, F[:, c], fa)
+vn /= np.linalg.norm(vn, axis=1, keepdims=True) + 1e-9
+ss_ = lambda e0, e1, v: np.clip((v - e0) / (e1 - e0), 0, 1) ** 2 * (3 - 2 * np.clip((v - e0) / (e1 - e0), 0, 1))
+def tc(u, v): return np.stack([u / (SW - 1), 1 - v / (SH - 1)], 1).astype(np.float32)
+vF = tc(P[:, 0] / px['front'] + cxf, bot['front'] - P[:, 1] / px['front'])
+vB = tc(ub(P[:, 0]), rowOf('back', P[:, 1]))
+s1 = np.stack([czs - sgn * P[:, 2] / px['side'], rowOf('side', P[:, 1])], 1)
+if 'side2' in M:
+    s2 = np.stack([czs2 - sgn2 * P[:, 2] / px['side2'], rowOf('side2', P[:, 1])], 1)
+    s1 = np.where(((vn[:, 0] > 0) == (sgn > 0))[:, None], s1, s2)
+vS = tc(s1[:, 0], s1[:, 1])
+headVv0 = P[:, 1] > Yf(cfg['joints']['chin'][1]) - 0.03
+wS = np.where(headVv0, ss_(0.25, 0.55, np.abs(vn[:, 0])), ss_(0.4, 0.72, np.abs(vn[:, 0])))
+headVv = P[:, 1] > Yf(cfg['joints']['chin'][1]) - 0.03
+fracV = (P[:, 2] - zBa) / np.maximum(zFa - zBa, 1e-3)
+pxu, pxv = vF[:, 0] * (SW - 1), (1 - vF[:, 1]) * (SH - 1)
+ellV = ((pxu - cxf) / rx) ** 2 + ((pxv - fcy) / ry) ** 2
+# the face stays front-painted: no side painting in the front part of the head's depth near the face (the side
+# paintings' profile eye and nose would land on the cheeks); ears and the back half of the head do take it
+faceZone = ss_(0.5, 0.64, fracV) * ss_(2.2, 1.4, ellV)
+wS *= np.where(headVv, 1 - faceZone, 1.0)
+armVv = np.isin(top4[:, 0], [6, 7, 8, 10, 11, 12]) & (P[:, 1] < min(J['shR'][1], J['shL'][1]) - 0.12)
+wS *= ~armVv                                                           # arms: side views show hair/body over them
+def colAt(t):
+    q = np.stack([t[:, 0] * (SW - 1), (1 - t[:, 1]) * (SH - 1)], 1)
+    return smp[np.clip(q[:, 1].round().astype(int), 0, SH - 1), np.clip(q[:, 0].round().astype(int), 0, SW - 1)]
+nearV = np.minimum(np.linalg.norm(colAt(vS) - colAt(vF), axis=1), np.linalg.norm(colAt(vS) - colAt(vB), axis=1))
+wS *= np.where(headVv, 1.0, ss_(48, 26, nearV))                        # body: only where the side view agrees (its arms hang over the torso)
+wS = np.clip(wS, 0, 1)
+# smooth the weights over the mesh a little
+for _ in range(2):
+    acc = np.zeros(len(P)); cnt = np.zeros(len(P))
+    for c in range(3): np.add.at(acc, F[:, c], wS[F].mean(1)); np.add.at(cnt, F[:, c], 1)
+    wS = 0.5 * wS + 0.5 * acc / np.maximum(cnt, 1)
+wB = ss_(0.12, -0.2, vn[:, 2])     # how much the surface faces backwards; colour = mix(mix(front, back, wB), side, wS)
+WTS = np.stack([wS, wB], 1).astype(np.float32)
 
 # ---- a narrower stance: the sheets are drawn with feet wide apart. Only the legs move, from the crotch down (the
 # pelvis and waist stay exactly as painted), each leg shifted as a whole so it keeps its width, growing linearly to the
@@ -403,7 +442,7 @@ if crotch is not None and crotch < bot['front'] - 0.12 * (bot['front'] - top['fr
     print('stance', round(F_, 3), '->', round(T_, 3), 'from crotch at', round(yc, 2))
 else:
     print('stance kept (gown or already narrow)')
-np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind,
+np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind, vF=vF, vS=vS, vB=vB, WTS=WTS,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
 # only trust confident pixels: nearly opaque, and not background-coloured near the outline (gaps between curls,

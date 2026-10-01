@@ -68,6 +68,14 @@ smooth base (the side outline with the nose/lips smoothed out). Head sides take 
 (>55°, never the front third of the head's depth); steep body sides (>~37°) too where the colours agree; shoulders may,
 arms below the shoulders never. `heads3.py <who> <height>` renders head close-ups at 0/45/90 to check.
 
+Texturing is blended per vertex, not chosen per face (that made hard seams): the GLB carries TEXCOORD_0 front,
+TEXCOORD_1 side (left or right painting by the vertex normal), TEXCOORD_2 back, TEXCOORD_3 weights (side, back; the
+exporter flips V so the shader uses back = 1 - y), and `figures.js` patches the Lambert shader to
+`mix(mix(front, back, wB), side, wS)`. wS ramps with how sideways the surface faces (heads from 25-55°, bodies 40-72°),
+is zero on the face (front part of the head's depth within a widened face oval: otherwise the side paintings' profile
+eye/nose land on the cheeks), zero on arms below the shoulders, and on the body only where the side painting's colour
+agrees (the side paintings show arms hanging over the torso).
+
 ## Walking and facing
 Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
 thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
