@@ -3288,7 +3288,7 @@ function buildTerrace() {
     for (let i = 0; i < 6; i++) { const a = i * 1.05; b.add(new THREE.SphereGeometry(0.2, 7, 5), mBush, x + Math.cos(a) * 0.14 * s, 0.76 * s, z + Math.sin(a) * 0.14 * s, 0, 0, 0, [s, 0.75 * s, s]); }
     for (let i = 0; i < 16; i++) { const a = rr() * 6.28, d = rr() * 0.26 * s; b.sph(0.05 * s, FL[pal[i % pal.length]], x + Math.cos(a) * d, (0.8 + (0.26 * s - d) * 0.55) * s, z + Math.sin(a) * d, 1, 6); }
   };
-  for (const [x, z, s, p] of [[-6, -3.2, 1.15, ['red', 'white']], [6, -3.2, 1.15, ['red', 'white']], [-8.3, 5.5, 1.15, ['pink', 'white']], [8.3, 5.5, 1.15, ['pink', 'white']], [-4.9, 5.4, 1.0, ['yellow', 'orange']], [4.9, 5.4, 1.0, ['yellow', 'orange']]]) urn(x, z, s, p);
+  for (const [x, z, s, p] of [[-6, -3.2, 1.15, ['red', 'white']], [6, -3.2, 1.15, ['red', 'white']], [-8.3, 4.3, 1.15, ['pink', 'white']], [8.3, 4.3, 1.15, ['pink', 'white']], [-4.9, 4.3, 1.0, ['yellow', 'orange']], [4.9, 4.3, 1.0, ['yellow', 'orange']]]) urn(x, z, s, p);
   const bed = (cx, cz, w, d, ry, pal) => {
     const co = Math.cos(ry), si = Math.sin(ry);
     b.box(w, 0.14, d, mSoil, cx, 0.06, cz, ry, 0);
@@ -3316,8 +3316,10 @@ function buildTerrace() {
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + rr(); b.add(new THREE.CylinderGeometry(0.015, 0.03, h * 0.3, 5), mBirch, x + Math.cos(a) * h * 0.09, h * (0.55 + i * 0.06), z + Math.sin(a) * h * 0.09, 0, Math.sin(a) * 0.55, Math.cos(a) * 0.55); }
     for (let i = 0; i < 26; i++) { const a = i * 2.4, v = (i % 7) / 6, d = h * (0.05 + Math.sin(v * 3.1) * 0.13) * (0.5 + (i % 3) * 0.3); b.add(new THREE.SphereGeometry(h * (0.05 + rr() * 0.04), 8, 6), i % 2 ? mBirchA : mBirchB, x + Math.cos(a) * d, h * (0.5 + v * 0.45), z + Math.sin(a) * d, rr() * 6, 0, 0, [1.2, 0.8, 1.2]); }
   };
-  for (const [x, z, h] of [[-14.5, -1.5, 7.5], [-16.5, 3, 9], [-13.5, 7.5, 6.5], [14.5, -2, 8], [16.5, 2.5, 6.5], [14, 8, 8.5], [-15, 14, 9.5], [15, 15, 9], [-19, -4, 8.5], [19, -3, 9], [21, 5, 7.5]]) pine(x, z, h);
-  for (const [x, z, h, l] of [[-14.2, -10, 6, 0.05], [-12.6, -11.6, 5, -0.06], [9.6, -12.4, 5.5, 0.04], [12.3, -8.2, 6.2, -0.05], [11.5, -11, 4.6, 0.07], [-8.2, 9.8, 5, 0.03]]) birch(x, z, h, l);
+  // (kept clear of the building and its gravel walk: several used to stand inside the wings)
+  for (const [x, z, h] of [[-14.5, -1.5, 7.5], [-20.5, 0, 9], [-26, 4, 6.5], [14.5, -2, 8], [16.5, 2.5, 6.5], [19.5, 0.5, 8.5], [-31, 16, 9.5], [31, 14, 9], [-19, -4, 8.5], [19, -3, 9], [24.5, -1.5, 7.5],
+    [-28, 30, 9], [27, 31, 8.5], [-12, 46, 9], [13, 47, 8], [-24, 40, 7.5], [24, 41, 8]]) pine(x, z, h);
+  for (const [x, z, h, l] of [[-14.2, -10, 6, 0.05], [-12.6, -11.6, 5, -0.06], [9.6, -12.4, 5.5, 0.04], [12.3, -8.2, 6.2, -0.05], [11.5, -11, 4.6, 0.07], [-12.5, 0.5, 5, 0.03]]) birch(x, z, h, l);
 
   // ----- benches (the first is the one to inspect) -----
   const bench = (x, z, ry, tagged) => {
@@ -3639,7 +3641,7 @@ function buildTerrace() {
     }
     // Grand Staircase (by the portico): a tower with tall stair windows and a pointed slate roof
     {
-      const F = frame(150, RD + 2.5), w = 3.8, d = 3.8, h = 10;
+      const F = frame(150, RD + 3.2), w = 3.5, d = 3.5, h = 10;   // clear of the portico's corner
       block(F, w, d, h);
       for (let i = 0; i < 3; i++) win(F, 'f', d / 2, 0, 1.4 + i * 2.9, 0.8, 2.1, true);
       for (const face of ['l', 'r']) win(F, face, w / 2, 0, 5.8, 0.8, 2.1, true);
