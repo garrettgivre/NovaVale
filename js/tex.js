@@ -246,40 +246,90 @@ export function plaque(text, { w = 512, h = 128, bg = '#b08a3e', fg = '#3a2a10',
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 
-// ---------- Skies seen through windows and the dome ----------
+/// ---------- Skies seen through windows and the dome ----------
+// One panorama: sky above the horizon line, far shore and lake below it. The horizon sits at 0.508 of the height so
+// the far shore meets the end of the terrace's water plane (eye 1.6 m, 80 m away is 1.4 degrees below level).
 export function sky(isNight) {
-  const W = 1024, H = 512, c = canvas(W, H), g = c.getContext('2d');
-  const gr = g.createLinearGradient(0, 0, 0, H * 0.52);
-  if (!isNight) { gr.addColorStop(0, '#5f86b0'); gr.addColorStop(0.6, '#a9bfcf'); gr.addColorStop(1, '#e3d8c0'); }
-  else { gr.addColorStop(0, '#05070f'); gr.addColorStop(0.6, '#141b33'); gr.addColorStop(1, '#2a2c42'); }
-  g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  if (!isNight) {
-    const N = fbm(256, 64, { scale: 4, oct: 5, seed: 21, sx: 1, sy: 1 });
-    const id = g.getImageData(0, 0, W, Math.floor(H * 0.5));
-    for (let y = 0; y < id.height; y++) for (let x = 0; x < W; x++) {
-      const n = N[Math.floor(y / id.height * 64) * 256 + Math.floor(x / W * 256)];
-      const cl = Math.max(0, (n - 0.5) * 2.6) * (1 - y / id.height * 0.6), i = (y * W + x) * 4;
-      id.data[i] += (245 - id.data[i]) * cl; id.data[i + 1] += (238 - id.data[i + 1]) * cl; id.data[i + 2] += (228 - id.data[i + 2]) * cl;
+  const W = 2048, H = 1024, Y = Math.round(H * 0.508), c = canvas(W, H), g = c.getContext('2d');
+  const r = rng(isNight ? 33 : 21);
+  const blob = (x, y, rx, ry, rgb, a) => {
+    for (const xx of [x, x - W, x + W]) {
+      if (xx + rx < 0 || xx - rx > W) continue;
+      g.save(); g.translate(xx, y); g.scale(1, ry / rx);
+      const gr = g.createRadialGradient(0, 0, 0, 0, 0, rx); gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(0.55, `rgba(${rgb},${a * 0.45})`); gr.addColorStop(1, `rgba(${rgb},0)`);
+      g.fillStyle = gr; g.fillRect(-rx, -rx, rx * 2, rx * 2); g.restore();
     }
-    g.putImageData(id, 0, 0);
+  };
+  const band = (y0, y1, rgb, a0, a1) => { const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, `rgba(${rgb},${a0})`); gr.addColorStop(1, `rgba(${rgb},${a1})`); g.fillStyle = gr; g.fillRect(0, Math.min(y0, y1), W, Math.abs(y1 - y0)); };
+  // a ridge line that wraps round the panorama (integer frequencies)
+  const ridge = (seed, ks) => { const q = rng(seed), ph = ks.map(() => q() * 6.283); return x => { let v = 0, n = 0; ks.forEach((k, i) => { const a = 1 / (1 + i * 0.7); v += a * Math.sin(6.283 * k * x / W + ph[i]); n += a; }); return v / n * 0.5 + 0.5; }; };
+  const pine = (x, y, h, w, col) => {
+    g.fillStyle = col;
+    for (let t = 0; t < 3; t++) { const ty = y - h * (0.18 + t * 0.27), tw = w * (1 - t * 0.28); g.beginPath(); g.moveTo(x, ty - h * 0.42); g.lineTo(x + tw / 2, ty + h * 0.08); g.lineTo(x - tw / 2, ty + h * 0.08); g.closePath(); g.fill(); }
+    g.fillRect(x - 0.7, y - h * 0.1, 1.4, h * 0.12);
+  };
+  const shore = (col, base, amp, seed, ks, pines) => {
+    const f = ridge(seed, ks);
+    g.fillStyle = col; g.beginPath(); g.moveTo(0, Y + 3);
+    for (let x = 0; x <= W; x += 4) g.lineTo(x, Y - base - f(x) * amp);
+    g.lineTo(W, Y + 3); g.closePath(); g.fill();
+    if (pines) for (let x = 0; x < W; x += 3 + r() * 7) { const yy = Y - base - f(x) * amp + 3, h = pines[0] + r() * pines[1]; pine(x, yy, h, h * 0.42, col); }
+  };
+
+  // ----- sky -----
+  const gr = g.createLinearGradient(0, 0, 0, Y);
+  if (!isNight) {
+    gr.addColorStop(0, '#2f5f9e'); gr.addColorStop(0.3, '#4f84bd'); gr.addColorStop(0.6, '#86aed0'); gr.addColorStop(0.85, '#c9d2cc'); gr.addColorStop(1, '#ecdcb8');
   } else {
-    const r = rng(33);
-    for (let i = 0; i < 500; i++) { g.fillStyle = `rgba(255,250,235,${0.2 + r() * 0.7})`; g.fillRect(r() * W, r() * H * 0.48, 1, 1); }
-    const mg = g.createRadialGradient(W * 0.72, H * 0.16, 0, W * 0.72, H * 0.16, 60);
-    mg.addColorStop(0, 'rgba(240,235,210,.5)'); mg.addColorStop(1, 'rgba(240,235,210,0)'); g.fillStyle = mg; g.fillRect(W * 0.72 - 60, H * 0.16 - 60, 120, 120);
-    g.fillStyle = '#f2ecd6'; g.beginPath(); g.arc(W * 0.72, H * 0.16, 11, 0, 7); g.fill();
+    gr.addColorStop(0, '#03060f'); gr.addColorStop(0.45, '#0a1230'); gr.addColorStop(0.8, '#1a2650'); gr.addColorStop(1, '#3a4670');
   }
-  // lake and a treeline on the far shore
-  const lake = g.createLinearGradient(0, H * 0.52, 0, H);
-  if (!isNight) { lake.addColorStop(0, '#7f97a0'); lake.addColorStop(1, '#3e5660'); } else { lake.addColorStop(0, '#1a2233'); lake.addColorStop(1, '#070a12'); }
-  g.fillStyle = lake; g.fillRect(0, H * 0.52, W, H);
-  const r = rng(44);
-  g.fillStyle = isNight ? '#070a10' : '#34452e';
-  g.beginPath(); g.moveTo(0, H * 0.53);
-  for (let x = 0; x <= W; x += 6) g.lineTo(x, H * 0.53 - 6 - r() * 16 - Math.sin(x * 0.01) * 8);
-  g.lineTo(W, H * 0.53); g.closePath(); g.fill();
-  if (!isNight) { g.fillStyle = 'rgba(255,255,255,.12)'; for (let i = 0; i < 40; i++) g.fillRect(r() * W, H * (0.55 + r() * 0.4), 20 + r() * 60, 1); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  g.fillStyle = gr; g.fillRect(0, 0, W, Y);
+  if (!isNight) {
+    // late-afternoon warmth round the sun (up and to the left of the lake) and near the horizon
+    blob(W * 0.936, H * 0.2, 520, 330, '255,226,170', 0.42); blob(W * 0.936, H * 0.2, 120, 100, '255,244,215', 0.7);
+    band(Y - 150, Y, '255,214,160', 0, 0.3);
+    // painted cumulus: shaded bellies first, then sunlit tops leaning towards the sun
+    const cloud = (cx, cy, w, h) => {
+      const n = 14 + Math.round(w / 22), puffs = [];
+      for (let i = 0; i < n; i++) { const dx = (r() * 2 - 1) * w * 0.5, k = 1 - Math.pow(Math.abs(dx) / (w * 0.5), 2); puffs.push([dx, -k * h * (0.25 + r() * 0.75), (0.35 + r() * 0.45) * h * (0.5 + k * 0.7)]); }
+      for (const [dx, dy, rr] of puffs) blob(cx + dx, cy + dy * 0.35 + h * 0.12, rr * 1.25, rr * 0.78, '150,168,196', 0.34);
+      for (const [dx, dy, rr] of puffs) blob(cx + dx - rr * 0.1, cy + dy, rr * 1.15, rr * 0.82, '250,246,238', 0.5);
+      for (const [dx, dy, rr] of puffs) blob(cx + dx - rr * 0.3, cy + dy - rr * 0.22, rr * 0.7, rr * 0.5, '255,252,246', 0.45);
+      blob(cx, cy + h * 0.28, w * 0.6, h * 0.16, '210,200,190', 0.18);
+    };
+    for (let i = 0; i < 26; i++) { const t = r(), cy = H * (0.25 + Math.pow(t, 0.8) * 0.22), s = 0.5 + (1 - t) * 0.9; cloud(r() * W, cy, (140 + r() * 170) * s, (34 + r() * 30) * s * (0.6 + (1 - t) * 0.5)); }
+    for (let i = 0; i < 9; i++) blob(r() * W, H * (0.34 + r() * 0.1), 260 + r() * 260, 5 + r() * 6, '255,222,184', 0.22);          // long stratus low down
+    for (let i = 0; i < 22; i++) blob(r() * W, H * (0.04 + r() * 0.2), 200 + r() * 260, 3 + r() * 5, '255,255,255', 0.1);          // high cirrus
+  } else {
+    band(Y - 190, Y, '96,118,168', 0, 0.45); blob(W * 0.1, Y - 8, 700, 60, '150,110,90', 0.16);                                      // town glow far off
+    for (let i = 0; i < 70; i++) blob(r() * W, H * 0.04 + Math.abs(Math.sin(r() * 3)) * H * 0.38, 120 + r() * 220, 30 + r() * 40, '170,185,230', 0.035);
+    for (let i = 0; i < 2600; i++) { const yy = Math.pow(r(), 0.8) * (Y - 14), a = (0.15 + r() * 0.75) * (1 - yy / Y * 0.55); g.fillStyle = `rgba(${225 + r() * 30},${225 + r() * 25},${215 + r() * 40},${a})`; const s = r() < 0.05 ? 2 : 1; g.fillRect(r() * W, yy, s, s); }
+    for (let i = 0; i < 40; i++) { const x = r() * W, y = r() * (Y * 0.7); blob(x, y, 6, 6, '255,245,225', 0.35); }
+    blob(W * 0.7, H * 0.4, 190, 190, '170,190,235', 0.22); blob(W * 0.7, H * 0.4, 60, 60, '220,230,250', 0.4);                  // moon halo
+    g.fillStyle = '#eee9d4'; g.beginPath(); g.arc(W * 0.7, H * 0.4, 19, 0, 7); g.fill();
+    g.fillStyle = 'rgba(150,145,125,.35)'; for (const [dx, dy, rr] of [[-6, -4, 5], [5, 3, 6], [-2, 8, 3.5], [7, -7, 3]]) { g.beginPath(); g.arc(W * 0.7 + dx, H * 0.4 + dy, rr, 0, 7); g.fill(); }
+  }
+  // ----- far shore: hazy hills, then layers of pines, each paler with distance -----
+  const H1 = isNight ? '#0d1530' : '#9bb0c0', H2 = isNight ? '#0a1126' : '#7f9ba5', H3 = isNight ? '#070d1e' : '#5b7a74', H4 = isNight ? '#050914' : '#34503e', H5 = isNight ? '#03060d' : '#223a2a';
+  const haze = (a, h) => band(Y - h, Y, isNight ? '48,60,100' : '232,220,196', 0, a);
+  shore(H1, 4, 80, 5, [2, 3, 5, 9], null); haze(isNight ? 0.4 : 0.5, 110);
+  shore(H2, 3, 54, 8, [3, 7, 11, 17], [8, 6]); haze(isNight ? 0.34 : 0.42, 80);
+  shore(H3, 2, 26, 13, [5, 13, 23, 31], [10, 8]); haze(isNight ? 0.25 : 0.3, 54);
+  shore(H4, 1, 15, 19, [7, 19, 37, 53], [13, 9]); haze(isNight ? 0.14 : 0.16, 34);
+  shore(H5, 0, 7, 27, [11, 29, 61, 79], [17, 12]);
+  if (isNight) {   // a light on a far jetty and a few cottage windows
+    for (const [u, y] of [[0.57, 4], [0.9, 7], [0.43, 3], [0.2, 5]]) { blob(W * u, Y - y, 16, 12, '255,196,120', 0.55); g.fillStyle = '#ffd89a'; g.fillRect(W * u - 1, Y - y - 1, 2, 2); }
+  }
+  g.fillStyle = isNight ? '#0d1328' : '#cfc2a2'; g.fillRect(0, Y - 1, W, 3);                                                          // the shingle at the water's edge
+  // ----- lake (what the windows show; the terrace lays its own water over the near part) -----
+  const lk = g.createLinearGradient(0, Y, 0, H);
+  if (!isNight) { lk.addColorStop(0, '#b4c4bc'); lk.addColorStop(0.08, '#7f9ea4'); lk.addColorStop(0.5, '#3f6670'); lk.addColorStop(1, '#25444d'); }
+  else { lk.addColorStop(0, '#2a3454'); lk.addColorStop(0.1, '#141c38'); lk.addColorStop(1, '#070b18'); }
+  g.fillStyle = lk; g.fillRect(0, Y + 2, W, H - Y);
+  g.save(); g.globalAlpha = isNight ? 0.35 : 0.42; g.filter = 'blur(2px)'; g.translate(0, 2 * Y + 2); g.scale(1, -1); g.drawImage(c, 0, Y - 200, W, 200, 0, Y - 200, W, 200); g.restore();
+  if (isNight) { g.fillStyle = 'rgba(230,235,210,.35)'; for (let i = 0; i < 90; i++) { const yy = Y + 4 + Math.pow(r(), 1.6) * 190; g.fillRect(W * 0.7 + (r() - 0.5) * (8 + (yy - Y) * 0.35), yy, 8 + r() * 26, 1); } }
+  for (let i = 0; i < 700; i++) { const t = Math.pow(r(), 1.5), yy = Y + 4 + t * (H - Y - 4), l = 10 + t * 120 * r() + r() * 20; g.fillStyle = r() < 0.55 ? `rgba(${isNight ? '120,140,190' : '230,240,235'},${(isNight ? 0.12 : 0.17) * (1 - t * 0.4)})` : `rgba(10,30,40,${0.12 + t * 0.1})`; g.fillRect(r() * W, yy, l, 1 + (t > 0.5 ? 1 : 0)); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4; return t;
 }
 
 export function starDome(opal) {
