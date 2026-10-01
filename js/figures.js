@@ -27,7 +27,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610011116';
+export const ASSET_V = '202610011223';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -192,6 +192,7 @@ function autoRelax(root, bones, fallback) {
 // rotate a bone about model-space axes: rot = [[axis, angle], ...] applied on top of its rest pose
 function pose(u, k, rot) {
   const b = u.bones[k]; if (!b) return;
+  if (u.dbgAx) rot = rot.filter(([ax]) => (u.dbgAx === 'z' ? ax === Zax : ax !== Zax));
   qa.identity();
   for (const [ax, a] of rot) { if (!a) continue; va.copy(ax).applyQuaternion(u.pq[k]); qb.setFromAxisAngle(va, a); qa.premultiply(qb); }
   b.quaternion.copy(qa).multiply(u.rest[k]);
@@ -206,7 +207,8 @@ const drift = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.7) * 0.
 
 // Talking gestures, kept mostly in the picture plane (these models come from paintings, so turning a forearm far
 // towards or away from the camera shows it edge-on): [side, lift (forward), open (out to the side), hold seconds]
-const GESTS = [['R', .35, .5, 1.3], ['L', .35, .5, 1.3], ['B', .3, .35, 1.1], ['R', .55, .25, 1], ['L', .55, .25, 1], ['B', .15, .6, 1.4], ['N', 0, 0, .9]];
+// (small: a painted arm raised far looks like a scarecrow, and a forearm brought forward shows its edge)
+const GESTS = [['R', .2, .26, 1.3], ['L', .2, .26, 1.3], ['B', .16, .18, 1.1], ['R', .3, .14, 1], ['L', .3, .14, 1], ['B', .1, .3, 1.4], ['N', 0, 0, .9], ['N', 0, 0, .7]];
 
 // Who moves how. tempo: how fast they breathe, sway and fidget; sway: how much they shift about; gest: size of their
 // talking gestures; chin: resting head pitch (- = chin up); every: seconds between idle habits; acts: their habits
@@ -232,15 +234,16 @@ const DEF = { tempo: 1, sway: 1, gest: 1, chin: 0, every: 6, look: 1, acts: { lo
 // Idle habits: a duration and an envelope-driven pose. e = 0..1..0 over the action (eased in and out); the pose is an
 // offset added on top of the standing pose: yaw/pitch/tilt of the head, chest lean, shoulders up, arm (R/L) out/bend.
 const ACTS = {
-  hip: { d: [4, 7], f: (e, s) => ({ arm: { [s.side]: { open: .42 * e, bend: 1.15 * e } }, tilt: .05 * e * (s.side === 'R' ? 1 : -1), sway: .5 * e * (s.side === 'R' ? -1 : 1) }) },
+  // weight onto one hip (the arms stay down: bending an elbow sideways folds the painted arm across the body)
+  hip: { d: [4, 7], f: (e, s) => ({ arm: { [s.side]: { open: .06 * e } }, tilt: .05 * e * (s.side === 'R' ? 1 : -1), sway: .6 * e * (s.side === 'R' ? -1 : 1) }) },
   chinUp: { d: [2.5, 4], f: e => ({ pitch: -.08 * e, chest: -.02 * e }) },
   sigh: { d: [2.2, 2.8], f: (e, s) => { const p = s.p; const inh = smooth(p / .4) * (1 - smooth((p - .45) / .45)); return { chest: -.05 * inh, sh: .06 * inh - .02 * smooth((p - .5) / .3) * (1 - smooth((p - .8) / .2)), pitch: .05 * smooth((p - .45) / .3) * e }; } },
-  shrug: { d: [1.1, 1.5], f: e => ({ sh: .12 * e, tilt: .06 * e, armBoth: { open: .12 * e, bend: .25 * e } }) },
+  shrug: { d: [1.1, 1.5], f: e => ({ sh: .12 * e, tilt: .06 * e, armBoth: { open: .06 * e } }) },
   roll: { d: [2.2, 3.2], f: (e, s) => ({ tilt: .13 * Math.sin(s.p * Math.PI * 2) * e, pitch: .04 * Math.sin(s.p * Math.PI * 4) * e, sh: .03 * Math.sin(s.p * Math.PI * 2 + 1) * e }) },
   look: { d: [1.8, 3.2], f: (e, s) => ({ yaw: s.dir * .32 * e, pitch: s.dir2 * .06 * e, chestYaw: s.dir * .06 * e }) },
   up: { d: [2.5, 4], f: (e, s) => ({ pitch: -.17 * e, yaw: s.dir * .1 * e, chest: -.015 * e }) },
   down: { d: [2, 3.5], f: (e, s) => ({ pitch: .16 * e, yaw: s.dir * .05 * e, chest: .02 * e }) },
-  fidget: { d: [1.4, 2.2], f: (e, s) => ({ armBoth: { open: .05 * e, bend: (.35 + .12 * Math.sin(s.p * 37)) * e }, pitch: .08 * e }) },
+  fidget: { d: [1.4, 2.2], f: (e, s) => ({ armBoth: { open: (.03 + .025 * Math.sin(s.p * 37)) * e }, pitch: .08 * e, tilt: .03 * Math.sin(s.p * 23) * e }) },
   bounce: { d: [1.2, 2], f: (e, s) => ({ bob: .018 * Math.abs(Math.sin(s.p * Math.PI * 3)) * e, tilt: .04 * Math.sin(s.p * Math.PI * 3) * e }) },
 };
 function pickAct(P) {
@@ -250,7 +253,7 @@ function pickAct(P) {
 
 export function animateFigure(g, dt, cam, speech) {
   const u = g.userData, P = PERS[u.who] || DEF, t = (u.t += dt), T = t * P.tempo;
-  const talking = speech.who === u.who && speech.typing, focused = speech.focus === u.who;
+  const talking = (speech.who === u.who && speech.typing) || !!u.forceG, focused = speech.focus === u.who;   // forceG: a held gesture (testing)
   const listening = focused && !talking && speech.who === 'nova';
   u.talk = ease(u.talk, talking ? 1 : 0, 3, dt);
   u.sp ??= { yaw: { x: 0, v: 0 }, pitch: { x: 0, v: 0 } };
@@ -316,7 +319,9 @@ export function animateFigure(g, dt, cam, speech) {
   // talking: pick a gesture now and then and ease into it (questions open the hands, exclamations go bigger)
   if (talking && (u.gNext -= dt) < 0) { u.gNow = GESTS[Math.floor(Math.random() * GESTS.length)]; u.gNext = u.gNow[3] * (0.8 + Math.random() * .5) / Math.sqrt(P.tempo); }
   if (!talking) u.gNow = null;
-  const gk = P.gest * (1 + .35 * (u.ex || 0));
+  if (u.forceG) u.gNow = u.forceG;
+  const gk = Math.min(1.3, P.gest * (1 + .25 * (u.ex || 0)));
+  if (u.dbgRest) { for (const k of ['shoulderR', 'upperR', 'foreR', 'handR', 'shoulderL', 'upperL', 'foreL', 'handL']) if (u.bones[k]) u.bones[k].quaternion.copy(u.rest[k]); return; }
   for (const s of ['R', 'L']) {
     const G = u.gNow, on = G && (G[0] === s || G[0] === 'B') ? 1 : 0;
     const qOpen = (u.q || 0) * u.talk * .15;
@@ -331,5 +336,6 @@ export function animateFigure(g, dt, cam, speech) {
     pose(u, 'upper' + s, [[Zax, side * (R * (1 - act * .35) - open * 0.35 - aOpen + idle)], [X, -0.06 - lift * 0.3]]);
     pose(u, 'fore' + s, [[X, -0.1 - lift * 0.4 - act * 0.15 - act * 0.05 * Math.sin(t * 4.1 + side)], [Zax, side * (0.04 - open * 0.35 + aBend)]]);
     pose(u, 'hand' + s, [[X, -0.03 - act * 0.08 * Math.sin(t * 3.3 + side)], [Zax, -side * (open * 0.12 + aBend * .2)]]);
+    if (u.dbgOnly) for (const k of ['shoulder', 'upper', 'fore', 'hand']) if (k !== u.dbgOnly && u.bones[k + s]) u.bones[k + s].quaternion.copy(u.rest[k + s]);
   }
 }

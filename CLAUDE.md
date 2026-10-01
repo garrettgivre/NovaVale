@@ -133,7 +133,12 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   they look about, weighted idle habits) and habits `ACTS` (hand on hip, chin up, sigh, shrug, neck roll, look around/up/down,
   fidget, bounce), springy head look, head and chest lead body turns, talking reacts to the line (`speech.line`: questions
   tilt and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
-  while Nova talks. Keep new moves in the picture plane.
+  while Nova talks. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
+  body, arms raised far look like a scarecrow, forearms brought forward show their edge.
+- Arms in the build: triangles bridging an arm and the body (a hand hanging a pixel from the hip) are cut and closed
+  (`armCut`), and each hand is found from the painting (pieces outside the legs below the wrist) and bound wholly to the
+  arm. Before this, moving an arm stretched a strip of hand colour to the hip and left fingertips behind.
+  Debug: `userData.dbgRest` / `dbgOnly` ('upper'|'fore'|'hand') / `dbgAx` ('z'|'x') / `forceG` (a held gesture).
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
   you're within ~2.8 m (Garrett found everyone always facing the player eerie).
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`

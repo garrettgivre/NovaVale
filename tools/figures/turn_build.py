@@ -440,13 +440,45 @@ print('torso vertices kept off the arms', int(inT.sum()))
 lowV = P[:, 1] < J['hips'][1] + 0.03
 def seg2(p, a, b):
     a, b = a[:2], b[:2]; ab = b - a; t = np.clip(((p - a) @ ab) / (ab @ ab), 0, 1); return np.linalg.norm(p - (a + t[:, None] * ab), axis=1)
+# hands found from the painting itself: below the wrist, a narrow piece of the front outline that stands apart from the
+# legs (the outermost piece of its row, not the body's middle) is that side's hand, fingertips included. The joint
+# estimate's 'tip' often stops mid-hand, and the fingers below it were bound to the hips: they stayed behind when the arm
+# moved, stretching the hand into a long claw.
+handPix = {'R': np.zeros(n, bool), 'L': np.zeros(n, bool)}
+Vi_, Ui_ = V.astype(int), U.astype(int)
+for s_ in 'RL':
+    wrRow = int(cfg['joints']['wr' + s_][1]); rowsOK = {}
+    for r in range(wrRow, int(bot['front']) + 1):
+        ss = segs(M['front'][r])
+        if len(ss) < 2: continue
+        # every piece outside the legs on this side (separate fingers come out as several pieces)
+        out_ = []
+        for q in (ss if s_ == 'R' else ss[::-1]):
+            if q[0] <= cxf <= q[1] or (q[1] - q[0]) * px['front'] > 0.14: break
+            out_.append(q)
+        if out_: rowsOK[r] = (min(q[0] for q in out_), max(q[1] for q in out_))
+    hp_ = np.array([(r in rowsOK) and (rowsOK[r][0] - 2 <= u <= rowsOK[r][1] + 2) for r, u in zip(Vi_, Ui_)])
+    # only pieces joined to the wrist from above count (a gap row ends the hand)
+    if hp_.any():
+        rows_ = sorted(rowsOK); keep_ = set(); prev = None
+        for r in rows_:
+            if prev is not None and r - prev > 6: break
+            keep_.add(r); prev = r
+        hp_ &= np.isin(Vi_, list(keep_))
+    handPix[s_] = hp_
+print('hand pixels from the painting', {k: int(v.sum()) for k, v in handPix.items()})
 for s_, js in (('R', (6, 7, 8)), ('L', (10, 11, 12))):
+    hpv = np.concatenate([handPix[s_]] * 2)
     tip = J['tip' + s_] + (J['tip' + s_] - J['wr' + s_]) * 0.4
     near = np.minimum(seg2(P[:, :2], J['el' + s_], J['wr' + s_]), seg2(P[:, :2], J['wr' + s_], tip)) < 0.07
     # anything further out than the hand (a thumb, a cuff) can't be leg
     sgx = 1 if s_ == 'L' else -1
     near |= (sgx * P[:, 0] > min(sgx * J['wr' + s_][0], sgx * J['tip' + s_][0]) - 0.01) & (P[:, 1] > J['tip' + s_][1] - 0.08)
+    near |= hpv
     for j in js: dist[lowV & ~near, j] = 9.0
+    # the painted hand belongs to the hand: no body bone, no other arm
+    for j in range(len(BONES)):
+        if j not in js and j != js[0] - 1: dist[hpv, j] = 9.0
     # and what is right by the hand is the hand's: never the hips
     handZ = lowV & (np.minimum(seg2(P[:, :2], J['wr' + s_], tip), 9) < 0.05)
     dist[handZ, 0] = np.maximum(dist[handZ, 0], dist[handZ][:, list(js)].min(1) + 0.05)
@@ -460,6 +492,24 @@ W = np.exp(-(dist - dist.min(1, keepdims=True)) / sigv)
 # shoulders (clavicles) only take a little
 W[:, [5, 9]] *= 0.35
 top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.sum(1, keepdims=True)
+# ---- cut the arms free of the body: the mesh is one sheet over the front painting, so where a hand or arm hangs a pixel
+# or two from the hip or the coat, triangles bridge the gap with one end on the arm and the other on the body. When the arm
+# moved, that strip stretched into a long band of hand colour (the 'stretched hands'). Drop every front/back triangle whose
+# corners disagree about belonging to an arm, and close the new edges with side walls like the outline.
+ARMB = [6, 7, 8, 10, 11, 12]
+armness = (Wt * np.isin(top4, ARMB)).sum(1)[:n]
+dA = armness[T].max(1) - armness[T].min(1)
+keepT = dA < cfg.get('armCut', 0.45)
+if (~keepT).any():
+    T = T[keepT]
+    E = np.concatenate([T[:, [0, 1]], T[:, [1, 2]], T[:, [2, 0]]])
+    key = np.sort(E, 1); _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
+    bnd = E[cnt[inv.ravel()] == 1]
+    side = np.concatenate([np.stack([bnd[:, 1], bnd[:, 0], bnd[:, 0] + n], 1), np.stack([bnd[:, 1], bnd[:, 0] + n, bnd[:, 1] + n], 1)])
+    Ff = T; Fb = T[:, [0, 2, 1]] + n; Fs = side
+    F = np.concatenate([Ff, Fb, Fs])
+    kind = np.concatenate([np.zeros(len(Ff)), np.ones(len(Fb)), np.full(len(Fs), 2)]).astype(np.int32)
+print('arm/body bridge triangles cut', int((~keepT).sum()))
 # ---- per-corner UVs: front view, back view, or side view, by face normal
 p0, p1, p2 = P[F[:, 0]], P[F[:, 1]], P[F[:, 2]]
 nrm = np.cross(p1 - p0, p2 - p0); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-9
