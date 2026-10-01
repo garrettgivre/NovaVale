@@ -124,6 +124,9 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
 `tools/figures`, then `python heads_js.py` and `python tools/bump.py`.
 - Head sheets: the shader (`figures.js`, `hd()`) reads heads from the head sheet in the texture atlas via `js/figheads.js`;
   each figure has its own shader program (`customProgramCacheKey`), or three.js reuses the first figure's.
+- Side views: the build carves each head's front from the head sheet's depth (cheeks and jaw recede) and scales the face
+  so its front-most point sits on the profile outline; the shader (`viewSide`) switches the sides of the face to the profile
+  painting when seen from the side or behind. Remaining: a slight smear under the jaw at exact profile (Jojo most).
 - Keep figure animation mostly in the picture plane: big turns towards or away from the camera show a painting-based
   mesh edge-on. Head turns are clamped (0.35 yaw / 0.18 pitch), gestures small.
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
@@ -151,7 +154,6 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
 Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
-- Faces at a full 90° profile are still soft; messy hair outlines (Dex) look a bit blocky side-on.
 - Not yet checked: Senior-difficulty wording of the two Act 3 puzzles; the thumb stick on a real phone.
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
   hand in Act 3, placing Celeste in the world on Day 2, lip-sync/blinking for figures (needs eyes-closed and mouth-open

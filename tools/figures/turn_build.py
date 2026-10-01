@@ -311,6 +311,50 @@ relief = np.zeros((SH, SW), np.float32); relief[by0:by1, bx0:bx1] = fdet * feath
 fr_ = ndimage.map_coordinates(relief, [V, U], order=1)
 zf = zf + fr_
 print('face relief: nose', round(float(fr_.max()), 3), 'm, sockets', round(float(fr_.min()), 3), 'm')
+# ---- carve the head's front from the head sheet's depth: the visual hull makes a rounded box, so the face was flat and
+# wide and the profile painting's eye landed on the cheek. The depth model, run on the large head-sheet front view, says
+# how far each point sits behind the front-most point of its row (the nose); calibrated per row so the outline sits at
+# the head's middle depth, it carves the cheeks, temples and jaw back. It only ever removes volume.
+if HEAD and 'front' in HEAD and cfg.get('headCarve', 1):
+    h_ = HEAD['front']; x0h, x1h = HV['front']
+    vrgb = cv2.cvtColor(hs[:, x0h:x1h + 1], cv2.COLOR_BGR2RGB).astype(np.float32) / 255; va_ = ha[:, x0h:x1h + 1].astype(np.float32) / 255
+    vrgb = vrgb * va_[..., None] + 0.5 * (1 - va_[..., None]); hh_, ww_ = vrgb.shape[:2]
+    th_ = 518; tw_ = max(14, int(round(th_ * ww_ / hh_ / 14)) * 14)
+    inp = (cv2.resize(vrgb, (tw_, th_), interpolation=cv2.INTER_AREA) - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
+    dH = cv2.resize(sess.run(None, {sess.get_inputs()[0].name: inp.transpose(2, 0, 1)[None].astype(np.float32)})[0][0], (ww_, hh_), interpolation=cv2.INTER_CUBIC)
+    hx = h_['sx'] * U + h_['ox'] - x0h; hy = h_['sy'] * V + h_['oy']
+    cc = [np.clip(hy, 0, hh_ - 1), np.clip(hx, 0, ww_ - 1)]
+    dv = ndimage.map_coordinates(dH, cc, order=1); av = ndimage.map_coordinates(va_, cc, order=1)
+    hv_ = headV & (hx >= 0) & (hx < ww_ - 1) & (hy >= 0) & (hy < hh_ - 1) & (av > 0.5)
+    zmid = (hullF + hullB) / 2; zDA = np.full(n, np.nan)
+    for r in np.unique(V[hv_]):
+        sel = hv_ & (V == r)
+        if sel.sum() < 6: continue
+        d_ = dv[sel]; dmax, dedge = np.percentile(d_, 98), np.percentile(d_, 4)
+        if dmax - dedge < 1e-4: continue
+        zDA[sel] = zf[sel].max() - (zf[sel].max() - zmid[sel].mean()) * np.clip((dmax - d_) / (dmax - dedge), 0, 1.2)
+    fin = np.isfinite(zDA)
+    zs = gsm(np.where(fin, zDA, zf), 1.5); wC = gsm(fin.astype(np.float32), 2.0) * fin
+    carve = np.minimum(0, zs - zf) * wC * cfg.get('headCarve', 1)
+    zf = np.maximum(zf + carve, zb + 0.003)
+    print('head carved: mean', round(float(-carve[fin].mean()), 4), 'm, max', round(float(-carve.min()), 4), 'm over', int(fin.sum()), 'vertices')
+    # fit the face to the profile: per row, scale the front surface about the head's middle depth so its front-most point
+    # (the nose, the lips, the brow) sits exactly on the side painting's outline. The face-detail pass pushed the nose ~3 cm
+    # past it, so seen side-on the painted profile sat behind the modelled nose.
+    zRaw = np.array([rngRaw[r][0] for r in V])
+    rowK = {}
+    for r in np.unique(V[hv_]):
+        sel = hv_ & (V == r)
+        if sel.sum() < 6: continue
+        top_ = zf[sel].max(); mid_ = zmid[sel].mean()
+        if top_ - mid_ > 0.01: rowK[r] = float(np.clip((zRaw[sel][0] - mid_) / (top_ - mid_), 0.5, 1.3))
+    print('profile fit rows', len(rowK))
+    if rowK:
+        # one scale for the whole face (per-row scales left small ridges across the lips that picked up the wrong painting)
+        kg = float(np.median(list(rowK.values()))); rowK = {r: kg for r in rowK}
+        kv = np.where(hv_, kg, 1.0); kv = 1 + (gsm(kv, 3.0) - 1) * wC
+        zf = np.maximum(zmid + (zf - zmid) * kv, zb + 0.003)
+        print('face fitted to the profile: row scale', round(float(np.min(list(rowK.values()))), 2), '-', round(float(np.max(list(rowK.values()))), 2))
 print('scale', sF, sB, 'depth', zf.max(), zb.min())
 
 # ---- triangles

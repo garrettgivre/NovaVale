@@ -27,7 +27,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610010850';
+export const ASSET_V = '202610011105';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -92,6 +92,18 @@ vec4 hd(vec2 uv) {
     }
   }
   return base;
+}
+// how much of the head a front-view lookup is (1 above the chin, fading out at the neck)
+float headW(vec2 uv) {
+  vec2 p = uv * vec2(${f(HM.A[0] - 1)}, ${f(HM.A[1] - 1)}); vec4 r = hV[0];
+  return step(p.y, r.w) * (1.0 - smoothstep(r.z, r.w, p.y)) * smoothstep(r.x, r.x + 5.0, p.x) * (1.0 - smoothstep(r.y - 5.0, r.y, p.x));
+}
+// The head is modelled from flat paintings, so each painting is only right from its own direction. Seen from the side
+// (or from behind), the sides of the face take the profile painting; seen from the front they keep the front one (the
+// profile there put a second eye on the cheek, and the front painting, stretched, smeared the side of the jaw).
+float viewSide(vec3 d, vec3 n) {
+  float side = max(smoothstep(0.7, 0.92, abs(d.x)), smoothstep(0.05, -0.35, d.z));
+  return side * smoothstep(0.12, 0.45, abs(n.x));
 }`;
         }
         sh.vertexShader = sh.vertexShader
@@ -101,17 +113,25 @@ attribute vec2 uv2;
 attribute vec2 uv3;
 varying vec2 vUvS;
 varying vec2 vUvB;
-varying vec2 vW;`)
+varying vec2 vW;
+varying vec3 vON;
+varying vec3 vOV;`)
           .replace('#include <uv_vertex>', `#include <uv_vertex>
-vUvS = uv1; vUvB = uv2; vW = uv3;`);
+vUvS = uv1; vUvB = uv2; vW = uv3;`)
+          .replace('#include <project_vertex>', `#include <project_vertex>
+vON = objectNormal; vOV = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz - transformed;`);
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
 varying vec2 vUvS;
 varying vec2 vUvB;
-varying vec2 vW;`)
+varying vec2 vW;
+varying vec3 vON;
+varying vec3 vOV;`)
           .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
 ${hd}`)
-          .replace('#include <map_fragment>', `vec4 fcol = mix(mix(hd(vMapUv), hd(vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), hd(vUvS), clamp(vW.x, 0.0, 1.0));
+          .replace('#include <map_fragment>', `float wSv = clamp(vW.x, 0.0, 1.0);
+${HM ? 'wSv = mix(wSv, max(wSv, viewSide(normalize(vOV), normalize(vON))), headW(vMapUv));' : ''}
+vec4 fcol = mix(mix(hd(vMapUv), hd(vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), hd(vUvS), wSv);
 diffuseColor *= fcol;`)
           .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= fcol.rgb;');
       };
