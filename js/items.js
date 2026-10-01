@@ -124,6 +124,7 @@ DOCS.clipping = {
   t: 'Newspaper clipping, June 2003',
   html: `<div class="paper news"><p class="mast">THE LAKESHORE LEDGER</p><p class="dateline">Sunday, June 22, 2003 · 50 cents</p>
     <p class="head">"A SKY YOU CAN SWIM UNDER": AQUADOME OPENS</p>
+    <img class="news-photo" src="assets/docs/opening.webp" alt="Opening night on the Aquadome steps"><p class="caption">Architect Opal Finch cuts the ribbon on the Aquadome's opening night.</p>
     <p>Hundreds of guests crowded the lakeshore last night for the opening of the Aquadome, a glass-domed spa and planetarium designed by architect Opal Finch.</p>
     <p>The evening ended in the planetarium, where the lights dimmed and five stars appeared over the stage in the shape of a cross. "That one's for the crew," Finch said.</p>
     <p>Each member of Finch's four-person build team was presented with a brass star pin. Asked about rumours of a hidden room, Finch only smiled: "Every building has one room its builders keep for themselves."</p></div>`,
@@ -141,11 +142,7 @@ const PC = [
 PC.forEach(([title, msg], i) => {
   DOCS['pc' + (i + 1)] = {
     t: `Postcard ${i + 1}: ${title}`,
-    html: `<div class="postcard"><div class="pc-front"><svg viewBox="0 0 300 180"><defs><linearGradient id="pcg${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8c8a0"/><stop offset="1" stop-color="#8a7a58"/></linearGradient></defs>
-      <rect width="300" height="180" fill="url(#pcg${i})"/><path d="M40 170 A110 110 0 0 1 260 170" fill="none" stroke="#4a3a24" stroke-width="3"/>
-      ${[0, 1, 2, 3, 4].map(k => `<line x1="150" y1="62" x2="${70 + k * 40}" y2="170" stroke="#4a3a24" stroke-width="1.5"/>`).join('')}
-      <text x="150" y="36" text-anchor="middle" font-family="Georgia" font-style="italic" font-size="18" fill="#3a2a18">Greetings from the Aquadome</text>
-      <text x="150" y="58" text-anchor="middle" font-family="Georgia" font-size="12" fill="#3a2a18">${title}</text></svg></div>
+    html: `<div class="postcard"><div class="pc-front"><img src="assets/postcards/pc${i + 1}.webp" alt="${title}"></div>
       <div class="pc-back"><p class="hand">${msg}</p><span class="stamp">AQ</span></div></div>`,
   };
 });

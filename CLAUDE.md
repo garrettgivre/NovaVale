@@ -160,6 +160,10 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   Debug: `userData.dbgRest` / `dbgOnly` ('upper'|'fore'|'hand') / `dbgAx` ('z'|'x') / `forceG` (a held gesture).
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
   you're within ~2.8 m (Garrett found everyone always facing the player eerie).
+- Painted art (Oct 2026, ChatGPT paint-overs of bases rendered from the game, `tools/art/bases/` + `BASES.md`): title screen
+  `assets/title.webp`, postcards `assets/postcards/pc1-8.webp` (notebook and the cards lying in the rooms), lobby paintings
+  `assets/paintings/lake1-4.webp`, the clipping's photo `assets/docs/opening.webp`. Still to paint: the crew photo and the four
+  ending illustrations (bases exist). Originals are kept out of git in `tools/art/painted/src/`.
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`
   opens from the notebook's People page.
 

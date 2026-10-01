@@ -742,10 +742,10 @@ function buildLobby() {
     FBt.pop();
   }
   // gilt-framed lake paintings in the bays between the pilasters
-  { const goldM = M(0xc9a15a, 0.4, 0.85), picM = [0, 1, 2].map(v => M(0xffffff, 0.7, 0, { map: lbPaint(v) })); let pi = 0;
+  { const goldM = M(0xc9a15a, 0.4, 0.85), picM = [1, 2, 3, 4].map(v => { const t = new THREE.TextureLoader().load(`assets/paintings/lake${v}.webp`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return M(0xffffff, 0.7, 0, { map: t }); }); let pi = 0;
     for (let k = 0; k < 24; k++) {
       const deg = k * 15 + 7.5; if (doorAngles.some(d => Math.abs(((deg - d + 540) % 360) - 180) < 14)) continue;
-      const a = rad(deg), w = 0.78, h = 1.0, y = 2.45, v = pi++ % 3;
+      const a = rad(deg), w = 0.78, h = 1.0, y = 2.45, v = pi++ % 4;
       FBt.push(Math.sin(a) * 8.93, 0, -Math.cos(a) * 8.93, -a);
       FBt.box(picM[v], w, h, 0.02, 0, y, 0.0);
       FBt.box(goldM, w + 0.16, 0.08, 0.06, 0, y + h / 2 + 0.04, 0.01); FBt.box(goldM, w + 0.16, 0.08, 0.06, 0, y - h / 2 - 0.04, 0.01);
@@ -3748,15 +3748,10 @@ export const POSTCARDS = [
   [5, 'archive', [3.25, 0.906, 1.45], 0.7], [6, 'wing', [1.15, 0.94, -6.2], 1.9], [7, 'terrace', [-4.5, 0.47, 1.5], 0.3], [8, 'plan', [1.2, 0.02, 2.6], 2.6],
 ];
 function postcards() {
-  const tex = T.textCanvas(256, 170, g => {
-    const gr = g.createLinearGradient(0, 0, 0, 170); gr.addColorStop(0, '#c8b890'); gr.addColorStop(1, '#8a7a58'); g.fillStyle = gr; g.fillRect(0, 0, 256, 170);
-    g.strokeStyle = '#4a3a24'; g.lineWidth = 3; g.beginPath(); g.arc(128, 150, 90, Math.PI, 0); g.stroke();
-    g.fillStyle = '#f4ecd8'; g.fillRect(0, 0, 256, 8); g.fillRect(0, 162, 256, 8); g.fillRect(0, 0, 8, 170); g.fillRect(248, 0, 8, 170);
-    g.fillStyle = '#3a2a18'; g.font = 'italic 20px Georgia'; g.textAlign = 'center'; g.fillText('Greetings from the Aquadome', 128, 40);
-  });
-  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 });
   for (const [n, room, p, r] of POSTCARDS) {
     const g = new THREE.Group(); g.position.set(p[0], p[1], p[2]); g.rotation.y = r; rooms[room].g.add(g);
+    const pt = new THREE.TextureLoader().load(`assets/postcards/pc${n}.webp`); pt.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.MeshStandardMaterial({ map: pt, roughness: 0.8 });
     const c = add(g, new THREE.PlaneGeometry(0.15, 0.1), m, 0, 0.002, 0); c.rotation.x = -Math.PI / 2; c.userData.nocast = 1;
     hit(g, 0, 0.05, 0, 0.2, 'pc_' + n, 'Postcard');
     rooms[room]['pc' + n] = g;
