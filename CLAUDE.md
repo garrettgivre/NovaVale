@@ -113,6 +113,11 @@ every clickable thing in view; the task list and Dot always say what's next; lor
 | `js/state.js` | `S` (phase, flags, inv, docs), save key `novavale.aquadome.v1`, `checkpoint`/`secondChance` |
 | `js/tex.js`, `js/audio.js` | procedural textures; synthesised music/SFX/ghost voice |
 
+The terrace's Aquadome exterior matches the inside: wings sit where the lobby's doors lead (lobby door angle a ->
+terrace direction (-sin a, cos a) from the drum centre (0, 18)): Planetarium (copper dome, behind), Spa (glazed lantern),
+Tech Office with the Guest Wing above (two storeys, dormers), Grand Staircase tower by the portico, Kitchen (chimney),
+Archive (hipped roof). Rooms are separate scenes at the origin; only this model shows how they fit together.
+
 Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin (Act 3 hooks) }`. To add a place: a
 `build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.
 

@@ -3481,6 +3481,130 @@ function buildTerrace() {
   for (const s of [-1, 1]) { b.box(0.1, 0.3, 0.03, IRON, s * 1.75, 2.8, 8.18); b.box(0.04, 0.04, 0.2, IRON, s * 1.75, 2.9, 8.08); b.box(0.14, 0.2, 0.14, lampM, s * 1.75, 2.82, 8.0); b.add(new THREE.ConeGeometry(0.12, 0.1, 4), IRON, s * 1.75, 3.0, 8.0, Math.PI / 4); }
   plaqueMesh(R.g, 'THE AQUADOME', 3.2, 0.36, 0, 5.27, 6.37, Math.PI, { size: 0.5, bg: '#8a7a5a', fg: '#2a2014' });
   door(R, 0, 8.17, 'Lobby', 'exit_terrace', [0, 0]).position.y = 0.36;
+  // ----- the wings round the rotunda, where the lobby's doors lead (lobby door angle a: from the terrace that direction
+  // is (-sin a, cos a) about the drum's centre). Sizes follow the rooms inside. Planetarium 0, Spa 55, Tech Office and the
+  // Guest Wing above it 110, Grand Staircase 150, Terrace 180 (the portico), Kitchen 250, Archive 305.
+  {
+    const C = [0, Z0], dirOf = a => [-Math.sin(a * DEG), Math.cos(a * DEG)];
+    const mWall = M(0xffffff, 0.85, 0, { t: tex('tAsh', terAshlarTex), bump: 0.05 });
+    const mCopper = M(0x5f8f7c, 0.55, 0.35), mCopperD = M(0x4c7464, 0.6, 0.3);
+    const glassR = M(0x9bbcc4, 0.35, 0.1, { emissive: 0xffc070, emissiveIntensity: 0 });
+    R.wingGlass = glassR;
+    // a frame for one wing: local x along the drum, local z away from it; returns world position and heading
+    const frame = (a, r) => { const [dx, dz] = dirOf(a); return { a, ry: Math.atan2(dx, dz), cx: C[0] + dx * r, cz: C[1] + dz * r, P(lx, lz) { const c = Math.cos(this.ry), s = Math.sin(this.ry); return [this.cx + lx * c + lz * s, this.cz - lx * s + lz * c]; } }; };
+    const at = (F, lx, ly, lz, fn) => { const [x, z] = F.P(lx, lz); fn(x, ly, z); };
+    // window on a face: face 'f' (outward, +z), 'l' (-x) or 'r' (+x); u = position along the face, y0 = sill height
+    const win = (F, face, half, u, y0, w, h, arched) => {
+      const ry = F.ry + (face === 'f' ? 0 : face === 'r' ? Math.PI / 2 : -Math.PI / 2);
+      const lx = face === 'f' ? u : face === 'r' ? half : -half, lz = face === 'f' ? half : u * (face === 'r' ? -1 : 1);
+      const n = 0.03, [x, z] = F.P(lx + (face === 'r' ? n : face === 'l' ? -n : 0), lz + (face === 'f' ? n : 0));
+      const shape = arched ? terArch(w, h) : (() => { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2, h); s.lineTo(-w / 2, h); s.closePath(); return s; })();
+      const outer = arched ? terArch(w + 0.3, h + 0.15) : (() => { const s = new THREE.Shape(); s.moveTo(-w / 2 - .15, -.08); s.lineTo(w / 2 + .15, -.08); s.lineTo(w / 2 + .15, h + .15); s.lineTo(-w / 2 - .15, h + .15); s.closePath(); return s; })();
+      outer.holes.push(new THREE.Path(shape.getPoints(16)));
+      b.add(new THREE.ExtrudeGeometry(outer, { depth: 0.12, bevelEnabled: false, curveSegments: 8 }), mTrim, x, y0, z, ry);
+      b.add(new THREE.ShapeGeometry(shape, 8), mWin, x, y0, z, ry);
+      const [mx, mz] = F.P(lx + (face === 'r' ? n * 2 : face === 'l' ? -n * 2 : 0), lz + (face === 'f' ? n * 2 : 0));
+      b.box(0.04, h - (arched ? w / 2 : 0.05), 0.04, BRONZE, mx, y0 + (h - (arched ? w / 2 : 0)) / 2, mz, ry);
+      b.box(w, 0.04, 0.04, BRONZE, mx, y0 + h * 0.45, mz, ry);
+      b.box(w + 0.4, 0.1, 0.26, mTrim, x, y0 - 0.05, z, ry);
+    };
+    // a rectangular block: plinth, walls, cornice
+    const block = (F, w, d, h, wallM = mWall) => {
+      at(F, 0, h / 2, 0, (x, y, z) => b.box(w, h, d, wallM, x, y, z, F.ry, 3.2));
+      at(F, 0, 0.3, 0, (x, y, z) => b.box(w + 0.3, 0.6, d + 0.3, mStone, x, y, z, F.ry, 1.5));
+      at(F, 0, h - 0.15, 0, (x, y, z) => b.box(w + 0.36, 0.3, d + 0.36, mTrim, x, y, z, F.ry, 1.5));
+      at(F, 0, h + 0.06, 0, (x, y, z) => b.box(w + 0.5, 0.12, d + 0.5, mTrim, x, y, z, F.ry, 1.5));
+    };
+    // roofs: gable (ridge along local x), hip (square-based frustum) and a low glazed lantern
+    const gable = (F, w, d, h, rise) => {
+      const pitch = Math.atan2(rise, d / 2), len = Math.hypot(rise, d / 2) + 0.35;
+      for (const s of [-1, 1]) at(F, 0, h + 0.12 + rise / 2, s * d / 4, (x, y, z) => b.box(w + 0.6, 0.14, len, mSlate, x, y, z, F.ry, 0, s * pitch));
+      const tri = new THREE.Shape(); tri.moveTo(-d / 2, 0); tri.lineTo(d / 2, 0); tri.lineTo(0, rise); tri.closePath();
+      for (const s of [-1, 1]) at(F, s * (w / 2 + 0.02), h + 0.12, 0, (x, y, z) => b.add(new THREE.ExtrudeGeometry(tri, { depth: 0.2, bevelEnabled: false }), mTrim, x, y, z, F.ry + Math.PI / 2 * (s > 0 ? 1 : -1) + (s > 0 ? Math.PI : 0)));
+      at(F, 0, h + 0.14 + rise, 0, (x, y, z) => b.box(w + 0.7, 0.12, 0.22, mSlate, x, y, z, F.ry));
+    };
+    const hip = (F, w, d, h, rise, top = 0.12, m = mSlate) => {
+      const g = new THREE.CylinderGeometry(top, Math.SQRT1_2, 1, 4, 1); g.rotateY(Math.PI / 4);
+      at(F, 0, h + 0.12 + rise / 2, 0, (x, y, z) => b.add(g, m, x, y, z, F.ry, 0, 0, [w + 0.6, rise, d + 0.6]));
+    };
+    // a low link between the drum and a wing
+    const link = (a, w, r0, r1, h) => { const F = frame(a, (r0 + r1) / 2); block(F, w, r1 - r0 + 0.6, h); return F; };
+
+    // Planetarium (north, behind the rotunda): its own drum and an opaque copper star dome
+    {
+      const [dx, dz] = dirOf(0), PR = 7.4, PC = [C[0] + dx * (RD + 2.6 + PR), C[1] + dz * (RD + 2.6 + PR)];
+      link(0, 4.2, RD - 0.4, RD + 2.9, 4.2);
+      b.cyl(PR + 0.35, PR + 0.45, 0.6, mStone, PC[0], 0.3, PC[1], 48);
+      b.add(new THREE.CylinderGeometry(PR, PR, 6.4, 48, 1, true), mWall, PC[0], 3.5, PC[1], 0, 0, 0, 1);
+      b.cyl(PR + 0.25, PR + 0.25, 0.35, mTrim, PC[0], 6.6, PC[1], 48); b.cyl(PR + 0.4, PR + 0.3, 0.16, mTrim, PC[0], 6.85, PC[1], 48);
+      for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; b.box(0.5, 5.6, 0.3, mTrim, PC[0] + Math.sin(a) * (PR + 0.1), 3.6, PC[1] + Math.cos(a) * (PR + 0.1), a); }
+      for (let k = 0; k < 12; k++) {   // round windows high up (the projector room has none lower)
+        const a = (k + .5) / 12 * Math.PI * 2; if (Math.cos(a) < -0.85) continue;
+        b.add(new THREE.CircleGeometry(0.42, 16), mWin, PC[0] + Math.sin(a) * (PR + 0.03), 5.4, PC[1] + Math.cos(a) * (PR + 0.03), a);
+        b.add(new THREE.TorusGeometry(0.47, 0.07, 6, 18), mTrim, PC[0] + Math.sin(a) * (PR + 0.05), 5.4, PC[1] + Math.cos(a) * (PR + 0.05), a);
+      }
+      b.add(new THREE.SphereGeometry(PR + 0.3, 40, 14, 0, Math.PI * 2, 0, Math.PI / 2), mCopper, PC[0], 6.9, PC[1], 0, 0, 0, [1, 0.72, 1]);
+      for (let k = 0; k < 16; k++) { const ph = k / 16 * Math.PI * 2, pts = []; for (let j = 0; j <= 10; j++) { const th = j / 10 * Math.PI / 2; pts.push([PC[0] + Math.sin(th) * Math.cos(ph) * (PR + 0.34), 6.9 + Math.cos(th) * (PR + 0.3) * 0.72, PC[1] + Math.sin(th) * Math.sin(ph) * (PR + 0.34)]); } b.add(terTube(pts, 0.06, 10, 4), mCopperD); }
+      const top = 6.9 + (PR + 0.3) * 0.72; b.cyl(0.55, 0.65, 0.7, mTrim, PC[0], top + 0.3, PC[1], 12); b.cyl(0.1, 0.62, 0.7, mCopperD, PC[0], top + 0.95, PC[1], 12); star3(R.g, 0.32, BRASS, PC[0], top + 1.55, PC[1], 0.06);
+    }
+    // Spa & Pools (north-east): a tall pool hall with arched windows and a glazed roof lantern over the pool
+    {
+      link(55, 3.6, RD - 0.4, RD + 1.6, 4);
+      const F = frame(55, RD + 1.4 + 5.2), w = 14, d = 10.4, h = 5.2;
+      block(F, w, d, h);
+      for (let i = 0; i < 5; i++) win(F, 'f', d / 2, -5.4 + i * 2.7, 1.3, 1.6, 3.1, true);
+      for (const face of ['l', 'r']) for (let i = 0; i < 3; i++) win(F, face, w / 2, -3 + i * 3, 1.3, 1.6, 3.1, true);
+      hip(F, w, d, h, 1.5, 0.3);
+      at(F, 0, h + 1.75, 0, (x, y, z) => b.box(7, 0.9, 3.6, glassR, x, y, z, F.ry));
+      at(F, 0, h + 2.25, 0, (x, y, z) => b.box(7.3, 0.12, 3.9, BRONZE, x, y, z, F.ry));
+      for (let i = 0; i <= 6; i++) at(F, -3.5 + i * 7 / 6, h + 1.75, 1.81, (x, y, z) => b.box(0.06, 0.9, 0.06, BRONZE, x, y, z, F.ry));
+    }
+    // Tech Office below, the Guest Wing above (west): two storeys, a slate gable roof with dormers
+    {
+      link(110, 3.4, RD - 0.4, RD + 1.4, 4.2);
+      const F = frame(110, RD + 1.2 + 4.6), w = 16, d = 9.2, h = 7.4;
+      block(F, w, d, h);
+      at(F, 0, 3.7, 0, (x, y, z) => b.box(w + 0.16, 0.22, d + 0.16, mTrim, x, y, z, F.ry, 1.5));   // floor band
+      for (let i = 0; i < 6; i++) { win(F, 'f', d / 2, -6.25 + i * 2.5, 1.1, 1.1, 1.6, false); win(F, 'f', d / 2, -6.25 + i * 2.5, 4.5, 1.1, 1.9, false); }
+      for (const face of ['l', 'r']) for (let i = 0; i < 2; i++) { win(F, face, w / 2, -2 + i * 4, 1.1, 1.1, 1.6, false); win(F, face, w / 2, -2 + i * 4, 4.5, 1.1, 1.9, false); }
+      gable(F, w, d, h, 2.6);
+      for (let i = 0; i < 3; i++) {   // dormers on the outer slope
+        const lx = -4.5 + i * 4.5; at(F, lx, h + 1.0, d / 4 + 0.35, (x, y, z) => b.box(1.5, 1.4, 1.6, mTrim, x, y, z, F.ry));
+        win(frame(110, RD + 1.2 + 4.6), 'f', d / 4 + 1.17, lx, h + 0.45, 0.8, 0.95, false);
+        at(F, lx, h + 1.85, d / 4 + 0.35, (x, y, z) => b.box(1.75, 0.12, 1.9, mSlate, x, y, z, F.ry));
+      }
+      for (const s of [-1, 1]) at(F, s * 5.5, h + 2.6, -1.3, (x, y, z) => { b.box(0.8, 1.8, 0.8, mWall, x, y, z, F.ry, 1.5); b.box(1.0, 0.15, 1.0, mTrim, x, y + 0.95, z, F.ry); });
+    }
+    // Grand Staircase (by the portico): a tower with tall stair windows and a pointed slate roof
+    {
+      const F = frame(150, RD + 2.5), w = 3.8, d = 3.8, h = 10;
+      block(F, w, d, h);
+      for (let i = 0; i < 3; i++) win(F, 'f', d / 2, 0, 1.4 + i * 2.9, 0.8, 2.1, true);
+      for (const face of ['l', 'r']) win(F, face, w / 2, 0, 5.8, 0.8, 2.1, true);
+      hip(F, w, d, h, 3.4, 0.02);
+      at(F, 0, h + 3.6, 0, (x, y, z) => { b.sph(0.12, BRASS, x, y, z); b.cyl(0.02, 0.03, 0.8, BRASS, x, y + 0.45, z, 5); });
+    }
+    // Kitchen (east, towards the lake side): a working wing with a big chimney and a back door
+    {
+      link(250, 3.2, RD - 0.4, RD + 1.4, 3.8);
+      const F = frame(250, RD + 1.2 + 4.1), w = 10.4, d = 8.2, h = 4.4;
+      block(F, w, d, h);
+      for (let i = 0; i < 3; i++) win(F, 'f', d / 2, -3.2 + i * 3.2, 1.2, 1.3, 1.9, false);
+      win(F, 'r', w / 2, -1.6, 1.2, 1.3, 1.9, false);
+      at(F, -w / 2 - 0.03, 0.6, 1.5, (x, y, z) => { b.box(0.08, 2.2, 1.1, M(0x5a3a26, 0.7), x, y + 1.1, z, F.ry); b.box(0.5, 0.15, 1.6, mStone, x - 0.2, 0.62, z, F.ry); });
+      gable(F, w, d, h, 2.2);
+      at(F, 3.2, h + 1.6, -1.2, (x, y, z) => { b.box(1.2, 3.6, 1.0, M(0x8a4a38, 0.85, 0, { t: tex('tBrick', () => T.tiles({ base: '#8a4a38', grout: '#cbb8a0', n: 8, seed: 31 })), bump: 0.03 }), x, y, z, F.ry, 0.8); b.box(1.4, 0.2, 1.2, mTrim, x, y + 1.85, z, F.ry); });
+    }
+    // Archive (north-west): Opal's tall-windowed room under a hipped roof
+    {
+      link(305, 3.2, RD - 0.4, RD + 1.4, 3.9);
+      const F = frame(305, RD + 1.2 + 4.6), w = 9.6, d = 9.2, h = 4.8;
+      block(F, w, d, h);
+      for (let i = 0; i < 3; i++) win(F, 'f', d / 2, -3 + i * 3, 1.0, 1.2, 2.6, true);
+      for (const face of ['l', 'r']) for (let i = 0; i < 2; i++) win(F, face, w / 2, -1.8 + i * 3.6, 1.0, 1.2, 2.6, true);
+      hip(F, w, d, h, 2.0);
+    }
+  }
   b.flush(R.g);
   lamps(R, [0, 3, -4, 0xffc890, 10, 14], [4, 2.5, -12, 0xffc890, 6, 10]);
   return R;
@@ -3618,7 +3742,7 @@ export function sync() {
   X.crown.visible = !has('crown_back');
   L.caseCrown.visible = has('crown_back');
   for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
-  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
+  rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1; rooms.terrace.wingGlass.emissiveIntensity = night() ? 0.9 : 0;
   for (const w in CAST) {
     const at = whereIs(w);
     if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync(), at[0] === curRoom);
