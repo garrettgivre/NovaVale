@@ -7,3 +7,4 @@
 !requirements.txt
 !refs/
 !refs/*.png
+!build_all.sh

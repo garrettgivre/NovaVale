@@ -3,9 +3,14 @@ import os, sys, numpy as np, cv2
 from rembg import remove, new_session
 D = os.path.dirname(os.path.abspath(__file__))
 src, name = sys.argv[1], sys.argv[2]
-im = cv2.imread(src)
-rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-a = remove(rgb, session=new_session('birefnet-general'), post_process_mask=True)[..., 3]
+raw = cv2.imread(src, cv2.IMREAD_UNCHANGED)
+if raw.ndim == 3 and raw.shape[2] == 4 and (raw[..., 3] < 10).mean() > 0.2:
+    a = raw[..., 3].copy(); al_ = a[..., None] / 255.0
+    im = (raw[..., :3] * al_ + 180 * (1 - al_)).astype(np.uint8)
+else:
+    im = raw[..., :3] if raw.ndim == 3 else cv2.cvtColor(raw, cv2.COLOR_GRAY2BGR)
+    rgb = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    a = remove(rgb, session=new_session('birefnet-general'), post_process_mask=True)[..., 3]
 m = (a > 128).astype(np.uint8)
 n, lab, st, _ = cv2.connectedComponentsWithStats(m)
 comps = sorted([i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] > 20000], key=lambda i: st[i, cv2.CC_STAT_LEFT])

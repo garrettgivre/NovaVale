@@ -6,25 +6,28 @@
 // following the camera, and talking gestures.
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
+import { HEADMAP } from './figheads.js';
 
 // who -> { head: model-space height of the head centre, talk: which arm gestures ('R' | 'L') }
 export const FIG = {
-  vesper: { head: 1.632, talk: 'L', relax: 0.36 },
-  cherry: { head: 1.714, talk: 'R', relax: 0.3 },
-  opal: { head: 1.553, talk: 'R', relax: 0.42 },
-  juniper: { head: 1.51, talk: 'R', relax: 0.36 },
-  dex: { head: 1.633, talk: 'R', relax: 0.3 },
-  harper: { head: 1.54, talk: 'R', relax: 0.3 },
-  celeste: { head: 1.577, talk: 'R', relax: 0.32 },
-  regent: { head: 1.72, talk: 'L', relax: 0.2 },
-  gus: { head: 1.614, talk: 'R', relax: 0.24 },
-  nate: { head: 1.67, talk: 'R', relax: 0.3 },
-  rashad: { head: 1.647, talk: 'R', relax: 0.3 },
-  kenji: { head: 1.618, talk: 'R', relax: 0.32 },
-  priya: { head: 1.553, talk: 'R', relax: 0.32 },
+  vesper: { head: 1.651, talk: 'L', relax: 0.36 },
+  cherry: { head: 1.825, talk: 'R', relax: 0.3 },
+  opal: { head: 1.57, talk: 'R', relax: 0.42 },
+  juniper: { head: 1.531, talk: 'R', relax: 0.36 },
+  dex: { head: 1.663, talk: 'R', relax: 0.3 },
+  harper: { head: 1.544, talk: 'R', relax: 0.3 },
+  celeste: { head: 1.58, talk: 'R', relax: 0.32 },
+  regent: { head: 1.721, talk: 'L', relax: 0.2 },
+  gus: { head: 1.619, talk: 'R', relax: 0.24 },
+  nate: { head: 1.674, talk: 'R', relax: 0.3 },
+  rashad: { head: 1.651, talk: 'R', relax: 0.3 },
+  kenji: { head: 1.62, talk: 'R', relax: 0.32 },
+  priya: { head: 1.57, talk: 'R', relax: 0.32 },
+  silas: { head: 1.637, talk: 'R', relax: 0.3 },
+  jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609302353';
+export const ASSET_V = '202610010850';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -64,7 +67,33 @@ export function buildFigure(who, HIT) {
       o.material = new THREE.MeshLambertMaterial({ map: old.map, emissive: 0xffffff, emissiveMap: old.map, emissiveIntensity: 0.3 });
       // blended texturing: TEXCOORD_1/2 look up the side and back paintings, TEXCOORD_3 holds the weights (side, back;
       // the exporter flips V, so back = 1 - y); colour = mix(mix(front, back, wB), side, wS)
+      // head sheet: the texture holds a much larger painting of the head below the body sheet. Wherever a lookup lands on
+      // a body view's head (above the neck), it reads the head sheet instead, fading in from the neck to the chin.
+      const HM = HEADMAP[who];
+      // each figure's head lookup is compiled into its shader: give it its own program (three.js would otherwise reuse the
+      // first figure's, since every figure's onBeforeCompile looks the same to it)
+      o.material.customProgramCacheKey = () => 'fig:' + who;
       if (o.geometry.attributes.uv3) o.material.onBeforeCompile = sh => {
+        let hd = 'vec4 hd(vec2 uv) { return texture2D(map, uv); }';
+        if (HM) {
+          const v = HM.v, f = n => n.toFixed(4);
+          sh.uniforms.hV = { value: v.map(r => new THREE.Vector4(r[0], r[1], r[2], r[3])) };
+          sh.uniforms.hT = { value: v.map(r => new THREE.Vector4(r[4], r[5], r[6], r[7])) };
+          hd = `uniform vec4 hV[${v.length}]; uniform vec4 hT[${v.length}];
+vec4 hd(vec2 uv) {
+  vec4 base = texture2D(map, uv);
+  vec2 A = vec2(${f(HM.A[0] - 1)}, ${f(HM.A[1] - 1)}), p = uv * A;
+  for (int i = 0; i < ${v.length}; i++) {
+    vec4 r = hV[i];
+    if (p.x > r.x && p.x < r.y && p.y < r.w) {
+      float w = (1.0 - smoothstep(r.z, r.w, p.y)) * smoothstep(r.x, r.x + 5.0, p.x) * (1.0 - smoothstep(r.y - 5.0, r.y, p.x));
+      vec4 t = hT[i];
+      return mix(base, texture2D(map, vec2(t.x * p.x + t.z, t.y * p.y + t.w) / A), w);
+    }
+  }
+  return base;
+}`;
+        }
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', `#include <common>
 attribute vec2 uv1;
@@ -80,7 +109,9 @@ vUvS = uv1; vUvB = uv2; vW = uv3;`);
 varying vec2 vUvS;
 varying vec2 vUvB;
 varying vec2 vW;`)
-          .replace('#include <map_fragment>', `vec4 fcol = mix(mix(texture2D(map, vMapUv), texture2D(map, vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), texture2D(map, vUvS), clamp(vW.x, 0.0, 1.0));
+          .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
+${hd}`)
+          .replace('#include <map_fragment>', `vec4 fcol = mix(mix(hd(vMapUv), hd(vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), hd(vUvS), clamp(vW.x, 0.0, 1.0));
 diffuseColor *= fcol;`)
           .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= fcol.rgb;');
       };

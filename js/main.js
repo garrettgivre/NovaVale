@@ -148,6 +148,7 @@ function focus(who) {
   // don't back the camera through a wall or a piece of furniture
   const R = roomOf();
   if (R) {
+    ray.camera = camera;   // sprites (lamp glows) need it
     ray.set(new THREE.Vector3(h.x, cy, h.z), dir); ray.far = dist + 0.3;
     const hit = ray.intersectObject(R.g, true).find(x => x.object.visible && x.object.material && x.object.material.visible !== false && !(function up(o) { for (; o; o = o.parent) if (o.userData.who) return true; return false; })(x.object));
     if (hit) dist = Math.max(1.2, hit.distance - 0.25);
@@ -274,6 +275,7 @@ addEventListener('blur', () => KEYS.clear());
 const walkRay = new THREE.Raycaster();
 const _o = new THREE.Vector3(), _d = new THREE.Vector3(), DOWN = new THREE.Vector3(0, -1, 0);
 walkRay.layers.set(2);   // the room only, never the people
+walkRay.camera = camera;
 const solid = h => { if (!h.object.visible || !h.object.material || h.object.material.visible === false) return false; for (let o = h.object; o; o = o.parent) { if (!o.visible) return false; if (o.userData.who) return false; } return true; };
 // can the camera stand at (x, z)? nothing in the way at knee, waist and eye height, floor underfoot, nobody too close
 function clear(x, z, dx, dz, R) {
@@ -525,4 +527,4 @@ const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novav
   document.getElementById('boot').remove();
   title();
 }, 30));
-window.__dbg = { S, renderer, rooms, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };
+window.__dbg = { S, renderer, camera, rooms, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };

@@ -6,7 +6,12 @@ from scipy import ndimage
 D = os.path.dirname(os.path.abspath(__file__))
 cfg = json.load(open(os.path.join(D, sys.argv[1])))
 name, HEIGHT, STEP = cfg['name'], cfg['height'], cfg.get('step', 2)
-sheet = cv2.imread(os.path.join(D, cfg['sheet'])); SH, SW = sheet.shape[:2]
+def loadRGB(p):
+    raw = cv2.imread(p, cv2.IMREAD_UNCHANGED)
+    if raw.ndim == 3 and raw.shape[2] == 4:
+        al = raw[..., 3:4] / 255.0; return (raw[..., :3] * al + 180 * (1 - al)).astype(np.uint8), raw[..., 3].copy()
+    return raw[..., :3], None
+sheet, _ = loadRGB(os.path.join(D, cfg['sheet'])); SH, SW = sheet.shape[:2]
 
 # ---- masks in sheet coordinates (from turn_cut.py cutouts and their offsets)
 def placed(view):
@@ -94,6 +99,65 @@ cxb = centroid(M['back'], trb) + xcm / px['back']
 X = lambda u: (u - cxf) * px['front']
 Yf = lambda v: (bot['front'] - v) * px['front']
 ub = lambda x: cxb - x / px['back']
+
+# ---- the head sheet (front | profile | back, much larger than the body sheet's heads): for each body view, find the
+# scale and offset (and mirror, for the profiles) that lay the head sheet's view over the body view's head, by matching
+# both the painting and the silhouette. The game's shader then looks the head up there instead (sharper faces and hair).
+HEAD = None
+if cfg.get('head'):
+    hs, ha = loadRGB(os.path.join(D, cfg['head'])); HH, HW = hs.shape[:2]
+    if ha is None: ha = np.full((HH, HW), 255, np.uint8)
+    occ = (ha > 128).sum(0) > 2
+    runs_ = []; c0 = None
+    for c in range(HW + 1):
+        o_ = c < HW and occ[c]
+        if o_ and c0 is None: c0 = c
+        if not o_ and c0 is not None: runs_.append((c0, c - 1)); c0 = None
+    runs_ = [r for r in runs_ if r[1] - r[0] > HW * 0.08]
+    if len(runs_) != 3: runs_ = [(int(HW * i / 3), int(HW * (i + 1) / 3) - 1) for i in range(3)]
+    HV = dict(zip(['front', 'prof', 'back'], runs_))
+    neckM, chinM = Yf(cfg['joints']['neck'][1]), Yf(cfg['joints']['chin'][1])
+    gB = cv2.cvtColor(sheet, cv2.COLOR_BGR2GRAY).astype(np.float32); gH = cv2.cvtColor(hs, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    aH = ha.astype(np.float32)
+    HEAD = {}
+    # front and back first: their scale (one drawing scale for the whole head sheet) is then used for the profiles, which
+    # only search for position and mirroring (matching them freely picked scales ~10% off, and the side of the head smeared)
+    kFix = None
+    for v in sorted(VIEWS, key=lambda v: v not in ('front', 'back')):
+        rT, rN, rC = int(top[v]), int(rowOf(v, neckM)), int(rowOf(v, chinM))
+        cols = np.nonzero(M[v][rT:rC].any(0))[0]
+        if not len(cols): continue
+        cx0, cx1 = max(0, cols.min() - 6), min(SW - 1, cols.max() + 6)
+        cy0, cy1 = max(0, rT - 6), min(SH - 1, rN + (rN - rC))
+        Tg, Ta = gB[cy0:cy1, cx0:cx1], A[v][cy0:cy1, cx0:cx1].astype(np.float32) * 255
+        bw = cols.max() - cols.min() + 1
+        best = None
+        for hk, mir in ([('front', False)] if v == 'front' else [('back', False)] if v == 'back' else [('prof', False), ('prof', True)]):
+            x0h, x1h = HV[hk]; Hg, Ha = gH[:, x0h:x1h + 1], aH[:, x0h:x1h + 1]
+            if mir: Hg, Ha = Hg[:, ::-1], Ha[:, ::-1]
+            hcols = np.nonzero((Ha > 128)[: int(HH * 0.45)].any(0))[0]
+            s0 = (hcols.max() - hcols.min() + 1) / bw if len(hcols) else HH / (cy1 - cy0)
+            for f in (np.linspace(0.7, 1.4, 29) if kFix is None else [None]):
+                k = kFix / px[v] if f is None else 1.0 / (s0 * f); w_, h_ = int(Hg.shape[1] * k), int(Hg.shape[0] * k)
+                if w_ < 20 or h_ < 20: continue
+                # pad: the template runs below the head sheet's bust, so at the right scale it can be taller than the view
+                py_, px_ = Tg.shape[0], Tg.shape[1]
+                rg = cv2.copyMakeBorder(cv2.resize(Hg, (w_, h_), interpolation=cv2.INTER_AREA), py_, py_, px_, px_, cv2.BORDER_CONSTANT, value=180)
+                ra = cv2.copyMakeBorder(cv2.resize(Ha, (w_, h_), interpolation=cv2.INTER_AREA), py_, py_, px_, px_, cv2.BORDER_CONSTANT, value=0)
+                sc = 0.5 * cv2.matchTemplate(rg, Tg, cv2.TM_CCOEFF_NORMED) + 0.5 * cv2.matchTemplate(ra, Ta, cv2.TM_CCOEFF_NORMED)
+                _, mx, _, ml = cv2.minMaxLoc(sc); ml = (ml[0] - px_, ml[1] - py_)
+                if best is None or mx > best[0]: best = (mx, k, ml, hk, mir, Hg.shape[1])
+        if best is None: continue
+        mx, k, (mxl, myl), hk, mir, Wv = best
+        if v in ('front', 'back'): HEAD.setdefault('_k', []).append(k * px[v])   # head-sheet metres per pixel
+        if v == 'back' or (v == 'front' and 'back' not in VIEWS): kFix = float(np.mean(HEAD['_k']))
+        x0h = HV[hk][0]
+        # body pixel (bx, by) -> head-sheet pixel: hx = sx * bx + ox, hy = sy * by + oy
+        sy = 1.0 / k; oy = (myl - cy0) / k
+        if mir: sx = -1.0 / k; ox = x0h + Wv - 1 - (mxl - cx0) / k
+        else: sx = 1.0 / k; ox = x0h + (mxl - cx0) / k
+        HEAD[v] = dict(x0=float(cx0), x1=float(cx1), chin=float(rC), neck=float(rN), sx=sx, sy=sy, ox=ox, oy=oy, score=round(float(mx), 3), mir=mir)
+        print('head', v, '->', hk, 'mirrored' if mir else '', 'scale', round(1 / k, 2), 'match', round(float(mx), 3))
 
 # ---- feet (front view): centres of the leftmost and rightmost segments just above the soles
 def segs(row):
@@ -225,6 +289,15 @@ half = int(ry * 1.35); cxI, cyI = int(round(cxf)), int(round(fcy))
 bx0, bx1, by0, by1 = max(0, cxI - half), min(SW, cxI + half), max(0, cyI - half), min(SH, cyI + half)
 crop = cv2.cvtColor(sheet[by0:by1, bx0:bx1], cv2.COLOR_BGR2RGB).astype(np.float32) / 255
 al_ = A['front'][by0:by1, bx0:bx1, None]; crop = crop * al_ + 0.5 * (1 - al_)
+if HEAD and 'front' in HEAD:
+    h_ = HEAD['front']; hx0_, hx1_ = int(h_['sx'] * bx0 + h_['ox']), int(h_['sx'] * bx1 + h_['ox']); hy0_, hy1_ = int(h_['sy'] * by0 + h_['oy']), int(h_['sy'] * by1 + h_['oy'])
+    print('face crop body', (bx0, bx1, by0, by1), 'head', (hx0_, hx1_, hy0_, hy1_), 'sheet', (HW, HH))
+    if hx1_ - hx0_ > 40 and hy1_ - hy0_ > 40:   # pad rather than clip, so the crop still lines up with the body's
+        pd = max(0, -hx0_, -hy0_, hx1_ - HW, hy1_ - HH)
+        hsP = cv2.copyMakeBorder(hs, pd, pd, pd, pd, cv2.BORDER_CONSTANT, value=(180, 180, 180)); haP = cv2.copyMakeBorder(ha, pd, pd, pd, pd, cv2.BORDER_CONSTANT, value=0)
+        hc_ = cv2.cvtColor(hsP[hy0_ + pd:hy1_ + pd, hx0_ + pd:hx1_ + pd], cv2.COLOR_BGR2RGB).astype(np.float32) / 255
+        ha_ = haP[hy0_ + pd:hy1_ + pd, hx0_ + pd:hx1_ + pd, None].astype(np.float32) / 255
+        crop = hc_ * ha_ + 0.5 * (1 - ha_); print('face depth from the head sheet', crop.shape[:2])
 inp = (cv2.resize(crop, (518, 518), interpolation=cv2.INTER_CUBIC) - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
 fd = sess.run(None, {sess.get_inputs()[0].name: inp.transpose(2, 0, 1)[None].astype(np.float32)})[0][0]
 fd = cv2.resize(fd, (bx1 - bx0, by1 - by0), interpolation=cv2.INTER_CUBIC)
@@ -444,6 +517,10 @@ if crotch is not None and crotch < bot['front'] - 0.12 * (bot['front'] - top['fr
     print('stance', round(F_, 3), '->', round(T_, 3), 'from crotch at', round(yc, 2))
 else:
     print('stance kept (gown or already narrow)')
+if HEAD:   # body sheet coordinates -> the atlas (body sheet at its top-left)
+    AW_, AH_ = max(SW, HW), SH + HH
+    re = lambda t: np.stack([t[:, 0] * (SW - 1) / (AW_ - 1), 1 - (1 - t[:, 1]) * (SH - 1) / (AH_ - 1)], 1).astype(np.float32)
+    vF, vS, vB, UV = re(vF), re(vS), re(vB), re(UV)
 np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind, vF=vF, vS=vS, vB=vB, WTS=WTS,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
@@ -477,6 +554,28 @@ new = np.clip(un, 0, 255)
 tex = tex.copy(); tex[fix] = new[fix].astype(np.uint8)
 halo = fix
 print('halo pixels', int(halo.sum()))
-cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
+if HEAD:
+    # head sheet texture: colours bled out past the outline; small near-white pockets that touch the outside (backdrop
+    # left between a glasses chain and the neck, say) count as outside
+    hm_ = ha > 128
+    wh = (hs.min(2) > 222) & ((hs.max(2).astype(int) - hs.min(2)) < 20) & hm_
+    lab_, nl_ = ndimage.label(wh)
+    outside = cv2.dilate((~hm_).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    if nl_:
+        area = ndimage.sum(wh, lab_, range(1, nl_ + 1)); touch = ndimage.maximum(outside, lab_, range(1, nl_ + 1))
+        bad = 1 + np.nonzero((area < hm_.sum() * 0.004) & (touch > 0))[0]
+        drop = np.isin(lab_, bad); print('head sheet: white pockets removed', int(drop.sum()), 'px')
+        hm_ = hm_ & ~drop
+    hcore = cv2.erode(((ha > 235) & hm_).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    _, (iy_, ix_) = ndimage.distance_transform_edt(~hcore, return_indices=True)
+    htex = hs[iy_, ix_]
+    AW, AH = max(SW, HW), SH + HH
+    atlas = np.zeros((AH, AW, 3), np.uint8); atlas[:SH, :SW] = tex; atlas[SH:, :HW] = htex
+    _, (iy_, ix_) = ndimage.distance_transform_edt(atlas.sum(2) == 0, return_indices=True); atlas = atlas[iy_, ix_]
+    cv2.imwrite(os.path.join(D, name + '_tex.png'), atlas)
+    json.dump({'A': [AW, AH], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
+              open(os.path.join(D, name + '_head.json'), 'w'))
+else:
+    cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
 print('head centre height', round(float(Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1])), 3))
 print('verts', len(P), 'faces', len(F), 'side faces', int(useSide.sum()))

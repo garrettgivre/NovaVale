@@ -105,7 +105,7 @@ every clickable thing in view; the task list and Dot always say what's next; lor
 | `js/main.js` | renderer + post shader (`uRetro`), camera, input (click-to-walk `floorAt`/`walkTo`, WASD/arrows, Shift, thumb stick `#joy`, drag-look, mouse-only screen-edge turning), `go()` node glides, conversation close-ups (`focus`: portrait lens fov 32/24, level, stops before walls), title screen, boot, `window.__dbg` |
 | `js/world.js` | rooms built in code (`buildLobby`, `buildSpa`, `buildPlanetarium`, `buildKitchen`, `buildTech`, `buildArchive`, `buildSuite`, `buildWing`, `buildTerrace`, `buildTunnel`, `buildStarRoom`), `NODES` camera spots, `whereIs(who)` (`DAY`/`NIGHT1` placement by phase), `sync()` (flags → scene), `update()` (people's facing), postcards, `hotspotsOnScreen` |
 | `js/figures.js` | the painted 3D characters: `FIG` registry, lazy queued GLB loading, `buildFigure` (matte Lambert + blended front/side/back shader, `autoRelax`), `animateFigure` (breathing, weight shift, glances, clamped head turns, talking gestures `GESTS`) |
-| `js/people.js` | the older SDF/marching-cubes sculpted characters; now only used for Silas and Jojo (no figure yet). Skipped for anyone in `FIG` |
+| `js/people.js` | the older SDF/marching-cubes sculpted characters; no longer used (everyone is a painted figure); kept for reference. Skipped for anyone in `FIG` |
 | `js/story.js` | `taskList()` + Dot hints, `HOT` hotspot handlers, `INTRO`/`hiLine`/`TOPICS` dialogue, `REST_NEED`, `finale()` (Opal), Act 3 (`EVIDENCE`, `kenjiCatch`, `kenjiFinale`), endings, phone `CALLS`, notebook `NOTES`, map `PLACES`/`openMap`, `FIRST_VISIT` |
 | `js/puzzles.js` | `aquaOS`, `switchboard`, `acrostic`, `recipe`, `constellation`, `drawerDial`, `starDoor`, `contradiction`, `musicBox` |
 | `js/items.js` | `ITEMS` (inventory with SVG icons) and `DOCS` (letters, logs, emails, postcards, appraisal, song card...) |
@@ -118,9 +118,12 @@ Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin
 
 ## Characters in 3D (painted figures)
 All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
-README: setup, sheet prompt, commands, how it works, what to check). Done: Vesper, Cherry, Opal, Juniper, Dex, Harper,
-Regent, Gus, Nate, Rashad, Kenji, Priya, plus Celeste (built but she's only a phone contact, not placed). **Silas and Jojo
-still use the old sculpted models; their turnaround sheets are the next thing to build.**
+README: setup, sheet prompt, commands, how it works, what to check). All 15 are built (Oct 2026) from
+new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celeste is built but only a phone contact).
+`people.js` (the old sculpted models) is no longer used by anyone. Rebuild everyone: `./build_all.sh <names>` in
+`tools/figures`, then `python heads_js.py` and `python tools/bump.py`.
+- Head sheets: the shader (`figures.js`, `hd()`) reads heads from the head sheet in the texture atlas via `js/figheads.js`;
+  each figure has its own shader program (`customProgramCacheKey`), or three.js reuses the first figure's.
 - Keep figure animation mostly in the picture plane: big turns towards or away from the camera show a painting-based
   mesh edge-on. Head turns are clamped (0.35 yaw / 0.18 pitch), gestures small.
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
@@ -148,7 +151,6 @@ still use the old sculpted models; their turnaround sheets are the next thing to
 Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
-- Build Silas and Jojo from turnaround sheets when Garrett sends them (then `people.js` could be retired).
 - Faces at a full 90° profile are still soft; messy hair outlines (Dex) look a bit blocky side-on.
 - Not yet checked: Senior-difficulty wording of the two Act 3 puzzles; the thumb stick on a real phone.
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
