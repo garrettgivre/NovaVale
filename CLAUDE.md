@@ -1,132 +1,149 @@
 # Nova Vale: The Secret of the Aquadome — notes for Claude
 
-A first-person Nancy Drew-style mystery made by Garrett for his partner Beau (who loves the classic Her Interactive games, Frutiger Aero/Y2K, Gaga-style camp, drag and fashion, and Mario Galaxy). The detective is a fictional character, Nova Vale; Beau is not in the game. Nods to Beau's tastes stay as nods (Vesper Vox is our own pop diva, not Gaga).
+Everything a new session needs to keep developing this game. Read it all before changing anything.
 
-## Rules
-- Art style: classic early-2000s Nancy Drew (Her Interactive). Realistic pre-rendered look, a faded grand resort (marble, mahogany, brass, damask), serif type, a wood-and-brass interface bar, magnifying-glass cursors, paper documents. NOT bubbly or glossy (Garrett rejected the first Frutiger Aero pass as "too bubbly and modern"). AquaOS is the one diegetic 2003 computer and looks like an XP-era desktop.
-- Few custom images: rooms are modelled in code (three.js) with procedural textures (`js/tex.js`), documents and puzzles are HTML/CSS/SVG, sound is synthesised. Phone-call portraits are SVG placeholders; painted art in `assets/portraits/<id>.webp` is used automatically when present (see `tools/art/WISHLIST.md`).
-- No build step. ES modules, three.js r169 vendored in `vendor/`, import map in `index.html`.
-- Mobile first, and it has to work on desktop too.
-- Don't draw four-point sparkle stars (Garrett's rule from his other projects); five-point stars are fine.
+## What this is
+A first-person, point-and-click mystery in the style of the classic Nancy Drew PC games (Her Interactive, early 2000s),
+made by **Garrett** for his partner **Beau**. Beau loves those games, plus Frutiger Aero/Y2K, Gaga-style camp, drag and
+fashion, Mario Galaxy, Stardew, MTG, collectibles, and pink/blue/black. The detective is a fictional character, **Nova
+Vale**; Beau is not in the game, and nods to his tastes stay as nods (Vesper Vox is our own pop diva, not Gaga).
 
-## Nova's voice
-A know-it-all who really does know it all (Garrett: "Beau is like that"). Bratty, confident, funny, never cruel. She calls people out when the evidence lets her ("call-out" topics are starred and appear once she has proof: Vesper's backup track, Dex's 11pm email, Juniper's oven log, Opal's pin and coat). Nancy Drew's audacity is the model. Keep new lines in that voice.
+- Repo: https://github.com/garrettgivre/NovaVale, branch `main` (the only branch). Commit and push to `main` after each
+  finished request; GitHub Pages serves `main` at **https://garrettgivre.github.io/NovaVale/** (no workflow file, Pages
+  settings). Git credentials already work on Garrett's PC. There is no `gh` CLI.
+- Local checkout: `C:\Users\Garrett\Documents\Nova-Vale-Aquadome` (Windows; Bash and PowerShell both available).
+- No build step: ES modules, three.js r169 vendored in `vendor/` (plus `MarchingCubes.js`, `GLTFLoader.js`,
+  `utils/BufferGeometryUtils.js`), import map in `index.html`. Mobile first, must also work on desktop.
 
-Cover story: Celeste picked Nova because her sister Mae (Lakeshore Public Library) saw her quietly catch a rare-map thief; police mean a public report and the papers, and a hired investigator would be spotted by Harper Vance (podcaster) in the building. So everyone meets Nova as Celeste's summer intern and starts as a stranger: guarded, dismissive or curious in character (Rashad sees through it at once; Nova keeps the cover with Harper). Greetings (`hiLine`) warm up with story flags. Nobody calls her "detective" before they've worked it out.
-Writing: avoid AI-ish constructions, especially "it's not X, it's Y" / "X isn't A, it's B", "Honestly? ...", "Also? ...", "There's a difference", stacked one-word fragments, and pithy aphorisms ("Ovens don't lie. People do.").
+## Working with Garrett
+- He playtests and gives notes; act on them, then show proof (screenshots or renders). He likes refinement over redesigns.
+- Commit messages: describe the change; end with the co-author trailer your environment specifies.
+- **Run `python tools/bump.py` before every commit that touches `js/`, `css/` or `assets/figures/`.** GitHub Pages lets
+  browsers cache for 10 minutes; bump.py stamps `?v=<time>` on every module (import map), the stylesheet and the figure
+  GLBs (`ASSET_V` in figures.js). Without it a refresh can run stale code (this confused testing more than once).
+- **Syntax-check before committing**: `for f in js/*.js; do node --check --input-type=module < $f || echo FAIL $f; done`.
+  Never chain the commit on a separate line from a failed check (a broken build was pushed once that way).
+- Editing: most edits are small Python scripts that replace exact strings and assert each occurs once. Write the script to
+  a file first (heredocs mangle JS apostrophes, backticks and `${`); in JS strings use `\'` for apostrophes.
+- Writing style (Garrett asked for this explicitly): no AI-sounding constructions. Avoid "it's not X, it's Y" / "X isn't A,
+  it's B", "Honestly? ...", "Also? ...", "There's a difference", stacked one-word fragments, and pithy aphorisms ("Ovens
+  don't lie. People do."). Plain, character-specific lines.
+- Never draw four-point sparkle stars (reads as an AI logo); five-point stars are fine.
+- Art: Garrett generates images in ChatGPT from prompts you write (he has a daily image limit). Character turnaround
+  prompt is in `tools/figures/README.md`; other wishes in `tools/art/WISHLIST.md`.
 
-## Design rules from fan research (what Nancy Drew fans love and hate)
-- Love: atmospheric places with lots to explore, suspects who each hide something, lore to read, Nancy's sass, phone friends, puzzles woven into the story, Second Chance.
-- Hate: chores and padding, backtracking and slow travel, unclear next steps, hotspots that are hard to find, repeated puzzles, endgames stuffed with puzzles, long anticlimactic endings.
-- So: no chores; the Map fast-travels to any visited place; the Reveal button (top right) marks every clickable thing in view; the task list and Dot always say what's next; optional lore rewards exploring (postcards, clippings, the crew photo) but is never required; the finale stays short.
+## The look
+Classic early-2000s Nancy Drew: realistic pre-rendered feel, a faded grand resort (marble, mahogany, brass, damask), serif
+type (Cinzel, EB Garamond, Caveat for handwriting, VT323 for screens), a wood-and-brass interface bar, paper documents.
+NOT bubbly or glossy (Garrett rejected a Frutiger Aero pass as "too bubbly and modern"). AquaOS is the one diegetic 2003
+computer and looks XP-era. Rooms are modelled in code with procedural textures (`js/tex.js`); documents and puzzles are
+HTML/CSS/SVG; all sound is synthesised (`js/audio.js`). Options (Menu): Retro picture (default on: 640 px render,
+15-bit colour, Bayer dither, scanlines), Music (own switch, corner button too), All sound.
 
-## Layout (built to grow)
-Hub and spokes. The rotunda lobby is the hub; every door around it leads somewhere (Planetarium N, Spa NE, Tech Office E, Grand Staircase SE, Terrace S, Kitchen W, Archive NW). Upstairs: the Guest Wing (Vesper's Spa Suite and Cherry's Suite 4 are locked, Linen, Suite 2 = Nova's room, window seat, the 2003 build crew photo). Outside: the Lakeside Terrace (dock, rowboat, the dome seen from outside, a padlocked boathouse that is a deliberate hook for a future case; Remy is "looking into" who owned the boats). Below: the service tunnel and the Star Room. To add a place: a `build<Place>()` in world.js (`mkRoom` with its key light, two `lamps`, doors tagged `door_x`/`exit_x`), nodes in `NODES`, door handlers in story `HOT`, an entry in `PLACES` (the map, with its position in `openMap`'s SVG), and optionally a `FIRST_VISIT` line.
+## Story and characters
+**Premise.** The Aquadome, a glass-domed lakeside spa and planetarium (opened 21 June 2003, closed nine years ago),
+reopens on Saturday with a gala. Its prize, the Prism Crown (silver-plated band, a real pallasite meteorite star), vanished
+from a locked display case on Tuesday night. Owner **Celeste Arden** brings in Nova. **Why a sixteen-year-old**: Celeste's
+sister Mae runs the Lakeshore Public Library, where Nova quietly caught a rare-map thief last spring; a police report is
+public record and would reach sponsors, insurer and the papers; a hired investigator would be spotted at once by the
+true-crime podcaster staying in the building. So Nova arrives undercover as **Celeste's summer intern**.
 
-## Options and look
-- Retro picture (default on, Menu > Retro picture): the 3D view renders at 640 px on its long side and is shown with nearest-neighbour pixels, 15-bit colour with 4x4 Bayer dithering and faint scanlines (`post` shader, `uRetro`). Off = the soft ~0.9 MP render. The UI is always sharp. Prefs in localStorage `novavale.retro` / `novavale.music`.
-- Music has its own switch (corner button, and Menu), separate from All sound. The ghost voice counts as a sound effect, not music.
+**Nova's voice.** A know-it-all who really does know it all ("Beau is like that"): bratty, confident, funny, never cruel,
+calls people out when evidence allows (Nancy Drew's audacity). **She stays coy until people catch on**: alibi questions
+use pretexts (the insurance timeline, the meteor shower, the cleaning rota) or small talk. Everyone except Celeste meets
+her as a stranger and reacts in character; each has a moment where they realise (Vesper at her email, Dex at his callout,
+Juniper at the oven log, Cherry on night one, Opal at the pin, Gus at the keys, Regent at the coat; Rashad guesses at once;
+Harper only ever suspects and Nova keeps the cover with her). Greetings (`hiLine`) warm up with story flags. Nobody calls
+her "detective" before they've worked it out.
 
-## Structure
-- Rendering (`js/main.js`): scene renders to a half-float target at about 0.9 MP, then a post shader softens, warms, desaturates, adds vignette and grain (the pre-rendered 800x600 feel). Shadows from one directional key light per room (`R.key` config); walls/floors/ceilings are `struct` (receive only). Conversations glide the camera to a head-and-shoulders close-up (`focus`/`unfocus`, story calls `E.focus(who)`).
-- `js/tex.js`: procedural textures (marble, wood, carpet, damask wallpaper, tiles, plaster, fabric, brushed metal, hair, palm fronds, brass plaques, painted skies, star domes), each `{map, bump}`.
-- `js/people.js`: the cast is sculpted, rigged and animated. Each body, head, hand (with fingers), garment and hairstyle is a signed distance field (smooth unions of ellipsoids/tapered capsules; `U/Sub/grow/above/below/mirX/sqz`, fabric `pleats`/`wrinkles`), polygonised with the vendored three.js `MarchingCubes` (sparse fill, welded, baked AO from the SDF) and painted with vertex colours (lips with a Cupid's bow, brows, lash line, eyeshadow, blush, apron, lapels). Body = two aligned grids split at y 0.74 (same spacing, triangles kept by side, so no seam); head, hair and each hand have finer grids. Everything is a `SkinnedMesh` on one skeleton (`BONES`: hips, spine, chest, neck, head, jaw, clavicles, arms, hands, legs); weights = softmax of distance to bone capsules (head/jaw/neck and hands use fixed rules). Meshes are cached in IndexedDB (`novavale`/`mesh`, key `VERSION:who`; bump `VERSION` whenever a shape or paint changes). `prepareCast()` runs at boot (first ever load ~15 s on desktop, cached ~3 s).
-- Animation (`animatePerson`, called from `world.update`): breathing, weight shift, head and eye tracking of the camera, blinking lids (separate lid caps), lip-sync jaw while their line types (`ui.speech`), listening nods during close-ups, talking gestures and a timed fidget per character, and a stance per character by two-bone arm IK (`CAST[who].pose`): Vesper and Cherry hand on hip, Juniper hands clasped, Opal hands behind her back, Dex fidgeting in front. `CAST[who]` holds proportions, colours, `hair()`, `skinParts()`, `outfit()`, `pose`, `gestureSide`, `fidget`, `acc()` (glasses, earrings, buttons; attached to bones).
-- `js/world.js`: rooms (`buildLobby`, `buildSpa`, `buildPlanetarium`, `buildKitchen`, `buildTech`, `buildArchive`, `buildSuite`, `buildTunnel`, `buildStarRoom`), each a Group at the origin with exactly two point lights (so switching rooms doesn't recompile shaders). `NODES` = camera spots {room, p:[x,z], look, exits}. Clickable things carry `userData.hot` (hotspot id), `.who` (character) or `.go` (walk arrow). Invisible hit spheres use the `HIT` material. `whereIs(who)` places characters by phase; `sync()` applies flags to the scene (pin, hologram card, sketch, dome code, crown).
-- `js/story.js`: `taskList()` (tasks + Dot's hints, junior/senior), `HOT` (hotspot handlers), `INTRO`/`TOPICS` (dialogue; lines starting `N:` are Nova, `*` is narration; `when`, `after`, `hot` = starred new lead), `REST_NEED` (what unlocks sleeping to the next phase), `finale()`, `badEnding()`, `ending()`, phone `CALLS`, notebook `NOTES`.
-- `js/puzzles.js`: `aquaOS` (password pixel2003), `switchboard` (zone 5 = planetarium; MAIN = bad ending), `acrostic` (LIPSYNC), `recipe` (vegan swaps), `constellation` (stars 0–4), `drawerDial` (729), `starDoor` (outer ringed planet, middle moon, inner comet).
-- Collectibles: eight 2003 postcards (`POSTCARDS` in world.js: room, position; `DOCS.pc1..pc8` in items.js), shown on the Journal's Postcards tab and in the ending letter. The archive bookcase holds a newspaper clipping (`DOCS.clipping`) and the Guest Wing has the crew photo (`DOCS.crewphoto`, also sets `pin_known` if you have the pin).
-- `js/state.js`: `S` (phase d1/n1/d2/n2/end, flags, inv, docs), localStorage key `novavale.aquadome.v1`, `checkpoint()`/`secondChance()`.
+**Suspects**: Vesper Vox (pop diva, secretly lip-syncing her comeback), Miss Cherry Pop (drag host of the Starfall Revue,
+secretly rehearsing a tribute to Vesper), Dex Halloway (tech, secretly built the singing "ghost" hologram), Juniper (chef,
+remade the gala cake vegan), Opal Finch (the architect, 63; took the crown). **Others** (optional to meet; `OTHERS` in
+story.js): Velvet Regent (drag performer, favourite to win; the other long coat; alibi from Harper's tape), Harper Vance
+(podcaster, "Lakeshore Unsolved"), Kenji Morimoto (conservator restoring Stella, a 1925 singing automaton; Act 3 culprit),
+Dr. Priya Anand (astronomer removing the projector; came here aged nine, postcard 1; red torch), Mateo "Jojo" Reyes
+(Juniper's nephew on skates; heard a door under the floor), Rashad Okafor (bellhop, mystery reader, grandson of crew
+member Marcus Okafor; his notebook hints the vault door), Gus Haddad (caretaker, every key but the Service door), Silas
+"Static" Boone (ghost web-show host; his 11:52 tape shows a long coat and a white flashlight), Ranger Nate Begay (lake
+warden; alibis Priya and Jojo). Phone: Dot (best friend, gives hints), Remy (cousin, research), Celeste (client).
+Sequel hook: the padlocked boathouse with lights at 2am (Gus won't explain; Nate and Remy are curious).
 
-## Painted figures (Sept 2026)
-Characters with turnaround art are real 3D models built from that art (`tools/figures/README.md`): depth-estimated front and
-back views fitted to the side silhouette, textured from the three paintings, rigged in Blender, `assets/figures/<who>.glb`.
-`js/figures.js` (`FIG`, `loadFigure`, `buildFigure`, `animateFigure`) poses the rig procedurally. Keep motion mostly in
-the picture plane (these meshes come from paintings: big turns towards/away from the camera show them edge-on): arms come
-down by `autoRelax` (swept until the hand is a hand's width from the body, both sides kept within 0.05), slight elbow bend,
-weight shifts between legs every 5-11 s with a spine/head counter-tilt, breathing, occasional glances, head turns clamped
-to 0.35 yaw / 0.18 pitch, and talking gestures from `GESTS` (one hand, the other or both opening outward, small forward lift),
-eased in and out. Textures only keep confident cutout pixels (alpha > .93 and not backdrop-coloured near the outline);
-everything else takes the nearest confident colour. Figures use a matte `MeshLambertMaterial` (the paintings carry their own
-lighting; a standard material's Fresnel sheen lit jagged hair outlines as grey-white specks). Close-ups (`focus` in main.js)
-use a portrait lens: the fov eases to 32 (portrait) / 24 (landscape), the camera backs off to frame head and upper body,
-level (pitch 0), and stops short of walls (raycast); a close wide-angle camera distorted faces; world.js uses a figure instead of the sculpted
-people.js model whenever `FIG[who]` exists. Done: Vesper, Cherry, Opal, Juniper, Dex, Harper, Velvet Regent, Gus, Nate, Rashad, Kenji, Priya (Silas and Jojo still sculpted); Celeste has a model (`assets/figures/celeste.glb`) but is only a phone contact, not placed in the world (Opal now has portrait/art cropped from her sheet). The rest still use the sculpted models until their turnarounds exist.
-Turnaround prompt: three full-body views side by side (front, left side, back), relaxed A-pose with arms 45 degrees out,
-neutral expression, empty hands, flat even studio lighting, plain light grey background, same scale in every view.
+**The case (spoilers)**. Phases `d1` Day 1, `n1` Night 1, `d2` Day 2, `n2` Night 2, `g` Gala Day, `end`. Sleeping in
+Suite 2 advances once `REST_NEED` is met.
+- **Day 1**: examine the case, find Opal's brass star pin, meet the five suspects, read the keypad log on Dex's PC
+  (AquaOS password `pixel2003`; log shows MAINT-0, the 2003 build-crew code, at 23:52, and, planted for Act 3, KMORIMOTO
+  Mon 13:36-14:51).
+- **Night 1**: singing over the speakers; switchboard (zone 5 = planetarium; MAIN = bad ending "Lights Out"); Dex's
+  hologram card under the projector; Cherry rehearsing on stage saw a flashlight and a long coat.
+- **Day 2**: Dex confesses the ghost (alibi); Vesper's lyric acrostic = LIPSYNC (alibi); Juniper's vegan recipe puzzle
+  (alibi; she saw the coat); the relaunch memo (planetarium → VIP bar) sends Opal out of the archive; her sketch →
+  projector constellation (Cygnus) → 7·2·9 → drawer: service key + Star Room blueprint.
+- **Night 2**: service door → tunnel → ring vault door (outer ringed planet, middle moon, inner comet) → Star Room → Opal.
+  Choose compassion (or bad ending "Locked In"). Opal says she never touched the star.
+- **Gala Day (Act 3)**: the star is too light. Dex's speaker magnet proves it fake at the case (`star_fake`); the
+  insurance appraisal at reception (real Mon 13:40); Kenji's Monday repair log; evidence board (`contradiction`: his log
+  vs the keypad log, `kenji_caught`); song card in his bench drawer (Mi Sol Sol | Fa Re Re) → Stella's music cylinder
+  (`musicBox`) → the real star (the Star's Tear, sold from the Morimoto family in 1946) and Kenji's letter. Confront him:
+  police = bad ending "Wrong Call"; otherwise he tells Celeste, the crown wears his replica, the stone goes home. Ending
+  letter from Celeste.
+- Second Chance (checkpoints before risky choices) on every bad ending. Junior/Senior difficulty changes hints and task
+  wording. Eight optional 2003 postcards, a newspaper clipping, the crew photo.
 
-## Figure shape (visual hull)
-Each row of the front outline is split into pieces (torso/head, arms, legs). Every piece gets a rounded-box cross-section
-(`boxy` exponent 2.6): the torso/head piece's depth is the side outline at that height (so the side profile matches the
-side painting), limbs are round. Heads use a rounder exponent (2.1). Cross-sections are smoothed over the grid (`hullSmooth` 3) so outline wiggles don't
-make lumps; the depth estimate only adds high-passed detail (±0.7 cm on clothes, ±1.4 cm on the face). Head texturing:
-sides and back of the head come from the side painting (faces turned >45°), but the front third of the head's depth
-always keeps the front painting (otherwise the profile's eye and nose landed on the cheeks). The old method (front/back depth
-surfaces meeting at the front outline) made lens-shaped blobs from the side. Next step if needed: a better head/face
-profile at 90° (the face is still mostly front-textured).
+## Design rules (from research into what Nancy Drew fans love and hate)
+Love: atmospheric places, suspects who each hide something, lore, Nancy's sass, phone friends, puzzles woven into the
+story, Second Chance. Hate: chores/padding, backtracking, unclear next steps, hard-to-find hotspots, repeated puzzles,
+puzzle-stuffed endgames, long endings. So: no chores; the Map fast-travels to visited places; the Reveal button marks
+every clickable thing in view; the task list and Dot always say what's next; lore is optional; finales stay short.
 
-Faces are sculpted by a second depth pass on a close crop of the face (`faceDepth` 0.03: the nose stands ~3 cm proud of
-the cheeks, eye sockets up to 2.5 cm in), band-passed and added inside a soft oval (`faceAspect`), on top of the head's
-smooth base (the side outline with the nose/lips smoothed out). Head sides take the side painting by facing direction
-(>55°, never the front third of the head's depth); steep body sides (>~37°) too where the colours agree; shoulders may,
-arms below the shoulders never. `heads3.py <who> <height>` renders head close-ups at 0/45/90 to check.
+## Code map
+| File | What's in it |
+|---|---|
+| `js/main.js` | renderer + post shader (`uRetro`), camera, input (click-to-walk `floorAt`/`walkTo`, WASD/arrows, Shift, thumb stick `#joy`, drag-look, mouse-only screen-edge turning), `go()` node glides, conversation close-ups (`focus`: portrait lens fov 32/24, level, stops before walls), title screen, boot, `window.__dbg` |
+| `js/world.js` | rooms built in code (`buildLobby`, `buildSpa`, `buildPlanetarium`, `buildKitchen`, `buildTech`, `buildArchive`, `buildSuite`, `buildWing`, `buildTerrace`, `buildTunnel`, `buildStarRoom`), `NODES` camera spots, `whereIs(who)` (`DAY`/`NIGHT1` placement by phase), `sync()` (flags → scene), `update()` (people's facing), postcards, `hotspotsOnScreen` |
+| `js/figures.js` | the painted 3D characters: `FIG` registry, lazy queued GLB loading, `buildFigure` (matte Lambert + blended front/side/back shader, `autoRelax`), `animateFigure` (breathing, weight shift, glances, clamped head turns, talking gestures `GESTS`) |
+| `js/people.js` | the older SDF/marching-cubes sculpted characters; now only used for Silas and Jojo (no figure yet). Skipped for anyone in `FIG` |
+| `js/story.js` | `taskList()` + Dot hints, `HOT` hotspot handlers, `INTRO`/`hiLine`/`TOPICS` dialogue, `REST_NEED`, `finale()` (Opal), Act 3 (`EVIDENCE`, `kenjiCatch`, `kenjiFinale`), endings, phone `CALLS`, notebook `NOTES`, map `PLACES`/`openMap`, `FIRST_VISIT` |
+| `js/puzzles.js` | `aquaOS`, `switchboard`, `acrostic`, `recipe`, `constellation`, `drawerDial`, `starDoor`, `contradiction`, `musicBox` |
+| `js/items.js` | `ITEMS` (inventory with SVG icons) and `DOCS` (letters, logs, emails, postcards, appraisal, song card...) |
+| `js/ui.js` | dialogue box (`say`, `choose`, `openTalk`; lines starting `N:` are Nova, `*...*` narration), panels, toasts, portraits, `PEOPLE` names/colours |
+| `js/state.js` | `S` (phase, flags, inv, docs), save key `novavale.aquadome.v1`, `checkpoint`/`secondChance` |
+| `js/tex.js`, `js/audio.js` | procedural textures; synthesised music/SFX/ghost voice |
 
-Texturing is blended per vertex, not chosen per face (that made hard seams): the GLB carries TEXCOORD_0 front,
-TEXCOORD_1 side (left or right painting by the vertex normal), TEXCOORD_2 back, TEXCOORD_3 weights (side, back; the
-exporter flips V so the shader uses back = 1 - y), and `figures.js` patches the Lambert shader to
-`mix(mix(front, back, wB), side, wS)`. wS ramps with how sideways the surface faces (heads from 25-55°, bodies 40-72°),
-is zero on the face (front part of the head's depth within a widened face oval: otherwise the side paintings' profile
-eye/nose land on the cheeks), zero on arms below the shoulders, and on the body only where the side painting's colour
-agrees (the side paintings show arms hanging over the torso).
+Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin (Act 3 hooks) }`. To add a place: a
+`build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.
 
-Arm bones blend over a short stretch (`armSigma` 0.013 vs 0.028 for the body) so elbows bend cleanly; talking gestures
-are kept small (forearm lift ≤ ~0.55 rad). Head side texture only behind the face (fracV < ~0.45 of the head's depth),
-else the side paintings left a ghost face behind the cheek. `posetest2.py <who>` renders a gesture pose at 20°/70°.
-
-## Walking and facing
-Click or tap the floor to walk there (`floorAt`: first visible hit must face up and be below 0.8 m; `walkTo` sets `V.walk` and a fading ring `mark`; the camera turns towards the target while walking and stops on arrival or when it stops getting closer). Screen-edge turning is mouse-only now (touch taps there walk). Shift runs. A one-time controls toast (`novavale.ctl`). Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
-thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
-and eye height against the current room, needs floor underfoot, keeps 0.55 m from people, and slides along walls. `go()`
-glides from wherever you are. People keep their own facing (`userData.base`: towards the room's middle, offset per
-person), turn fully to you when talking and partly when you're within 2.8 m; heads only track you when you're near.
-Figures: the stance is narrowed in `turn_build.py`, legs only: from the crotch down each leg shifts as a whole towards
-`stance` (default 0.55 of the drawn foot spread, at least 0.09 m); the pelvis and waist stay as painted, gowns with no gap
-between the legs are left alone, arm-owned vertices excluded. Body shape comes from the art: on rows where an arm hangs
-clear of the body, the torso segment never binds to the arms (relaxing the arms used to pull every waist in); legs are owned by the hips through a geodesic line down each leg; below the hips only the hand region
-(near the forearm/hand line, or further out than it) may follow the arms. `auto_joints.py` ends an arm run when it jumps
-sideways (it used to run on down a trouser leg: Gus, Rashad, Priya had fingertips on their thighs).
-
-## Loading
-Figures load lazily: people in the current room immediately, everyone else queued one at a time (`loadFigure(who, cb, now)`).
-`prepareCast` skips characters that have a figure (it used to sculpt their old SDF models at boot for nothing).
-
-## Caching (important)
-GitHub Pages lets browsers cache files for 10 minutes, so a refresh right after a push can run old code/models. Run
-`python tools/bump.py` before committing changes to js/, css/ or assets/figures/: it stamps `?v=<time>` on every module
-(import map in index.html), the stylesheet and the figure GLBs (`ASSET_V` in figures.js).
-
-Hair edges: the paintings fade into the backdrop over the outline's last few pixels. `turn_build.py` trims every view's
-mask inward (`trim`, 3 px), fills small enclosed gaps, keeps only confident pixels and un-mixes the backdrop from a band
-along the outline (paler-and-greyer-than-inside pixels only). `headshot.py <who> <height> <tag>` renders a tele close-up
-of the head in Blender to check.
-
-## The cast
-Five suspects (Vesper, Cherry, Dex, Juniper, Opal) plus nine side characters, all optional to meet (a Day 1 task counts them, `OTHERS` in story.js). The user supplied full-body art for everyone except Opal: `assets/art/<id>.webp` (512x768, shown full size from the notebook's People page) and `assets/portraits/<id>.webp` (400x480 face crops, used in talks and the notebook; Opal's are cropped from her turnaround). Phone contacts Remy, Dot and Celeste also have art.
-- Velvet Regent (`regent`): drag performer, favourite to win the Revue, wears the other long white coat. Suspect-ish; cleared by Harper's recording.
-- Harper Vance (`harper`): true-crime podcaster. Her 11:57 recording (Regent's alibi) catches the Star Room door groaning under the building.
-- Kenji Morimoto (`kenji`): conservator restoring Stella, a 1925 singing automaton (a ghost red herring). Says the meteorite is unsellable quietly: the thief didn't want money.
-- Dr. Priya Anand (`priya`): astronomer removing the projector; came as a child (postcard 1). Red torch, so the white light wasn't hers; knows Cygnus.
-- Mateo "Jojo" Reyes (`jojo`): Juniper's nephew on skates, pitching a roller disco. Heard a heavy door under the floor.
-- Rashad Okafor (`rashad`): bellhop, mystery reader, grandson of crew member Marcus Okafor. Saw Opal at 12:20; grandpa's notebook (`DOCS.okafor`) hints the ring door order.
-- Gus Haddad (`gus`): caretaker with every key except the Service door (Opal's). Padlocked boathouse = sequel hook.
-- Silas "Static" Boone (`silas`): paranormal web-show host. His 11:52 lobby tape (`DOCS.tape`) shows a long coat and a white flashlight.
-- Ranger Nate Begay (`nate`): lake warden, alibis Priya and Jojo, has seen boathouse lights (sequel hook).
-Placement: `DAY`/`NIGHT1` in world.js. Models: `CAST` in people.js (props in `PROP`, garments in `G`, paints in `PA`; `prepareCast(first,…)` builds the current room's people first, the rest in the background, and `sync()` adds each as it's ready).
-
-## The case (spoilers)
-Day 1: examine the case, find Opal's brass pin, meet all five, read the keypad log (MAINT-0, a 2003 build-team code). Night 1: the singing ghost; switchboard → planetarium; Dex's hologram card; Cherry's secret rehearsal and the flashlight in a long coat. Day 2: Dex confesses the ghost (alibi); Vesper's acrostic = lip sync (alibi); Juniper's vegan cake puzzle (alibi, saw the long coat); the relaunch memo makes Opal leave the archive; her sketch → constellation → 7·2·9 → drawer: service key + Star Room blueprint. Night 2: service door → tunnel → ring door → Star Room → Opal. Choose compassion (save the planetarium) for the good ending. Then Act 3, Gala Day (phase `g`): the returned star is too light. Dex's speaker magnet (`g_magnet` topic) shows it's fake at the display case (`star_fake`); the insurance appraisal at the reception desk says it was real Mon 13:40 (`appraisal_read`); Kenji's Monday repair log (`g_star`, `repair_seen`) vs the keypad log (Mon 13:36-14:51 KMORIMOTO, planted on Day 1) on the evidence board (`contradiction` puzzle, `kenji_caught`); Stella's song card in the bench drawer (`kbench`, `waltzcard`: Mi Sol Sol | Fa Re Re) sets the music cylinder (`musicBox`, `stella_open`) and Stella's chest gives up the real star (the Star's Tear, sold from the Morimoto family in 1946) and Kenji's letter. Confront Kenji (`g_truth` → `kenjiFinale`): calling the police = bad ending `kenji`; otherwise he tells Celeste, the crown wears his replica at the gala and the stone goes home. Opal's finale plants "I never touched the star".
+## Characters in 3D (painted figures)
+All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
+README: setup, sheet prompt, commands, how it works, what to check). Done: Vesper, Cherry, Opal, Juniper, Dex, Harper,
+Regent, Gus, Nate, Rashad, Kenji, Priya, plus Celeste (built but she's only a phone contact, not placed). **Silas and Jojo
+still use the old sculpted models; their turnaround sheets are the next thing to build.**
+- Keep figure animation mostly in the picture plane: big turns towards or away from the camera show a painting-based
+  mesh edge-on. Head turns are clamped (0.35 yaw / 0.18 pitch), gestures small.
+- People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
+  you're within ~2.8 m (Garrett found everyone always facing the player eerie).
+- Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`
+  opens from the notebook's People page.
 
 ## Testing
-- Serve: `python -m http.server 8777` (launch config `aquadome`).
-- `window.__dbg = {S, go, story, NODES}` is exposed for testing: `__dbg.go('T1',{fade:true})`, `__dbg.story.onHot('computer')`, `__dbg.story.onTalk('dex')`, `__dbg.story.tasks()`. The whole case was played through this way (both bad endings and Second Chance too).
-- A hidden browser pane throttles timers; wait longer after fades.
+- Serve locally: `python -m http.server 8777` from the repo root. In the Claude desktop app, `.claude/launch.json`
+  (git-ignored) holds `{"version":"0.0.1","configurations":[{"name":"aquadome","runtimeExecutable":"python","runtimeArgs":["-m","http.server","8777"],"port":8777}]}`.
+- Debug handle: `window.__dbg = { S, go, story, NODES, V, focus, unfocus }`. E.g. `__dbg.go('L1')`,
+  `__dbg.story.onTalk('dex')`, `__dbg.story.onHot('case')`, `__dbg.story.tasks()`, set `__dbg.S.phase='g'` plus flags and
+  call `sync()` from `/js/world.js` to jump ahead. Click through dialogue by clicking `#talk.on #talkLine`; options are
+  `#talkOpts button`. Node ids: L1-L4 lobby, S1-S2 spa, P1-P2 planetarium, K1 kitchen, T1-T2 tech, A1 archive, R1 suite,
+  W1-W3 wing, E1-E3 terrace, U* tunnel, X1 Star Room.
+- In the desktop app's browser pane, frames only advance while screenshots are taken, so animations, glides and walking
+  need several screenshots in a row; reload with a fresh `?v` (run bump.py) to avoid cached modules.
+- The whole case, the "Lights Out" and "Locked In" bad endings and Second Chance have been played through this way, and
+  Act 3's good path end to end (the "Wrong Call" bad ending has not been played yet).
+
+## Status and next steps
+Recently done (newest first): coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
+loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
+Open items:
+- Build Silas and Jojo from turnaround sheets when Garrett sends them (then `people.js` could be retired).
+- Faces at a full 90° profile are still soft; messy hair outlines (Dex) look a bit blocky side-on.
+- Not yet checked: Senior-difficulty wording of the two Act 3 puzzles; the thumb stick on a real phone.
+- Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
+  hand in Act 3, placing Celeste in the world on Day 2, lip-sync/blinking for figures (needs eyes-closed and mouth-open
+  face crops from Garrett).

@@ -6,7 +6,7 @@ from scipy import ndimage
 D = os.path.dirname(os.path.abspath(__file__))
 cfg = json.load(open(os.path.join(D, sys.argv[1])))
 name, HEIGHT, STEP = cfg['name'], cfg['height'], cfg.get('step', 2)
-sheet = cv2.imread(os.path.join(D, os.path.join(D, cfg['sheet']))); SH, SW = sheet.shape[:2]
+sheet = cv2.imread(os.path.join(D, cfg['sheet'])); SH, SW = sheet.shape[:2]
 
 # ---- masks in sheet coordinates (from turn_cut.py cutouts and their offsets)
 def placed(view):

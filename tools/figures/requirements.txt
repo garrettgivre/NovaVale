@@ -1,0 +1,7 @@
+rembg[cpu]
+onnxruntime==1.19.2
+opencv-python-headless
+scipy
+scikit-image
+huggingface_hub
+numpy

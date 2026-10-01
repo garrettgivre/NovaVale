@@ -82,7 +82,7 @@ if angles:
 if not posed:
     for o in sc.objects: o.select_set(o in (ob, arm))
     bpy.context.view_layer.objects.active = arm
-    out = os.path.join(r'C:\Users\Garrett\Documents\Nova-Vale-Aquadome\assets\figures', name + '.glb')
+    out = os.path.join(D, '..', '..', 'assets', 'figures', name + '.glb')   # the repo's assets/figures
     os.makedirs(os.path.dirname(out), exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_image_format='WEBP', export_image_quality=90, export_yup=True, export_skins=True, export_animations=False)
     print('EXPORT OK', os.path.getsize(out))
