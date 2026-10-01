@@ -3924,9 +3924,9 @@ export function hotspotsOnScreen(camera, w, h) {
     const u = o.userData; if (!(u.hot || u.who) || u.go || o.isMesh && o.parent && (o.parent.userData.hot || o.parent.userData.who)) return;
     for (let p = o; p; p = p.parent) if (!p.visible) return;
     _b.setFromObject(o); if (_b.isEmpty()) return; _b.getCenter(_v);
-    if (_v.distanceTo(camera.position) > 14) return;
+    const d = _v.distanceTo(camera.position); if (d > 14) return;
     _v.project(camera); if (_v.z > 1 || Math.abs(_v.x) > 1 || Math.abs(_v.y) > 1) return;
-    out.push({ x: (_v.x + 1) / 2 * w, y: (1 - _v.y) / 2 * h, name: u.name || u.hot || u.who });
+    out.push({ x: (_v.x + 1) / 2 * w, y: (1 - _v.y) / 2 * h, name: u.name || u.hot || u.who, d, who: !!u.who });
   });
   return out;
 }

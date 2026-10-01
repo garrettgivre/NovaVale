@@ -171,6 +171,10 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
 - Look: figures are mostly self-lit (`emissiveIntensity` .52, diffuse grey .61) so rooms light them alike; bloom only
   above 1.15 (lamps); the normal picture renders ~0.48 MP with a soft blur (hides seams in the painted models).
 - Raycasts use three-mesh-bvh (`vendor/three-mesh-bvh.js`, `accelerate()` in main.js builds a tree for every static room mesh after `buildWorld`; meshes added later get none). Walking rays use layer 2 (room meshes only, not people). Merged static meshes without a BVH made walking drop to 30 fps on the terrace.
+- Touch (Oct 2026): taps that just miss something clickable still count (`pickNear`, rings up to 28 px); a second floor tap
+  within 420 ms runs there (`V.walk.run`); the stick pushed to the edge runs; press and hold = Reveal; after standing still
+  1.4 s, faint glints mark tappable things within 4.2 m (`nearHints`, `#near`); a light vibration on a hotspot tap; captions
+  sit above the stick; Reveal labels stay on screen. All puzzles and panels checked at 412 px wide.
 - Lost WebGL context (switching apps on a phone): index.html makes every 2D canvas `willReadFrequently` (memory-backed, survives backgrounding); main.js rebuilds the env maps on restore (`rebuildEnv`) and reloads into the save if a probe canvas was wiped. Test with `WEBGL_lose_context`.
 - Draw-call budget: views run ~150-430 calls/frame (`__dbg.renderer.info`); merge static meshes per material (`mergeGeometries`) and instance repeats when adding detail. `__dbg.view(node)` jumps to a camera spot instantly.
 - Serve locally: `python -m http.server 8777` from the repo root. In the Claude desktop app, `.claude/launch.json`

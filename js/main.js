@@ -220,6 +220,8 @@ canvas.addEventListener('pointerdown', e => {
   initAudio();
   down = { x: e.clientX, y: e.clientY, yaw: V.yaw, pitch: V.pitch, moved: false, id: e.pointerId };
   canvas.setPointerCapture(e.pointerId);
+  // touch: press and hold to show everything you can tap
+  if (e.pointerType !== 'mouse') { const dn = down; setTimeout(() => { if (down === dn && !dn.moved) { dn.longp = true; $('#btnReveal').onclick(); } }, 550); }
 });
 canvas.addEventListener('pointermove', e => {
   if (down && down.id === e.pointerId) {
@@ -241,13 +243,30 @@ canvas.addEventListener('pointerup', e => {
   if (!down || down.id !== e.pointerId) return;
   const d = down; down = null;
   if (d.moved || V.busy || V.focus || ui.talking() || ui.panelOpen() || V.title) return;
-  const u = pick(e.clientX, e.clientY);
-  if (u) return activate(u);
+  if (d.longp) return;
+  const touch = e.pointerType !== 'mouse';
+  const u = pick(e.clientX, e.clientY) || (touch ? pickNear(e.clientX, e.clientY) : null);
+  if (u) { if (touch && navigator.vibrate) try { navigator.vibrate(8); } catch (er) { } return activate(u); }
   const ed = edge(e.clientX, e);
   if (ed) return turn(ed);
   const f = floorAt(e.clientX, e.clientY);
-  if (f) { initAudio(); walkTo(f); }
+  if (f) {
+    initAudio();
+    // a second tap on the floor soon after the first, near it: run there
+    const now = performance.now(), run = lastTap && now - lastTap.t < 420 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 70;
+    lastTap = run ? null : { t: now, x: e.clientX, y: e.clientY };
+    walkTo(f); if (run) V.walk.run = true;
+  }
 });
+let lastTap = null;
+// touch: a finger covers a lot of screen, so a tap that just misses something clickable still counts (nearest within ~28 px)
+function pickNear(x, y) {
+  for (const r of [12, 20, 28]) for (let k = 0; k < 8; k++) {
+    const a = k / 8 * Math.PI * 2, u = pick(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    if (u && (u.hot || u.who)) return u;
+  }
+  return null;
+}
 canvas.addEventListener('pointerleave', () => ui.tip(null));
 // ---------- Walking: WASD / arrow keys, or the thumb stick on touch screens ----------
 const KEYS = new Set(), JOY = { x: 0, y: 0, id: null };
@@ -303,7 +322,7 @@ function walk(dt) {
     if (!R || d < 0.12) { V.walk = null; walkV = 0; return; }
     const want = Math.atan2(-dx, -dz), turnD = angDiff(V.yaw, want);
     if (d > 0.6) { V.yawT = null; V.yaw += turnD * Math.min(1, dt * 3.2); }
-    walkV = Math.min(1.9, walkV + dt * 4) * Math.min(1, d / 0.5 + 0.25);
+    walkV = Math.min(V.walk.run ? 3.3 : 1.9, walkV + dt * (V.walk.run ? 6 : 4)) * Math.min(1, d / 0.5 + 0.25);
     const st = Math.min(d, walkV * dt) * Math.max(0.25, Math.cos(Math.min(Math.abs(turnD), 1.4)));
     const mx = dx / d * st, mz = dz / d * st;
     if (clear(p.x + mx, p.z + mz, mx, mz, R)) p.x += mx, p.z += mz;
@@ -323,7 +342,7 @@ function walk(dt) {
   if (mag > 1) { f /= mag; s /= mag; }
   const R = roomOf(); if (!R) return;
   V.yawT = null; walkT += dt;
-  const sp = (k.has('shift') ? 3.0 : 1.7) * Math.min(1, 0.4 + walkT * 2), fx = -Math.sin(V.yaw), fz = -Math.cos(V.yaw);
+  const sp = (k.has('shift') || Math.hypot(JOY.x, JOY.y) > 0.93 ? 3.0 : 1.7) * Math.min(1, 0.4 + walkT * 2), fx = -Math.sin(V.yaw), fz = -Math.cos(V.yaw);
   const dx = (fx * f + -fz * s) * sp * dt, dz = (fz * f + fx * s) * sp * dt;
   const p = camera.position;
   if (clear(p.x + dx, p.z + dz, dx, dz, R)) { p.x += dx; p.z += dz; }
@@ -355,7 +374,9 @@ $('#btnReveal').onclick = () => {
   initAudio(); sfx('click');
   const box = $('#reveal'); box.innerHTML = '';
   for (const p of hotspotsOnScreen(camera, innerWidth, innerHeight)) {
-    const m = document.createElement('div'); m.className = 'rv'; m.style.left = p.x + 'px'; m.style.top = p.y + 'px';
+    const m = document.createElement('div'); m.className = 'rv'; m.style.top = p.y + 'px';
+    const lab = ui.PEOPLE[p.name] ? ui.PEOPLE[p.name].n : p.name, half = Math.min(innerWidth / 2 - 4, lab.length * 3.6 + 10);   // keep labels on screen
+    m.style.left = Math.max(half, Math.min(innerWidth - half, p.x)) + 'px'; m.style.setProperty('--dx', (p.x - Math.max(half, Math.min(innerWidth - half, p.x))) + 'px');
     m.innerHTML = '<i></i><span></span>'; m.querySelector('span').textContent = ui.PEOPLE[p.name] ? ui.PEOPLE[p.name].n : p.name; box.appendChild(m);
   }
   box.classList.remove('on'); void box.offsetWidth; box.classList.add('on');
@@ -446,7 +467,7 @@ function loop() {
     if (F.dir < 0 && F.t <= 0) { camera.position.copy(F.from.p); V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); }
   }
   camera.rotation.y = yaw; camera.rotation.x = pitch;
-  footsteps();
+  footsteps(); nearHints(dt);
   update(dt, t, camera);
   renderer.setRenderTarget(rt); renderer.render(scene, camera);
   renderer.setRenderTarget(null); post.uniforms.uT.value = t; renderer.render(postScene, postCam);
@@ -481,6 +502,18 @@ canvas.addEventListener('webglcontextrestored', () => {
   try { rebuildEnv(renderer); } catch (e) { location.reload(); }
 }, false);
 addEventListener('visibilitychange', () => { if (document.hidden) { try { save(); } catch (e) { } } });
+
+// ---------- Touch: a faint glint on things you can tap close by, once you've stood still a moment ----------
+let nearT = 0, nearAcc = 0, nearPos = '';
+function nearHints(dt) {
+  const box = $('#near'); if (!box || !document.body.classList.contains('touch')) return;
+  const still = !V.walk && !V.move && !V.busy && !V.focus && !V.title && V.node && !ui.talking() && !ui.panelOpen() && Math.hypot(JOY.x, JOY.y) < 0.1 && !down;
+  const key = camera.position.x.toFixed(2) + camera.position.z.toFixed(2) + V.yaw.toFixed(2);
+  if (!still || key !== nearPos) { nearT = 0; nearPos = key; if (box.classList.contains('on')) box.classList.remove('on'); return; }
+  nearT += dt; if (nearT < 1.4 || (nearAcc += dt) < 0.5 && box.classList.contains('on')) return; nearAcc = 0;
+  box.innerHTML = hotspotsOnScreen(camera, innerWidth, innerHeight).filter(p => p.d < 4.2 && !p.who).map(p => `<i style="left:${p.x}px;top:${p.y}px"></i>`).join('');
+  box.classList.add('on');
+}
 
 // ---------- Footsteps: one every ~0.65 m walked or glided, sounding like the floor underfoot ----------
 const FLOOR = { lobby: 'marble', spa: 'tile', kitchen: 'tile', plan: 'carpet', tech: 'carpet', suite: 'carpet', wing: 'carpet', archive: 'wood', tunnel: 'concrete', star: 'wood' };

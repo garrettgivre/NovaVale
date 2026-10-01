@@ -309,7 +309,7 @@ body.talking #corner, body.paneled #corner { opacity: 0; pointer-events: none; }
 #reveal { position: fixed; inset: 0; pointer-events: none; z-index: 15; opacity: 0; transition: opacity .5s; }
 #reveal.on { opacity: 1; }
 .rv { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; }
-.rv i { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 0 10px rgba(216,180,104,.8), inset 0 0 8px rgba(216,180,104,.5); animation: rv 1s ease-in-out infinite alternate; }
+.rv i { translate: var(--dx, 0) 0; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 0 10px rgba(216,180,104,.8), inset 0 0 8px rgba(216,180,104,.5); animation: rv 1s ease-in-out infinite alternate; }
 .rv span { margin-top: 3px; padding: 1px 7px; background: rgba(18,11,6,.85); border: 1px solid #6a4a24; font-family: var(--caps); font-size: 10px; letter-spacing: .05em; color: var(--cream); white-space: nowrap; }
 @keyframes rv { to { transform: scale(1.25); } }
 
@@ -389,3 +389,17 @@ canvas#c.c-walk { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3
   #screen.title-s { background: linear-gradient(180deg, rgba(8,6,14,.35), rgba(8,6,14,0) 30%, rgba(8,6,14,0) 60%, rgba(8,6,14,.55)), url(../assets/title_portrait.webp) 84% 62% / cover no-repeat, #1a1424; }
   #screen.title-s .tbtns { margin-top: 44vh; }
 }
+
+/* touch: faint glints on tappable things nearby (after standing still), a slightly bigger thumb stick */
+#near { position: fixed; inset: 0; pointer-events: none; z-index: 14; opacity: 0; transition: opacity .8s; }
+#near.on { opacity: 1; }
+#near i { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: rgba(255,232,170,.9); box-shadow: 0 0 8px 3px rgba(216,180,104,.55); animation: nearg 1.6s ease-in-out infinite alternate; }
+@keyframes nearg { from { opacity: .35; transform: scale(.8); } to { opacity: .9; transform: scale(1.1); } }
+body.talking #near, body.paneled #near { display: none; }
+body.touch #joy { width: 124px; height: 124px; }
+body.touch #joy i { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
+body.touch .turn { width: 44px; height: 96px; }
+/* touch: captions sit above the thumb stick, not over it */
+body.touch #caption { bottom: calc(var(--barH) + var(--sb) + 154px); }
+.tp-row .btn { white-space: nowrap; padding-left: 12px; padding-right: 12px; }
+@media (max-width: 480px) { .tp-row { gap: 6px; } .tp-row .btn { padding-left: 8px; padding-right: 8px; font-size: 13px; } }
