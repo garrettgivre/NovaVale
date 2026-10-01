@@ -15,7 +15,7 @@ python -m http.server 8777
 Then visit http://localhost:8777. It works on phones and desktops. Progress saves automatically in the browser.
 
 ## Controls
-Click or tap to look, talk and move between viewpoints, or walk freely: WASD / arrow keys (Q/E or left/right arrows turn), or the thumb stick on a phone. Drag to look around.
+Click or tap the floor to walk there, click people to talk and things to look at. Or walk with WASD / arrow keys (Shift runs, Q/E or left/right arrows turn), or the thumb stick on a phone. Drag to look around.
 
 ## Cast
 Five suspects and nine other guests and staff, each with full-body art by Garrett (in the notebook's People page) and a sculpted 3D model.

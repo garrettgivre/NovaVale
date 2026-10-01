@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { S, load, newGame, hasSave, save, PHASE_NAME } from './state.js';
 import { buildWorld, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
+import { FIG } from './figures.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
 import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic } from './audio.js';
@@ -101,7 +102,7 @@ const basePitch = () => innerWidth < innerHeight ? -0.14 : PITCH0;
 
 function place(nodeId, look) {
   const n = NODES[nodeId];
-  V.node = nodeId; S.node = nodeId;
+  V.node = nodeId; S.node = nodeId; V.walk = null; mark.material.opacity = 0;
   camera.position.set(n.p[0], EYE, n.p[1]);
   const l = look || n.look;
   V.yaw = yawTo(n.p, l[0], l[1]); V.pitch = basePitch(); V.yawT = null;
@@ -177,7 +178,31 @@ function pick(x, y) {
   }
   return null;
 }
-const edge = x => x < innerWidth * 0.08 ? 1 : x > innerWidth * 0.92 ? -1 : 0;
+// screen-edge turning is for mice only (on touch screens a tap near the edge should walk there)
+const edge = (x, e) => (e && e.pointerType !== 'mouse') ? 0 : x < innerWidth * 0.06 ? 1 : x > innerWidth * 0.94 ? -1 : 0;
+// where on the floor a screen point lands (or null): the first visible surface hit must face upwards and be in reach
+const _n = new THREE.Vector3();
+function floorAt(x, y) {
+  const R = roomOf(); if (!R) return null;
+  ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  for (const h of ray.intersectObject(R.g, true)) {
+    if (h.distance > 16) return null;
+    let hidden = false; for (let p = h.object; p; p = p.parent) if (!p.visible || p.userData.who) { hidden = true; break; }
+    const m = h.object.material; if (hidden || !m || m.visible === false || (m.transparent && m.opacity < 0.4)) continue;
+    if (!h.face) return null;
+    _n.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+    return _n.y > 0.75 && h.point.y < 0.8 ? h.point.clone() : null;
+  }
+  return null;
+}
+// a small ring where you clicked
+const mark = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.22, 32), new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0, depthWrite: false }));
+mark.rotation.x = -Math.PI / 2; mark.userData.nocast = 1; mark.renderOrder = 5;
+function walkTo(p) {
+  V.walk = { x: p.x, z: p.z, stuck: 0 };
+  scene.add(mark); mark.position.set(p.x, p.y + 0.02, p.z); mark.material.opacity = 0.9; mark.scale.setScalar(1);
+}
 
 function activate(u) {
   if (!u) return;
@@ -206,8 +231,8 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (e.pointerType !== 'mouse' || V.busy || V.focus || ui.talking() || V.title) { canvas.className = ''; return; }
-  const u = pick(e.clientX, e.clientY), ed = edge(e.clientX);
-  canvas.className = u ? (u.go ? 'c-go' : u.who ? 'c-talk' : 'c-look') : ed > 0 ? 'c-left' : ed < 0 ? 'c-right' : '';
+  const u = pick(e.clientX, e.clientY), ed = edge(e.clientX, e);
+  canvas.className = u ? (u.go ? 'c-go' : u.who ? 'c-talk' : 'c-look') : ed > 0 ? 'c-left' : ed < 0 ? 'c-right' : floorAt(e.clientX, e.clientY) ? 'c-walk' : '';
   ui.tip(u ? (u.who ? ui.PEOPLE[u.who].n : u.name || '') : null, e.clientX, e.clientY);
 });
 canvas.addEventListener('pointerup', e => {
@@ -216,8 +241,10 @@ canvas.addEventListener('pointerup', e => {
   if (d.moved || V.busy || V.focus || ui.talking() || ui.panelOpen() || V.title) return;
   const u = pick(e.clientX, e.clientY);
   if (u) return activate(u);
-  const ed = edge(e.clientX);
-  if (ed) turn(ed);
+  const ed = edge(e.clientX, e);
+  if (ed) return turn(ed);
+  const f = floorAt(e.clientX, e.clientY);
+  if (f) { initAudio(); walkTo(f); }
 });
 canvas.addEventListener('pointerleave', () => ui.tip(null));
 // ---------- Walking: WASD / arrow keys, or the thumb stick on touch screens ----------
@@ -226,7 +253,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape') ui.closePanel();
   if (ui.talking() || ui.panelOpen() || !V.node || V.title || e.target.tagName === 'INPUT') return;
   const k = e.key.toLowerCase();
-  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'q', 'e'].includes(k)) { KEYS.add(k); e.preventDefault(); }
+  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'q', 'e', 'shift'].includes(k)) { KEYS.add(k); if (k !== 'shift') e.preventDefault(); }
 });
 addEventListener('keyup', e => KEYS.delete(e.key.toLowerCase()));
 addEventListener('blur', () => KEYS.clear());
@@ -259,9 +286,30 @@ function clear(x, z, dx, dz, R) {
   return true;
 }
 let walkT = 0;
+let walkV = 0;
 function walk(dt) {
-  if (V.busy || V.focus || V.move || V.title || !V.node || ui.talking() || ui.panelOpen()) { KEYS.clear(); return; }
+  mark.material.opacity = Math.max(0, mark.material.opacity - dt * (V.walk ? 0.4 : 2.5)); mark.scale.setScalar(1 + (0.9 - mark.material.opacity) * 0.3);
+  if (V.busy || V.focus || V.move || V.title || !V.node || ui.talking() || ui.panelOpen()) { KEYS.clear(); V.walk = null; return; }
   const k = KEYS;
+  const manual = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown'].some(x => k.has(x)) || Math.hypot(JOY.x, JOY.y) > 0.12;
+  if (manual) V.walk = null;
+  if (V.walk) {   // walking to a clicked spot: turn towards it while moving, stop there or when blocked
+    const R = roomOf(), p = camera.position, dx = V.walk.x - p.x, dz = V.walk.z - p.z, d = Math.hypot(dx, dz);
+    if (!R || d < 0.12) { V.walk = null; walkV = 0; return; }
+    const want = Math.atan2(-dx, -dz), turnD = angDiff(V.yaw, want);
+    if (d > 0.6) { V.yawT = null; V.yaw += turnD * Math.min(1, dt * 3.2); }
+    walkV = Math.min(1.9, walkV + dt * 4) * Math.min(1, d / 0.5 + 0.25);
+    const st = Math.min(d, walkV * dt) * Math.max(0.25, Math.cos(Math.min(Math.abs(turnD), 1.4)));
+    const mx = dx / d * st, mz = dz / d * st;
+    if (clear(p.x + mx, p.z + mz, mx, mz, R)) p.x += mx, p.z += mz;
+    else if (clear(p.x + mx, p.z, mx, 0, R)) p.x += mx;
+    else if (clear(p.x, p.z + mz, 0, mz, R)) p.z += mz;
+    // stop when no longer getting closer (a spot against a wall, or behind furniture)
+    if (d < (V.walk.best ?? 1e9) - 0.01) { V.walk.best = d; V.walk.stuck = 0; }
+    else if ((V.walk.stuck += dt) > 0.35) { V.walk = null; walkV = 0; }
+    walkT += dt; p.y = EYE + Math.sin(walkT * 8) * 0.01;
+    return;
+  }
   let f = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0) - JOY.y;
   let s = (k.has('d') ? 1 : 0) - (k.has('a') ? 1 : 0) + JOY.x * 0.8;
   const turnIn = (k.has('arrowleft') || k.has('q') ? 1 : 0) - (k.has('arrowright') || k.has('e') ? 1 : 0);
@@ -270,7 +318,7 @@ function walk(dt) {
   if (mag > 1) { f /= mag; s /= mag; }
   const R = roomOf(); if (!R) return;
   V.yawT = null; walkT += dt;
-  const sp = 1.7 * Math.min(1, 0.4 + walkT * 2), fx = -Math.sin(V.yaw), fz = -Math.cos(V.yaw);
+  const sp = (k.has('shift') ? 3.0 : 1.7) * Math.min(1, 0.4 + walkT * 2), fx = -Math.sin(V.yaw), fz = -Math.cos(V.yaw);
   const dx = (fx * f + -fz * s) * sp * dt, dz = (fz * f + fx * s) * sp * dt;
   const p = camera.position;
   if (clear(p.x + dx, p.z + dz, dx, dz, R)) { p.x += dx; p.z += dz; }
@@ -349,6 +397,13 @@ function resume() {
   if (typeof yaw === 'number') V.yaw = yaw;
   story.onRoom(n.room); refresh();
   document.body.classList.add('playing');
+  // once: how to get around
+  try {
+    if (!localStorage.getItem('novavale.ctl')) {
+      localStorage.setItem('novavale.ctl', '1');
+      setTimeout(() => ui.toast(matchMedia('(pointer: coarse)').matches ? 'Tap the floor to walk there, or use the stick. Drag to look around.' : 'Click the floor to walk there, or use WASD (Shift to run). Drag to look around.'), 2500);
+    }
+  } catch (e) { /* private mode */ }
 }
 
 story.setEngine({ go, refresh, resume, focus, unfocus, room: () => roomOf() && roomOf().id });
@@ -427,9 +482,9 @@ resize();
 // sculpt the people in the saved room (or the lobby) first; everyone else follows in the background
 const ROOMCAST = { lobby: ['cherry', 'kenji', 'harper', 'silas'], spa: ['vesper'], tech: ['dex'], kitchen: ['juniper', 'jojo'], archive: ['opal'], plan: ['priya', 'regent', 'cherry'], wing: ['rashad', 'gus'], terrace: ['gus', 'silas', 'nate'], star: ['opal'] };
 const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novavale.aquadome.v1') || 'null'); const room = d && NODES[d.node] ? NODES[d.node].room : 'lobby'; return [...new Set([...(ROOMCAST[room] || []), 'cherry', 'kenji', 'harper'])]; } catch (e) { return ['cherry', 'kenji', 'harper']; } };
-(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast(firstCast(), (i, n) => {
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => prepareCast(firstCast().filter(w => !FIG[w]), (i, n) => {
   document.querySelector('#boot p').textContent = i < n ? `Preparing the cast… ${i + 1} of ${n}` : 'Opening the Aquadome…';
-}, () => { if (V.node) sync(); })).then(() => setTimeout(() => {
+}, () => { if (V.node) sync(); }, Object.keys(FIG))).then(() => setTimeout(() => {
   buildWorld(scene, renderer);
   showRoom('lobby'); place('L1'); sync();
   loop();

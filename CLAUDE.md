@@ -81,7 +81,7 @@ are kept small (forearm lift ≤ ~0.55 rad). Head side texture only behind the f
 else the side paintings left a ghost face behind the cheek. `posetest2.py <who>` renders a gesture pose at 20°/70°.
 
 ## Walking and facing
-Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
+Click or tap the floor to walk there (`floorAt`: first visible hit must face up and be below 0.8 m; `walkTo` sets `V.walk` and a fading ring `mark`; the camera turns towards the target while walking and stops on arrival or when it stops getting closer). Screen-edge turning is mouse-only now (touch taps there walk). Shift runs. A one-time controls toast (`novavale.ctl`). Free walking on top of the node system: WASD / arrow up-down to move, A/D strafe, arrow left-right or Q/E to turn, and a
 thumb stick `#joy` on touch screens (`body.touch`). `walk(dt)` in main.js moves the camera with ray checks at knee, waist
 and eye height against the current room, needs floor underfoot, keeps 0.55 m from people, and slides along walls. `go()`
 glides from wherever you are. People keep their own facing (`userData.base`: towards the room's middle, offset per
@@ -92,6 +92,10 @@ between the legs are left alone, arm-owned vertices excluded. Body shape comes f
 clear of the body, the torso segment never binds to the arms (relaxing the arms used to pull every waist in); legs are owned by the hips through a geodesic line down each leg; below the hips only the hand region
 (near the forearm/hand line, or further out than it) may follow the arms. `auto_joints.py` ends an arm run when it jumps
 sideways (it used to run on down a trouser leg: Gus, Rashad, Priya had fingertips on their thighs).
+
+## Loading
+Figures load lazily: people in the current room immediately, everyone else queued one at a time (`loadFigure(who, cb, now)`).
+`prepareCast` skips characters that have a figure (it used to sculpt their old SDF models at boot for nothing).
 
 ## Caching (important)
 GitHub Pages lets browsers cache files for 10 minutes, so a refresh right after a push can run old code/models. Run

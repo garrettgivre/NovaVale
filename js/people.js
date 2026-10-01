@@ -737,8 +737,8 @@ async function prepareOne(who) {
   DATA[who] = d;
 }
 // Build the people in `first` now (with progress), then everyone else quietly, calling onEach as each is ready.
-export async function prepareCast(first, progress, onEach) {
-  const all = Object.keys(CAST), now = all.filter(w => first.includes(w)), later = all.filter(w => !first.includes(w));
+export async function prepareCast(first, progress, onEach, skip = []) {
+  const all = Object.keys(CAST).filter(w => !skip.includes(w)), now = all.filter(w => first.includes(w)), later = all.filter(w => !first.includes(w));
   for (let i = 0; i < now.length; i++) { progress && progress(i, now.length); await prepareOne(now[i]); }
   progress && progress(now.length, now.length);
   (async () => { for (const w of later) { await new Promise(r => setTimeout(r, 30)); await prepareOne(w); onEach && onEach(w); } })();

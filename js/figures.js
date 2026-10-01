@@ -24,13 +24,26 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609302023';
+export const ASSET_V = '202609302105';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
-export function loadFigure(who, onReady) {
+// people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
+const queue = []; let busyQ = false;
+function pump() {
+  if (busyQ || !queue.length) return;
+  const [who, cb] = queue.shift(); if (loading[who]) return pump();
+  busyQ = true; startLoad(who, cb).finally(() => { busyQ = false; setTimeout(pump, 300); });
+}
+export function loadFigure(who, onReady, now = true) {
   if (!FIG[who] || loading[who]) return;
+  if (!now) { if (!queue.some(q => q[0] === who)) queue.push([who, onReady]); return pump(); }
+  startLoad(who, onReady);
+}
+function startLoad(who, onReady) {
+  if (loading[who]) return loading[who];
   loading[who] = new GLTFLoader().loadAsync(`assets/figures/${who}.glb?v=${ASSET_V}`).then(gl => { loaded[who] = gl.scene; onReady && onReady(who); })
     .catch(e => console.warn('figure', who, e));
+  return loading[who];
 }
 
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Zax = new THREE.Vector3(0, 0, 1);

@@ -1037,7 +1037,7 @@ export function sync() {
   rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
   for (const w in CAST) {
     const at = whereIs(w);
-    if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync());
+    if (at && FIG[w] && !figReady(w)) loadFigure(w, () => sync(), at[0] === curRoom);
     const ready = FIG[w] ? figReady(w) : castReady(w);
     if (!at || !ready) { chars[w] && chars[w].parent && chars[w].parent.remove(chars[w]); continue; }
     // painted figures (from the art) replace the sculpted models where they exist
