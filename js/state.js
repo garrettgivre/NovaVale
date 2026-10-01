@@ -1,9 +1,9 @@
 // Game state, flags and saving.
 const KEY = 'novavale.aquadome.v1';
 
-export const PHASES = ['d1', 'n1', 'd2', 'n2', 'end'];
+export const PHASES = ['d1', 'n1', 'd2', 'n2', 'g', 'end'];
 export const PHASE_NAME = {
-  d1: 'Day 1', n1: 'Night 1', d2: 'Day 2', n2: 'Night 2', end: 'The Gala',
+  d1: 'Day 1', n1: 'Night 1', d2: 'Day 2', n2: 'Night 2', g: 'Gala Day', end: 'The Gala',
 };
 
 export function freshState(diff = 'junior') {

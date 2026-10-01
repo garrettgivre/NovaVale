@@ -312,6 +312,25 @@ function buildLobby() {
   for (const s of [-1, 1]) { cyl(cs, 0.03, 0.06, 0.95, BRASS, s * 0.85, 0.475, 0.62, 12); sph(cs, 0.055, BRASS, s * 0.85, 0.97, 0.62, 12); }
   add(cs, new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(-0.85, 0.9, 0.62), new THREE.Vector3(0, 0.62, 0.66), new THREE.Vector3(0.85, 0.9, 0.62)), 20, 0.022, 8), M(0x5a0f18, 0.8));
   tag(cs, 'case', 'Display case');
+  R.caseCrown = crown(cs, 0, 1.15, 0, 1.0);
+
+  // Kenji's workbench with Stella, the 1925 singing automaton
+  const kb = new THREE.Group(); kb.position.set(7.4, 0, 1.5); faceTo(kb, 0, 0); R.g.add(kb);
+  box(kb, 1.3, 0.05, 0.6, mat.mahog(), 0, 0.76, 0);
+  for (const s of [-1, 1]) for (const t of [-1, 1]) box(kb, 0.05, 0.74, 0.05, mat.mahog(), s * 0.6, 0.37, t * 0.26);
+  box(kb, 0.5, 0.12, 0.4, mat.mahog(), 0.35, 0.65, 0);
+  for (let i = 0; i < 5; i++) cyl(kb, 0.006, 0.006, 0.14, IRON, -0.5 + i * 0.03, 0.85, -0.18, 6);
+  tag(box(kb, 0.42, 0.02, 0.3, M(0xf2ead6, 0.9), 0.35, 0.795, 0.05), 'kbench', 'Kenji\'s workbench');
+  const st = new THREE.Group(); st.position.set(-0.25, 0.785, 0); kb.add(st);
+  box(st, 0.36, 0.1, 0.26, M(0x5a2a1e, 0.4), 0, 0.05, 0);
+  const cylM = M(0xc9a24a, 0.3, 1); const cy_ = cyl(st, 0.045, 0.045, 0.24, cylM, 0, 0.05, 0.135, 16); cy_.rotation.z = Math.PI / 2;
+  const dress = M(0xe8c8d0, 0.7, 0, { t: TX.velvet() }), skin = M(0xf4e4d8, 0.3), hairM = M(0x3a2418, 0.7);
+  lathe(st, [[0.001, 0.1], [0.13, 0.1], [0.11, 0.2], [0.07, 0.3], [0.05, 0.36], [0.06, 0.4], [0.001, 0.42]], dress, 0, 0, 0, 24);
+  sph(st, 0.055, skin, 0, 0.47, 0, 16);
+  const hr = sph(st, 0.062, hairM, 0, 0.49, -0.01, 16); hr.scale.set(1, 0.9, 1);
+  for (const s of [-1, 1]) { const a = cyl(st, 0.012, 0.01, 0.13, dress, s * 0.07, 0.33, 0.02, 8); a.rotation.z = s * 0.5; sph(st, 0.014, skin, s * 0.1, 0.27, 0.03, 8); }
+  for (const s of [-1, 1]) sph(st, 0.008, M(0x203050, 0.2), s * 0.02, 0.48, 0.05, 8);
+  tag(st, 'stella', 'Stella');
 
   // the brass star pin on the floor
   const pin = new THREE.Group(); pin.position.set(-3.55, 0.012, 4.15); R.g.add(pin);
@@ -997,7 +1016,7 @@ const DAY = {
 const NIGHT1 = { cherry: ['plan', -1.7, -5.9, 0.5], silas: ['lobby', -2.8, -4.6], gus: ['wing', 0.9, -2.0], nate: ['terrace', 4.4, -13.5] };
 export function whereIs(who) {
   const p = S.phase;
-  if (p === 'd1' || p === 'd2') {
+  if (p === 'd1' || p === 'd2' || p === 'g') {
     if (who === 'opal' && p === 'd2' && has('opal_left')) return null;
     return DAY[who] || null;
   }
@@ -1013,6 +1032,7 @@ export function sync() {
   P.code.visible = has('const_done');
   A.sketch.visible = !has('sketch');
   X.crown.visible = !has('crown_back');
+  L.caseCrown.visible = has('crown_back');
   for (const [n, room] of POSTCARDS) rooms[room]['pc' + n].visible = !has('pc_' + n);
   rooms.terrace.domeGlow.emissiveIntensity = night() ? 0.8 : 0; rooms.terrace.winGlow.emissiveIntensity = night() ? 1.4 : 0.1;
   for (const w in CAST) {

@@ -184,3 +184,44 @@ export function starDoor(done) {
     if (pos.every((p, k) => p === want[k])) { sfx('solve'); setTimeout(() => { closePanel(true); done(); }, 700); }
   });
 }
+
+// ---------- Evidence board: find the two statements that can't both be true ----------
+export function contradiction(cards, answer, done, onWrong) {
+  const pick = new Set();
+  const body = panel(`<div class="ev"><p>${junior() ? 'Two of these can\'t both be true. Tap them, then press the button.' : 'Find the lie.'}</p>
+    <div class="ev-grid">${cards.map(c => `<button class="ev-c" data-k="${c.k}"><b>${c.t}</b><span>${c.s}</span></button>`).join('')}</div>
+    <button class="btn" id="evgo" disabled>These don't add up</button></div>`, { cls: 'doc', title: 'Evidence' });
+  const go = body.querySelector('#evgo');
+  body.querySelectorAll('.ev-c').forEach(b => b.onclick = () => {
+    sfx('click'); const k = b.dataset.k;
+    if (pick.has(k)) pick.delete(k); else { if (pick.size === 2) return; pick.add(k); }
+    b.classList.toggle('on', pick.has(k)); go.disabled = pick.size !== 2;
+  });
+  go.onclick = () => {
+    if (answer.every(k => pick.has(k))) { sfx('solve'); closePanel(true); done(); return; }
+    shake(body.querySelector('.ev-grid')); onWrong && onWrong([...pick]);
+  };
+}
+
+// ---------- Stella's music cylinder: set one pin per beat to play the song card ----------
+const NOTES = [['Do', 'C'], ['Re', 'D'], ['Mi', 'E'], ['Fa', 'F'], ['Sol', 'G']];
+const TUNE = [2, 4, 4, 3, 1, 1];   // Mi Sol Sol | Fa Re Re
+export function musicBox(done) {
+  const card = S.docs.includes('waltzcard');
+  const set_ = [-1, -1, -1, -1, -1, -1];
+  const body = panel(`<div class="mb"><p>${!card ? 'A pinned brass cylinder in Stella\'s base, and a little crank. Pins can be moved, one per beat. Without the right tune it\'s just a very pretty lock.'
+      : junior() ? 'Set one pin per beat to match Stella\'s song card. The cylinder is marked in letters; the card is in do-re-mi. (Do is C.)' : 'Set the pins to Stella\'s song.'}</p>
+    <div class="mb-cyl">${NOTES.slice().reverse().map(([so, l], ri) => { const r = 4 - ri; return `<div class="mb-row"><i>${l}</i>${set_.map((_, c) => `<button class="mb-p" data-r="${r}" data-c="${c}"></button>`).join('')}</div>`; }).join('')}
+      <div class="mb-bars"><span>beat 1</span><span>2</span><span>3</span><span>|</span><span>1</span><span>2</span><span>3</span></div></div>
+    <button class="btn" id="mbgo" ${card ? '' : 'disabled'}>Turn the crank</button></div>`, { cls: 'doc', title: 'Stella\'s cylinder' });
+  if (!card) return;
+  const draw = () => body.querySelectorAll('.mb-p').forEach(b => b.classList.toggle('on', set_[+b.dataset.c] === +b.dataset.r));
+  body.querySelectorAll('.mb-p').forEach(b => b.onclick = () => { const c = +b.dataset.c, r = +b.dataset.r; set_[c] = set_[c] === r ? -1 : r; sfx('click'); draw(); });
+  body.querySelector('#mbgo').onclick = async () => {
+    const btn = body.querySelector('#mbgo'); btn.disabled = true;
+    for (let c = 0; c < 6; c++) { if (set_[c] >= 0) sfx('switch'); await new Promise(r => setTimeout(r, 260)); }
+    btn.disabled = false;
+    if (set_.every((r, c) => r === TUNE[c])) { sfx('solve'); setTimeout(() => { closePanel(true); done(); }, 500); }
+    else shake(body.querySelector('.mb-cyl'));
+  };
+}

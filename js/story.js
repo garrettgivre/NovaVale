@@ -4,7 +4,7 @@
 import { S, has, set, hasItem, giveItem, addDoc, night, checkpoint, secondChance, save, PHASE_NAME } from './state.js';
 import { openTalk, closeTalk, say, choose, caption, panel, closePanel, fade, screen, closeScreen, toast, portrait, PEOPLE } from './ui.js';
 import { ITEMS, DOCS, icon } from './items.js';
-import { aquaOS, switchboard, acrostic, recipe, constellation, drawerDial, starDoor } from './puzzles.js';
+import { aquaOS, switchboard, acrostic, recipe, constellation, drawerDial, starDoor, contradiction, musicBox } from './puzzles.js';
 import { sfx, ghostVoice, ambience } from './audio.js';
 import { whereIs, sync, POSTCARDS } from './world.js';
 
@@ -64,6 +64,17 @@ function taskList() {
             : !has('const_done') ? '"The stars remember." Use the planetarium\'s projector console with Opal\'s sketch.'
               : 'Try the numbers from the dome on the locked drawer in the archive.', 'Opal loves this building more than anyone.']);
     add('Wait for nightfall in your suite', false, REST_NEED.d2(), [SUITE, 'Tonight you find the Star Room.']);
+  } else if (p === 'g') {
+    add('Find out what\'s wrong with the star', has('star_fake'), true,
+      [hasItem('magnet') ? 'Hold the magnet to the crown in the lobby display case.' : 'A real iron meteorite sticks to a magnet. Dex\'s office is full of old speaker parts: ask him.', 'Real meteorites have iron in them.']);
+    add('Find out when the star was last real', has('appraisal_read'), has('star_fake'),
+      ['The insurance papers are at the reception desk in the lobby.', 'Somebody insured that crown. Insurers check things.']);
+    add('Find the lie', has('kenji_caught'), has('appraisal_read'),
+      [!has('repair_seen') ? 'Kenji logs every minute of his day. Ask him to see Monday\'s page, then compare it with the case\'s access log on Dex\'s computer.' : 'Talk to Kenji. His Monday log and the keypad log can\'t both be right.', 'Who had the case open after the appraisal?']);
+    add('Open Stella', has('stella_open'), has('kenji_caught'),
+      [!S.docs.includes('waltzcard') ? 'Stella\'s song card is in Kenji\'s workbench drawer, right next to her.' : 'Set one pin per beat on Stella\'s cylinder. The card is in do-re-mi, the cylinder in letters: Do = C, Re = D, Mi = E, Fa = F, Sol = G.', 'Kenji keeps everything precious close by.']);
+    add('Have it out with Kenji', has('g_done'), has('stella_open'),
+      ['Kenji is by his workbench in the lobby.', 'He\'s waiting for you.']);
   } else if (p === 'n2') {
     add('Open the service door behind the planetarium stage', has('hatch_open'), true,
       ['The Service door is to the right of the planetarium stage. You have the key.', 'You have a key for it.']);
@@ -88,6 +99,7 @@ const REST_NEED = {
 };
 async function rest() {
   if (S.phase === 'n2') return think('Sleep? Now? The Star Room is right there. Absolutely not.');
+  if (S.phase === 'g') return think('The gala is tonight, and the most expensive thing in it is fake. Naps are for people without a twist to solve.');
   if (!REST_NEED[S.phase]()) {
     const t = taskList().find(x => !x.d);
     return think(['I don\'t leave cases half-solved to take naps.', t ? 'Still to do: ' + t.t.toLowerCase() + '.' : '']);
@@ -144,6 +156,12 @@ const HOT = {
 
   // the lobby
   case: async () => {
+    if (S.phase === 'g') {
+      if (has('star_fake')) return caption(has('stella_open') ? 'Kenji\'s replica, back on its velvet. Honestly? It\'s gorgeous. Crime suits him.' : 'A perfect star. Perfectly fake.');
+      if (!hasItem('magnet')) return think(['The Prism Crown, back where it belongs. Celeste polished the glass twice.', 'Every crystal is in place. Every glint is right. So why did it weigh nothing?', 'Real meteorites have iron in them. If I had a decent magnet, I could settle this in a second.']);
+      set('star_fake'); sfx('switch'); E.refresh();
+      return think(['*You hold Dex\'s magnet against the glass, right over the star. Then against the band. Then over the star again.*', 'The band: a tiny tug. Silver plate on brass, fine.', 'The star: nothing. Not a twitch.', 'Iron-nickel meteorites stick to magnets. This one doesn\'t. Which means it isn\'t one.', 'Somebody swapped the star. And not Opal: the lid had to be open for a lot longer than six minutes to unset a stone.']);
+    }
     const first = !has('case_seen'); set('case_seen');
     await think(first ? ['The glass lid is sitting a hair crooked. No scratches, no pry marks, lock untouched.', 'So nobody smashed anything. Somebody typed the code. People always think a keypad is a secret. It\'s a diary.', 'And the velvet still has a dent where the crown sat. Hello, crime scene.', !has('pin') ? 'Also: something is glinting on the floor. Nobody else noticed? Really?' : '']
       .filter(Boolean) : 'Opened with a code, not forced. Whoever did this didn\'t have to try very hard.');
@@ -154,7 +172,22 @@ const HOT = {
   },
   plaque: () => { set('plaque_seen'); showDoc('plaque'); },
   guestbook: () => showDoc('guestbook'),
-  desk: () => caption('The reception desk. A beige booking computer, a brass bell and a guest book. The bell is the only thing here that still works properly.'),
+  desk: () => S.phase === 'g' && has('star_fake') ? (set('appraisal_read'), E.refresh(), showDoc('appraisal'), setTimeout(() => think(['Real at 13:40 on Monday. Appraised by Kenji Morimoto.', 'Fake by Saturday morning. So who touched it in between?', 'Everyone who opened that case is in the keypad log. Everyone.']), 400)) : caption('The reception desk. A beige booking computer, a brass bell and a guest book. The bell is the only thing here that still works properly.'),
+
+  // Kenji's corner of the lobby
+  stella: () => {
+    if (has('stella_open')) return caption('Stella, chest open, humming to herself. She has been very brave about all this.');
+    if (!has('kenji_caught')) return think(['Stella: a 1925 singing automaton in a pink velvet dress, with a pinned brass cylinder in her base.', S.phase === 'g' ? 'Kenji hasn\'t looked away from her all morning.' : 'Kenji says she sings in three-four time. I believe him. I believe everything a man that precise tells me. Mostly.']);
+    musicBox(async () => {
+      set('stella_open'); giveItem('realstar'); addDoc('kenjiletter'); sfx('take'); E.refresh();
+      await think(['*Stella lifts her head and sings six notes, in waltz time. With a click, a little door in her chest swings open.*', 'Inside, wrapped in silk: a dark star, heavy, full of tiny green crystals. It snaps to the magnet so hard I nearly drop it.', 'And a letter.']);
+      showDoc('kenjiletter');
+    });
+  },
+  kbench: () => {
+    if (!S.docs.includes('waltzcard') && has('kenji_caught')) { addDoc('waltzcard'); E.refresh(); return showDoc('waltzcard'); }
+    caption(S.docs.includes('waltzcard') ? 'Kenji\'s bench drawer. Tiny brushes, tinier screws, and the outline of where a song card used to live.' : 'Tiny brushes, a loupe, a jar of porcelain fingers. I\'m not going through a man\'s drawers without a reason. Yet.');
+  },
 
   // the tech office
   computer: () => aquaOS(id => { if (id === 'log') toast('New in your notebook: the access log'); if (id === 'memo') toast('New in your notebook: the relaunch memo'); }),
@@ -347,7 +380,7 @@ const TOPICS = {
     { id: 'pin', ...pinQ, lines: ['That\'s an original Aquadome staff pin! The build crew got them on opening night in 2003.', 'They\'re super rare. I\'ve only seen one person wear one around here...', 'Opal. On her coat.'], after: () => set('pin_known') },
   ],
   dex: [
-    { id: 'crown', q: 'What happened with the display case?', lines: ['It has a keypad. Codes only, no keys. I set all the staff codes myself.', 'It wasn\'t forced, so whoever opened it had a code. Which looks bad for me. I know. I KNOW.', 'N: Can I see the access log?', 'It\'s in SecureLog on my computer. I\'d open it for you, but I\'m really, really busy with the gala lights.', 'N: That was a yes. I\'ll let myself in.', 'That was NOT a... okay. Just don\'t touch anything else.'], after: () => set('asked_dex_crown') },
+    { id: 'g_magnet', q: 'I need a strong magnet. Right now.', hot: 1, when: () => S.phase === 'g' && !hasItem('magnet'), lines: ['A... magnet? Like a fridge magnet, or like a magnet?', 'N: Like a magnet, Dex.', '*He digs through a box of dead speakers and comes up with a heavy black disc.*', 'From the old planetarium subwoofer. Don\'t put it near your phone. Or a credit card. Or me, honestly.'], after: () => { giveItem('magnet'); sfx('take'); E.refresh(); } },    { id: 'crown', q: 'What happened with the display case?', lines: ['It has a keypad. Codes only, no keys. I set all the staff codes myself.', 'It wasn\'t forced, so whoever opened it had a code. Which looks bad for me. I know. I KNOW.', 'N: Can I see the access log?', 'It\'s in SecureLog on my computer. I\'d open it for you, but I\'m really, really busy with the gala lights.', 'N: That was a yes. I\'ll let myself in.', 'That was NOT a... okay. Just don\'t touch anything else.'], after: () => set('asked_dex_crown') },
     { id: 'tuesday', q: 'Where were you on Tuesday night?', when: () => !has('dex_confess') && !has('dex_partial'), lines: ['Asleep! In my room! By like... eleven? Ish?', '*He doesn\'t quite meet your eyes.*', 'N: "Ish." Noted.'] },
     { id: 'callout', q: '"Asleep by eleven"? Your own email says ghost test, Tuesday, 11pm.', hot: 1, when: () => has('holo_mail') && !has('dex_confess') && !has('dex_partial'), lines: ['You read my... okay, that\'s a privacy thing, we should talk about—', 'N: We can talk about privacy right after we talk about lying to a detective.', 'Fine! FINE. I was in the planetarium until about 11:40. Testing a thing. A secret thing. I can\'t say what.', 'N: You\'ll tell me. They always do.'], after: () => set('dex_partial') },
     { id: 'ghost', q: 'What do you make of the ghost?', when: () => !has('dex_confess'), lines: ['Ghosts aren\'t real. It\'s probably a feedback loop in the old speakers. Technically.', '*He laughs a little too loudly.*', 'N: Technically, you\'re sweating.'] },
@@ -398,6 +431,9 @@ const TOPICS = {
     { id: 'pin', ...pinQ, lines: ['A build crew pin. My mum pointed at one on opening night: "Those are the people who made the sky."'] },
   ],
   kenji: [
+    { id: 'g_star', q: 'The star in the crown is fake.', hot: 1, when: () => S.phase === 'g' && has('star_fake') && !has('repair_seen'), lines: ['*Kenji goes very still.*', 'That\'s... not possible. I appraised it myself.', 'N: On Monday. I read your certificate. You log everything, don\'t you? Show me Monday.', '*He hesitates a fraction too long, then hands over his notebook.*'], after: () => { set('repair_seen'); setTimeout(() => showDoc('repairlog'), 50); } },
+    { id: 'g_catch', q: 'Your Monday doesn\'t add up.', hot: 1, when: () => S.phase === 'g' && has('repair_seen') && has('appraisal_read') && !has('kenji_caught'), lines: ['N: Let me show you something, Kenji. Two somethings.'], after: null, catch: 1 },
+    { id: 'g_truth', q: 'I found the Star\'s Tear.', hot: 1, when: () => S.phase === 'g' && has('stella_open') && !has('g_done'), lines: ['*Kenji sees the dark star in your hand and closes his eyes.*'], fin: 1 },
     { id: 'stella', q: 'A singing doll. The same week as a singing ghost.', lines: ['I know how it looks. But Stella sings in three-four time. A waltz. And she has been in pieces on my table all week.', 'Your ghost sings in four-four.', 'N: You checked the ghost\'s time signature.', 'Of course. Didn\'t you?', 'N: ...I respect that enormously.'] },
     { id: 'crown', q: 'You appraised the crown?', lines: ['For the insurance. The band is silver plate, pretty and ordinary. The star is a real pallasite: olivine crystals set in meteoric iron. It\'s worth more than the roof.', 'N: So a thief could sell it for a fortune.', 'A thief could. But nobody has tried. I have friends who would hear about it, and I\'ve heard nothing.', 'N: So whoever took it didn\'t take it for the money.', '*Kenji nods, pleased, like a teacher with a good student.*'], after: () => set('kenji_money') },
     { id: 'tuesday', q: 'Where were you on Tuesday night?', lines: ['In my room, gluing a porcelain finger back on under a magnifier. I log every repair.', '*He shows you a notebook: every repair recorded to the minute. 23:40 to 00:30, "Stella, left hand, third finger".*', 'N: That is the most boring alibi I\'ve ever heard. It\'s perfect.'] },
@@ -449,6 +485,7 @@ async function doTopic(who, t) {
     }));
   }
   if (t.after) t.after();
+  if (t.catch) await kenjiCatch();
   save();
 }
 
@@ -473,6 +510,7 @@ export async function onTalk(who) {
     await doTopic(who, list[i]);
     E.refresh();
     if (who === 'opal' && has('opal_left')) { sync(); break; }
+    if (list[i].fin) return kenjiFinale();
   }
   closeTalk(); E.unfocus(); E.refresh();
 }
@@ -485,7 +523,7 @@ async function finale() {
   await say('opal', ['*Opal sits beside the crown under a small painted sky, as if she\'s been waiting.*', 'I wondered who would find this room first. I hoped it would be someone who deserved to.', 'We built it for ourselves, the four of us. A secret Star Room at the end of the tunnel. We toasted opening night right here.']);
   let i = await choose([{ text: 'You took the crown to stop the relaunch.' }, { text: 'I\'m calling the police. Right now.' }, { text: 'Nice room. Now tell me why the crown is in it.' }]);
   if (i === 1) { closeTalk(); E.unfocus(); return badEnding('locked'); }
-  await say('opal', ['...Yes.', 'I opened the case with the old code at 11:52 and carried the crown down here in my coat pocket. I lost my pin on the way. Sloppy.', 'N: Very sloppy. I found it in about four seconds.', 'If there\'s no crown, there\'s no gala. If there\'s no gala, maybe Celeste reconsiders. Maybe my stars stay.', 'It was a foolish plan. But it was the only one I had.']);
+  await say('opal', ['...Yes.', 'I opened the case with the old code at 11:52 and carried the crown down here in my coat pocket. I lost my pin on the way. Sloppy.', 'I never touched the star, before you ask. I wouldn\'t know how to set a stone, and I\'d never dare try with that one.', 'N: Very sloppy. I found it in about four seconds.', 'If there\'s no crown, there\'s no gala. If there\'s no gala, maybe Celeste reconsiders. Maybe my stars stay.', 'It was a foolish plan. But it was the only one I had.']);
   i = await choose([{ text: 'You\'ll never work on another building again.' }, { text: 'It was a terrible plan. Let me give you a better one.' }]);
   if (i === 0) { closeTalk(); E.unfocus(); return badEnding('locked'); }
   await say('opal', ['N: The planetarium matters. You don\'t save it by hiding a crown in a basement. You save it by showing Celeste what it can do. With me in the room, so she actually listens.', '*Opal is quiet for a long moment. Then she laughs, softly.*', 'You\'re insufferable, Miss Vale. You sound exactly like me, twenty-three years ago.', 'All right. Take it back up. Tell Celeste everything. I won\'t make you drag me.']);
@@ -493,12 +531,58 @@ async function finale() {
   closeTalk(); E.unfocus();
   await think(['*You lift the Prism Crown off its cushion. The meteorite star glints violet in the candlelight.*', 'Case closed. As predicted. By me.']);
   await call('celeste', ['Nova? It\'s nearly one in the morning, is everything...', 'N: I found the crown. You\'re welcome. And you\'re going to hear Opal out about the planetarium, because you\'re about to make a very expensive mistake.', '*Celeste listens for a long time.*', '...A VIP lounge can go anywhere. The old laundry is bigger anyway.', 'Tell Opal her stars stay. And tell her she\'s running the planetarium show at the gala.']);
+  await fade(async () => { S.phase = 'g'; save(); sync(); E.refresh(); }, 900);
+  E.go('L1', { fade: true, look: [-4.2, 3.2] });
+  await new Promise(r => setTimeout(r, 1400));
+  await think(['*Morning. Gala day. You set the Prism Crown back on its velvet, and Celeste nearly cries with relief.*',
+    'Except something has been bothering me since the Star Room.',
+    'When I lifted that crown, the star weighed nothing. An iron meteorite should feel like a fishing sinker. That felt like a boiled sweet.',
+    'Kenji told me nobody had tried to sell the stone. Opal swears she never touched it.', 'One of those is a clue, and I\'m about to find out which.']);
+  E.refresh();
+}
+
+// ---------- Gala Day: the Star's Tear ----------
+const EVIDENCE = [
+  { k: 'appraisal', t: 'Insurance appraisal', s: 'Mon 13:40: the star is a real pallasite. Magnet: strong.' },
+  { k: 'magnet', t: 'Your magnet test', s: 'Today: the star doesn\'t even twitch. It\'s fake.' },
+  { k: 'log', t: 'Keypad log', s: 'Mon 13:36 to 14:51: case opened by KMORIMOTO.' },
+  { k: 'repairlog', t: 'Kenji\'s repair log', s: 'Mon 13:30 to 15:00: at his bench, regluing Stella\'s finger.' },
+  { k: 'opal', t: 'Opal', s: 'Took the crown Tuesday night. Never touched the star.' },
+  { k: 'kenji', t: 'Kenji', s: 'Nobody has tried to sell the stone. The thief didn\'t want money.' },
+];
+async function kenjiCatch() {
+  await new Promise(res => contradiction(EVIDENCE, ['log', 'repairlog'], async () => {
+    set('kenji_caught'); E.refresh();
+    await say('kenji', ['N: Your log says you were at your bench regluing a finger from half past one till three on Monday.', 'N: The keypad says you had the crown\'s case open from 13:36 to 14:51. For an appraisal that took you, according to your own certificate, about four minutes.',
+      '*Kenji puts his brush down very carefully.*', 'I... was cleaning the band. Silver tarnishes.', 'N: For an hour and fifteen minutes. With a log that says you were somewhere else. You log everything, Kenji. You didn\'t log that.',
+      '*He looks at Stella, then away from her, very fast.*', 'Please don\'t touch Stella. She\'s fragile.', 'N: Noted. That was the worst thing you could have said.']);
+    res();
+  }, picked => {
+    const lines = { opal: 'Opal\'s story fits everything else. Rude of it, but true.', kenji: 'He said that. It\'s not wrong, just suspiciously well put.', magnet: 'Those don\'t clash, they agree: real Monday, fake now. Something happened in between.', appraisal: 'Those don\'t clash, they agree: real Monday, fake now. Something happened in between.' };
+    const k = picked.find(x => lines[x]); if (k) toast(lines[k].split('.')[0] + '.');
+  }));
+}
+async function kenjiFinale() {
+  checkpoint();
+  await say('kenji', ['*Kenji reads his own letter in your hand and lets out a long breath.*', 'My grandmother used to draw it for me. Three green crystals, in a triangle. "Like a little face," she said.', 'On Monday I put my loupe on that crown, and the little face looked back at me.']);
+  let i = await choose([{ text: 'You stole a $38,000 stone. I\'m calling the police.' }, { text: 'It was hers. That doesn\'t make swapping it right.' }, { text: 'Why not just tell Celeste?' }]);
+  if (i === 0) { closeTalk(); E.unfocus(); return badEnding('kenji'); }
+  if (i === 2) await say('kenji', ['Tell a woman who has just sold her own planetarium to keep the lights on that the prize of her gala belongs to someone else?', 'I thought I would make the replica, take the stone home quietly, and write to her afterwards. I am not proud of the plan. It was a frightened plan.']);
+  else await say('kenji', ['No. It doesn\'t. I know.', 'I told myself I was only taking back what was taken. But I lied in my own log. My grandmother would have been ashamed of that part, not the stone.']);
+  i = await choose([{ text: 'Then we tell Celeste together. Now. Before the gala.' }, { text: 'Put it back and we\'ll pretend this never happened.' }]);
+  if (i === 1) {
+    await say('kenji', ['*He shakes his head.*', 'No. You don\'t mean that, and I wouldn\'t let you. A secret like this is what put us both here.']);
+  }
+  await say('kenji', ['N: Here\'s what happens. You tell Celeste everything. I tell her you\'re the reason the crown looks perfect, because your fake is better than most people\'s real. And then she finds out where that stone actually belongs.', '*Kenji laughs, startled, and wipes his glasses.*', 'You are a very strange detective, Miss Vale.', 'N: I\'m an extremely good detective. The strange is a bonus.']);
+  set('g_done'); closeTalk(); E.unfocus(); sfx('solve');
+  await call('celeste', ['Nova? Twice in one day, this is either wonderful or terrible.', 'N: Both. Sit down. Kenji has something to tell you, and then I have something to tell you about what you\'re going to do next.', '*A long, long phone call later.*', '...The crown wears Kenji\'s replica tonight. And on Monday, I\'m writing to the Morimoto family myself.', 'Nova, how do you do this?', 'N: I pay attention. Most people only look.']);
   ending();
 }
 
 // ---------- Endings ----------
 const BAD = {
   blackout: ['Lights Out', 'You flip the big red MAIN switch. Every light in the Aquadome dies at once, and the pumps shudder to a stop.', 'In the dark, footsteps hurry past the tech office. Somewhere below, a heavy door closes.', 'By the time the power is back, whoever it was is long gone, and Celeste has called off the gala. For once, you have nothing clever to say.'],
+  kenji: ['Wrong Call', 'The police arrive at noon. Kenji goes quietly, holding Stella\'s song card, and doesn\'t say a word in his own defence.', 'The Star\'s Tear is locked in an evidence room for two years while lawyers argue over whose it is. The gala goes ahead with an empty mount in the crown.', 'You were right about who did it. You were wrong about everything else.'],
   locked: ['Locked In', 'Opal\'s face closes like a door. "Then I\'m sorry, Miss Vale."', 'She slips past you and swings the vault door shut. The rings spin. The lock clunks.', 'It\'s morning before Dex finds you. By then, Opal and the Prism Crown are long gone. Being right about everything turns out not to help much from inside a vault.'],
 };
 export function badEnding(k) {
@@ -518,7 +602,7 @@ function ending() {
     <p>The gala was the most beautiful night this building has seen in nine years, and it happened because of you (as you reminded me, twice).</p>
     <p>Opal ran the planetarium show herself. When five stars lit up in a cross over the stage, half the room cried. The other half was Cherry.</p>
     <p>Vesper "sang" "Starfall" perfectly, and then Cherry performed a surprise tribute that made Vesper cry so hard she had to take off her sunglasses. Dex's singing ghost finally hit the high notes. Juniper's cake was gone in eleven minutes.</p>
-    <p>Velvet Regent won the Revue and wore the Prism Crown like they were born in it. Dr. Anand is keeping the projector where it is and running Tuesday star shows with Opal. Kenji's Stella sang a waltz at midnight. Jojo is getting one roller night a month under the dome, and Juniper is doing the snack bar.</p>
+    <p>Velvet Regent won the Revue and wore the Prism Crown like they were born in it. Nobody in the room knew the star was Kenji's replica; Regent calls it &ldquo;the most honest fake I have ever worn&rdquo;. On Monday I wrote to the Morimoto family in Nagano. The Star's Tear is going home. Dr. Anand is keeping the projector where it is and running Tuesday star shows with Opal. Kenji's Stella sang a waltz at midnight, and he cried, and so did I. Jojo is getting one roller night a month under the dome, and Juniper is doing the snack bar.</p>
     <p>Harper Vance's podcast called you "an absolute menace, in the best way". Silas Boone's ghost episode has four thousand views and is, I'm told, "deeply wrong". Rashad says he's writing a novel about you. You have been warned.</p>
     <p>The planetarium stays. The Prism Crown is back where it belongs, and so, I think, is the Aquadome.</p>
     <p>With endless thanks,</p><p class="sig">Celeste Arden</p>
@@ -541,7 +625,7 @@ const CALLS = {
     { id: 'opal', q: 'Anything on Opal Finch?', when: () => has('met_opal'), lines: ['She fought hard against the Aquadome closing. I found an old magazine interview.', 'Quote: "I built a secret into that dome that only the stars know about."', 'Spooky, right?', 'N: Not spooky. Specific.'] },
     { id: 'boathouse', q: 'Why would a boathouse have a brand new padlock?', when: () => has('v_terrace'), lines: ['Uh, because somebody doesn\'t want anyone in the boathouse?', 'N: Brilliant, Remy. Truly. Look up who owned the Aquadome\'s boats before it closed.', 'On it. That might take a while.', 'N: That\'s fine. It\'s not this case.'] },
   ],
-  celeste: () => [{ id: 'update', q: 'Just checking in.', lines: () => S.phase === 'd1' ? ['Nova. Any progress? The gala is on Saturday and I haven\'t slept.', 'N: Progress is my whole personality. Give me a day.'] : S.phase === 'n1' ? ['You\'re up too? That singing again. I\'m starting to believe in ghosts.', 'N: Don\'t. It\'s a speaker. I\'ll prove it.'] : S.phase === 'd2' ? ['Day two. The press arrives tomorrow. Please tell me you\'re close.', 'N: I\'m close. I\'m always close. Today I\'m closer.'] : ['Be careful down there, Nova.'] }],
+  celeste: () => [{ id: 'update', q: 'Just checking in.', lines: () => S.phase === 'd1' ? ['Nova. Any progress? The gala is on Saturday and I haven\'t slept.', 'N: Progress is my whole personality. Give me a day.'] : S.phase === 'n1' ? ['You\'re up too? That singing again. I\'m starting to believe in ghosts.', 'N: Don\'t. It\'s a speaker. I\'ll prove it.'] : S.phase === 'g' ? ['It\'s gala day and the crown is back. I could kiss you. I won\'t, I\'m your client.', 'N: Hold that thought. Something about the crown isn\'t finished.'] : S.phase === 'd2' ? ['Day two. The press arrives tomorrow. Please tell me you\'re close.', 'N: I\'m close. I\'m always close. Today I\'m closer.'] : ['Be careful down there, Nova.'] }],
 };
 
 async function call(who, lines) { openTalk(who, { pt: true }); await say(who, lines); closeTalk(); }
@@ -580,7 +664,7 @@ const NOTES = {
   silas: () => [has('met_silas') && 'Paranormal web show host, filming uninvited.', has('tape_seen') && 'His Tuesday tape: a long coat and a white flashlight crossing the lobby at 11:52.'],
   jojo: () => [has('met_jojo') && 'Juniper\'s nephew. Wants a roller disco in the planetarium.', has('nate_alibis') && 'CLEARED: skating on the terrace all night (Ranger Begay).', has('jojo_door') && 'Heard a heavy door "under the floor" around 12:15.'],
   priya: () => [has('met_priya') && 'Astronomer, here to remove the star projector. Came here as a child.', has('priya_red') && 'Uses a red torch at night. The midnight light was white.', has('nate_alibis') && 'CLEARED: on the dock with Ranger Begay at midnight.'],
-  kenji: () => [has('met_kenji') && 'Conservator restoring Stella, a 1925 singing automaton.', has('kenji_money') && 'The meteorite is worth a fortune, and nobody has tried to sell it. The thief didn\'t want money.'],
+  kenji: () => [has('met_kenji') && 'Conservator restoring Stella, a 1925 singing automaton.', has('repair_seen') && 'Monday log: at his bench 13:30 to 15:00. The keypad log says the case was open 13:36 to 14:51, by him.', has('stella_open') && 'Swapped the star for a replica: the Star\'s Tear, sold from his family in 1946. It was hidden in Stella.', has('kenji_money') && 'The meteorite is worth a fortune, and nobody has tried to sell it. The thief didn\'t want money.'],
   rashad: () => [has('met_rashad') && 'Bellhop, 17, reads too many mysteries. Grandson of Marcus Okafor from the 2003 build crew.', has('rashad_saw') && 'Saw Opal come up at 12:20, coat buttoned, one pocket heavy.', has('okafor_seen') && 'His grandfather\'s notebook describes the Star Room door.'],
   gus: () => [has('met_gus') && 'Caretaker for nine years. Has every key.', has('gus_key') && 'Except the planetarium Service door: Opal has the only key.', has('boathouse_ask') && 'Won\'t say why the boathouse has a new padlock. Not this case.'],
   harper: () => [has('met_harper') && 'True-crime podcaster ("Lakeshore Unsolved").', has('harper_alibi') && 'Her recording has a heavy metal groan at 11:57. Something under the building.'],

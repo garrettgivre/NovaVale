@@ -24,7 +24,7 @@ export const FIG = {
   priya: { head: 1.553, talk: 'R', relax: 0.32 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202609301946';
+export const ASSET_V = '202609302023';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 export function loadFigure(who, onReady) {

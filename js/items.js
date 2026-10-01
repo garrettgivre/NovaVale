@@ -1,5 +1,13 @@
 // Inventory items (with little SVG icons) and documents.
 export const ITEMS = {
+  magnet: {
+    n: 'Speaker magnet', d: 'A heavy round magnet from one of Dex\'s old speakers. It nearly took a filing cabinet with it.',
+    svg: '<circle cx="32" cy="32" r="20" fill="#3a3a44" stroke="#15151a" stroke-width="3"/><circle cx="32" cy="32" r="9" fill="#9aa0aa"/><path d="M22 14l4 6M42 14l-4 6" stroke="#ff4a4a" stroke-width="4" stroke-linecap="round"/>',
+  },
+  realstar: {
+    n: 'The Star\'s Tear', d: 'The real meteorite: dark iron full of green olivine crystals, heavy as a fishing sinker. It snaps to the magnet.',
+    svg: '<path d="M32 6l7.6 15.4 17 2.5-12.3 12 2.9 16.9L32 44.8 16.8 52.8l2.9-16.9L7.4 23.9l17-2.5z" fill="#3c3a34" stroke="#1c1a16" stroke-width="3" stroke-linejoin="round"/><g fill="#9adb6a"><circle cx="28" cy="26" r="3"/><circle cx="37" cy="31" r="2.5"/><circle cx="30" cy="37" r="2.2"/><circle cx="24" cy="33" r="1.6"/></g>',
+  },
   pin: {
     n: 'Brass star pin', d: 'A small brass five-point star with "AQ 03" stamped on the back. Found under the display case.',
     svg: '<path d="M32 6l7.6 15.4 17 2.5-12.3 12 2.9 16.9L32 44.8 16.8 52.8l2.9-16.9L7.4 23.9l17-2.5z" fill="#ffc95c" stroke="#b07a1e" stroke-width="3" stroke-linejoin="round"/>',
@@ -79,7 +87,7 @@ export const DOCS = {
   },
   log: {
     t: 'Display case access log',
-    html: `<div class="paper mono"><p>DISPLAY CASE 01 · ACCESS LOG</p><p>TUE 09:14  DHALLOWAY  open  (polish)</p><p>TUE 09:20  DHALLOWAY  close</p><p><b>TUE 23:52  MAINT-0    open</b></p><p><b>TUE 23:58  MAINT-0    close</b></p><p>—</p><p>MAINT-0 = legacy master code (2003 build team). Note from Dex: "I thought we deleted this??"</p></div>`,
+    html: `<div class="paper mono"><p>DISPLAY CASE 01 · ACCESS LOG</p><p>TUE 09:14  DHALLOWAY  open  (polish)</p><p>TUE 09:20  DHALLOWAY  close</p><p>MON 13:36  KMORIMOTO  open  (insurance appraisal)</p><p>MON 14:51  KMORIMOTO  close</p><p><b>TUE 23:52  MAINT-0    open</b></p><p><b>TUE 23:58  MAINT-0    close</b></p><p>—</p><p>MAINT-0 = legacy master code (2003 build team). Note from Dex: "I thought we deleted this??"</p></div>`,
   },
   mail_holo: {
     t: 'Email: Dex to Dex',
@@ -160,4 +168,32 @@ DOCS.okafor = {
     <p class="hand">The door has three rings. O says you set them "from the outside in, like the solar system": the planet with the ring, then the moon, then the comet.</p>
     <p class="hand">Toasted with ginger beer. Best night of my life. - M.O.</p>
     <svg viewBox="0 0 200 60" style="width:60%"><g fill="none" stroke="#3a3a6a" stroke-width="2"><circle cx="30" cy="30" r="12"/><ellipse cx="30" cy="30" rx="22" ry="6"/><path d="M95 18 a13 13 0 1 0 0 26 a10 10 0 1 1 0 -26z"/><circle cx="162" cy="24" r="7"/><path d="M156 28 L140 44 M160 31 L146 48"/></g></svg></div>`,
+};
+
+DOCS.appraisal = {
+  t: 'Insurance appraisal: the Prism Crown',
+  html: `<div class="paper mono"><p>LAKESHORE MUTUAL · FINE ARTS SCHEDULE</p><p>Item: "Prism Crown" (gala prize). Silver-plated band, 5-point star mount.</p>
+    <p>Stone: pallasite meteorite (stony-iron). Olivine crystals in iron-nickel matrix. Mass 41.2 g.</p>
+    <p>Tests, MON 13:40: <b>magnetic response: STRONG.</b> Olivine fluoresces faint green under loupe light.</p>
+    <p>Appraised value: $38,000 (stone) · $400 (band).</p><p>Appraiser: K. Morimoto, conservator. Signed and dated.</p>
+    <p class="hand">Nova: so the star was real at 13:40 on Monday. Good to know exactly when it stopped being.</p></div>`,
+};
+DOCS.repairlog = {
+  t: 'Kenji\'s repair log (Monday)',
+  html: `<div class="paper lined"><p class="hand">MON</p><p class="hand">09:10–12:30  Stella: cylinder pins, cleaned and re-seated (all 30)</p>
+    <p class="hand">12:30–13:30  lunch (Juniper's lemon bread, outstanding)</p><p class="hand"><b>13:30–15:00  Stella: left hand, first finger, reglued</b></p>
+    <p class="hand">15:00–17:15  Stella: bellows leather, patched</p><p class="hand">Notes: Stella's song card returned to the bench drawer.</p></div>`,
+};
+DOCS.waltzcard = {
+  t: 'Stella\'s song card',
+  html: `<div class="paper"><p class="lh">STELLA · 1925 · Melody for the cylinder</p><p style="font-size:1.3em;text-align:center;letter-spacing:.08em"><b>Mi · Sol · Sol &nbsp;|&nbsp; Fa · Re · Re</b></p>
+    <p class="small" style="text-align:center">"Three to a bar, like a heartbeat that's learned to dance."</p><p class="hand">(Pencilled in the corner: "C = do. Stella sings in C.")</p></div>`,
+};
+DOCS.kenjiletter = {
+  t: 'A letter folded behind the star',
+  html: `<div class="paper lined"><p class="hand">For whoever finds this, if it isn't me.</p>
+    <p class="hand">In 1938 a stone fell through the roof of my great-grandmother's barn in Nagano. The family called it Hoshi no Namida: the Star's Tear. They kept it on the household shrine for eight years.</p>
+    <p class="hand">In 1946, with nothing to eat, my grandmother sold it to a dealer for a sack of rice. She never forgot the date, or the man's name. It went from collection to collection. In 2003 it went into a crown.</p>
+    <p class="hand">On Monday I held it under my loupe and saw the three crystals she described, in a triangle, like a little face. I made a replica that night. On Tuesday morning I swapped them.</p>
+    <p class="hand">I meant to tell Celeste after the gala. I know how that sounds. — K. M.</p></div>`,
 };
