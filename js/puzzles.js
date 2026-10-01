@@ -188,7 +188,7 @@ export function starDoor(done) {
 // ---------- Evidence board: find the two statements that can't both be true ----------
 export function contradiction(cards, answer, done, onWrong) {
   const pick = new Set();
-  const body = panel(`<div class="ev"><p>${junior() ? 'Two of these can\'t both be true. Tap them, then press the button.' : 'Find the lie.'}</p>
+  const body = panel(`<div class="ev"><p>${junior() ? 'Two of these can\'t both be true. Tap them, then press the button.' : 'Two of these can\'t both be true.'}</p>
     <div class="ev-grid">${cards.map(c => `<button class="ev-c" data-k="${c.k}"><b>${c.t}</b><span>${c.s}</span></button>`).join('')}</div>
     <button class="btn" id="evgo" disabled>These don't add up</button></div>`, { cls: 'doc', title: 'Evidence' });
   const go = body.querySelector('#evgo');

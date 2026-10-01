@@ -178,14 +178,17 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   W1-W3 wing, E1-E3 terrace, U* tunnel, X1 Star Room.
 - In the desktop app's browser pane, frames only advance while screenshots are taken, so animations, glides and walking
   need several screenshots in a row; reload with a fresh `?v` (run bump.py) to avoid cached modules.
-- The whole case, the "Lights Out" and "Locked In" bad endings and Second Chance have been played through this way, and
-  Act 3's good path end to end (the "Wrong Call" bad ending has not been played yet).
+- Full playthrough script (Oct 2026, scratchpad `play.js`, worth recreating if lost): drives `story.onHot`/`onTalk` through every
+  phase, talks to everyone about every topic, sets the outcomes of unchanged puzzles, solves the evidence board for real,
+  takes the Locked In and Wrong Call endings and Second Chance, and reaches Case Closed, in Junior and Senior, with no page
+  errors. A world check raycasts every hotspot from its room's camera spots and the glides between spots (postcard 8 was
+  hidden by the new planetarium seats and moved into the aisle).
 
 ## Status and next steps
 Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
-- Not yet checked: Senior-difficulty wording of the two Act 3 puzzles; the thumb stick on a real phone.
+- Not yet checked: the thumb stick on a real phone.
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
   hand in Act 3, placing Celeste in the world on Day 2, lip-sync/blinking for figures (needs eyes-closed and mouth-open
   face crops from Garrett).
