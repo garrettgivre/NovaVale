@@ -491,4 +491,4 @@ const firstCast = () => { try { const d = JSON.parse(localStorage.getItem('novav
   document.getElementById('boot').remove();
   title();
 }, 30));
-window.__dbg = { S, go, story, NODES, V, focus, unfocus };
+window.__dbg = { S, renderer, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };

@@ -215,6 +215,28 @@ function reTex(m, rx, ry) {
   return c;
 }
 
+// Soft contact shadows (a cheap stand-in for ambient occlusion): dark gradient strips along the bottom and top of a
+// wall run and on the floor and ceiling next to it. len = run length, (x, z) its middle, ry its facing, h wall height.
+let AOT;
+function aoMat(o) {
+  if (!AOT) {
+    const c = T.canvas(4, 64), g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.35, 'rgba(0,0,0,.45)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 4, 64); AOT = new THREE.CanvasTexture(c);
+  }
+  return new THREE.MeshBasicMaterial({ map: AOT, transparent: true, opacity: o, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+}
+function aoRun(p, len, x, z, ry, h, { floor = 0.38, ceil = 0.22, o = 0.42 } = {}) {
+  const nx = Math.sin(ry), nz = Math.cos(ry), m = aoMat(o), mc = aoMat(o * 0.6);
+  const strip = (w, hh, y, d, rx, mm) => {
+    const s = add(p, new THREE.PlaneGeometry(len, w), mm, x + nx * d, y, z + nz * d);
+    s.rotation.order = 'YXZ'; s.rotation.y = ry; s.rotation.x = rx; s.userData.nocast = 1; s.renderOrder = 1; return s;
+  };
+  // the texture is dark at v=0 (top of the plane): flip so the dark edge sits in the corner
+  if (floor) { strip(0.5, 0, 0.25, 0.012, 0, m).rotation.z = Math.PI; strip(floor, 0, 0.004, floor / 2, -Math.PI / 2, m); }
+  if (ceil) { strip(0.4, 0, h - 0.2, 0.012, 0, mc); strip(ceil, 0, h - 0.004, ceil / 2, Math.PI / 2, mc).rotation.z = Math.PI; }
+}
+
 // A rectangular room: floor, ceiling with crown moulding, walls with an optional wood wainscot.
 function rectRoom(R, x0, x1, z0, z1, h, { floor, wall, wains = null, wh = 1.05, ceil = null }) {
   const w = x1 - x0, d = z1 - z0, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
@@ -231,6 +253,7 @@ function rectRoom(R, x0, x1, z0, z1, h, { floor, wall, wains = null, wh = 1.05, 
     }
     piece(0.16, 0.08, 0.035, trim);
     piece(0.14, h - 0.07, 0.1, crown);
+    aoRun(R.g, len, x, z, ry, h);
   }
 }
 

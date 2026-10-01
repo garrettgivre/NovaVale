@@ -39,8 +39,8 @@ export function fbm(w, h, { scale = 4, oct = 4, seed = 1, sx = 1, sy = 1 } = {})
   return out;
 }
 
-function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
-function toTex(c, rep, srgb = true) {
+export function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+export function toTex(c, rep, srgb = true) {
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -48,11 +48,11 @@ function toTex(c, rep, srgb = true) {
   if (rep) t.repeat.set(rep[0], rep[1]);
   return t;
 }
-const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
-const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+export const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
+export const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
 
 // Build a colour + height canvas pair from a per-pixel function f(x,y) -> [r,g,b,height0..1].
-function pix(w, h, f) {
+export function pix(w, h, f) {
   const c = canvas(w, h), b = canvas(w, h);
   const cx = c.getContext('2d'), bx = b.getContext('2d');
   const ci = cx.createImageData(w, h), bi = bx.createImageData(w, h);
@@ -64,7 +64,7 @@ function pix(w, h, f) {
   cx.putImageData(ci, 0, 0); bx.putImageData(bi, 0, 0);
   return { c, b, cx, bx };
 }
-const done = (P, rep) => ({ map: toTex(P.c, rep), bump: toTex(P.b, rep, false) });
+export const done = (P, rep) => ({ map: toTex(P.c, rep), bump: toTex(P.b, rep, false) });
 
 // ---------- Stone and tile ----------
 export function marble({ base = '#e9e2d3', vein = '#8a8173', tiles = 2, inlay = null, seed = 3, rep } = {}) {
