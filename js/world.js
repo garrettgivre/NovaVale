@@ -3036,88 +3036,456 @@ function buildWing() {
   return R;
 }
 
-// ---------- Outside: the lakeside terrace ----------
+/// ---------- Outside: the lakeside terrace ----------
+// Textures and helpers (prefix ter). Everything static is baked: geometry is merged per material (terBake) so the whole
+// garden costs a few dozen draw calls.
+const terSm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const terHash = (x, y) => { const s = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453; return s - Math.floor(s); };
+
+function terPaveTex() {   // flagstones in running bond, each its own tone
+  const S = 512, rows = 10, rh = S / rows, N = T.fbm(S, S, { scale: 8, oct: 4, seed: 71 }), r = T.rng(72);
+  const pal = ['#b3a995', '#a9a090', '#bab09d', '#9e9688', '#b5aa94', '#a8a193'].map(T.hexRGB);
+  const RD = [];
+  for (let j = 0; j < rows; j++) {
+    const k = 7 + (j % 2), w = Array.from({ length: k }, () => 0.7 + r() * 0.6), tot = w.reduce((a, b) => a + b, 0);
+    RD.push({ k, off: r() * S, w: w.map(v => v / tot * S), col: w.map(() => { const k = 0.93 + r() * 0.12; return pal[Math.floor(r() * pal.length)].map(c => c * k); }) });
+  }
+  return T.done(T.pix(S, S, (x, y) => {
+    const j = Math.floor(y / rh), ly = y - j * rh, R = RD[j];
+    let rx = (x - R.off) % S; if (rx < 0) rx += S;
+    let acc = 0, i = 0; while (i < R.k - 1 && rx >= acc + R.w[i]) { acc += R.w[i]; i++; }
+    const lx = rx - acc, e = Math.min(ly, rh - ly, lx, R.w[i] - lx), n = N[y * S + x];
+    if (e < 2.2) return [70, 65, 54, 0.1];
+    const c = R.col[i], sh = (0.88 + n * 0.28) * (e < 5 ? 0.9 + e * 0.02 : 1) * (0.97 + terHash(x, y) * 0.06);
+    return [c[0] * sh, c[1] * sh, c[2] * sh, 0.75 + n * 0.1 - (e < 5 ? 0.15 : 0)];
+  }));
+}
+function terGrassTex() {   // mown stripes, blade speckle, a little colour drift
+  const S = 512, A = T.fbm(S, S, { scale: 5, oct: 4, seed: 81 }), B = T.fbm(S, S, { scale: 48, oct: 2, seed: 82 });
+  const g1 = T.hexRGB('#436228'), g2 = T.hexRGB('#778f3e');
+  return T.done(T.pix(S, S, (x, y) => {
+    const a = A[y * S + x], b = B[y * S + x], t = terSm(0.35, 0.7, a), stripe = y < S / 2 ? 1.06 : 0.92;
+    const k = (0.8 + b * 0.42) * stripe * (b > 0.8 ? 0.82 : 1);
+    return [(g1[0] + (g2[0] - g1[0]) * t) * k, (g1[1] + (g2[1] - g1[1]) * t) * k, (g1[2] + (g2[2] - g1[2]) * t) * k, b];
+  }));
+}
+function terPatchTex() {   // big soft patches laid over the lawn: sun-dried yellow and shade
+  const S = 512, N = T.fbm(S, S, { scale: 4, oct: 4, seed: 91 }), N2 = T.fbm(S, S, { scale: 6, oct: 3, seed: 92 });
+  const c = T.canvas(S, S), g = c.getContext('2d'), im = g.createImageData(S, S);
+  for (let i = 0; i < S * S; i++) {
+    const dry = terSm(0.52, 0.72, N[i]) * 0.5, dark = terSm(0.56, 0.74, N2[i]) * 0.5, a = Math.max(dry, dark), col = dry >= dark ? [158, 146, 74] : [22, 40, 20];
+    im.data[i * 4] = col[0]; im.data[i * 4 + 1] = col[1]; im.data[i * 4 + 2] = col[2]; im.data[i * 4 + 3] = a * 255;
+  }
+  g.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function terGravelTex() {
+  const S = 256, N = T.fbm(S, S, { scale: 10, oct: 3, seed: 61 });
+  return T.done(T.pix(S, S, (x, y) => {
+    const h = terHash(x * 0.7, y * 0.7), h2 = terHash(x + 40, y + 7), k = 0.72 + N[y * S + x] * 0.3 + (h > 0.85 ? 0.25 : 0) - (h2 > 0.9 ? 0.25 : 0);
+    return [168 * k, 156 * k, 134 * k, 0.4 + h * 0.5];
+  }));
+}
+function terSidingTex() {   // faded painted clapboard
+  const S = 512, bh = 64, N = T.fbm(S, S, { scale: 4, oct: 5, seed: 101 }), r = T.rng(102);
+  const base = T.hexRGB('#8c9a90'), raw = T.hexRGB('#a89d88'), tint = Array.from({ length: S / bh }, () => 0.9 + r() * 0.18);
+  return T.done(T.pix(S, S, (x, y) => {
+    const b = Math.floor(y / bh), ly = y - b * bh, n = N[y * S + x];
+    const sh = ly < 5 ? 0.62 + ly * 0.07 : ly > bh - 9 ? 0.78 : 1.02 - (ly / bh) * 0.12;
+    const bare = terSm(0.58, 0.74, n), seam = ((x + b * 157) % 311) < 2 ? 0.6 : 1;
+    const c = base.map((v, i) => (v * (1 - bare) + raw[i] * bare) * tint[b] * (0.93 + n * 0.12));
+    return [c[0] * sh * seam, c[1] * sh * seam, c[2] * sh * seam, ly < 5 ? 0.2 : ly > bh - 9 ? 0.4 : 0.7];
+  }));
+}
+function terShingleTex() {   // rows stack along u: laid on a slab whose x runs up the slope
+  const S = 256, row = 32, N = T.fbm(S, S, { scale: 6, oct: 3, seed: 112 });
+  const pal = ['#4b4239', '#3f3830', '#564a3d', '#463d34', '#51473a'].map(T.hexRGB);
+  return T.done(T.pix(S, S, (x, y) => {
+    const j = Math.floor(x / row), lx = x - j * row, off = (j * 13) % 32, yy = (y + off) % S, k = Math.floor(yy / 32), ly = yy % 32;
+    const c = pal[(j * 7 + k * 3) % 5], v = 0.88 + terHash(j, k) * 0.24, n = N[y * S + x];
+    const sh = (lx > row - 5 ? 0.5 + (row - lx) * 0.1 : 1) * (ly < 1.5 ? 0.45 : 1) * (0.9 + n * 0.2) * v;
+    return [c[0] * sh, c[1] * sh, c[2] * sh, lx > row - 5 ? 0.2 : ly < 1.5 ? 0.15 : 0.7];
+  }));
+}
+function terAshlarTex() {   // limestone courses with weather streaks
+  const S = 512, rows = 8, rh = S / rows, N = T.fbm(S, S, { scale: 6, oct: 4, seed: 121 }), St = T.fbm(S, S, { scale: 3, oct: 3, seed: 122, sx: 7, sy: 1 });
+  const B = T.hexRGB('#d3c9b0'), r = T.rng(123), tint = Array.from({ length: 64 }, () => 0.9 + r() * 0.16);
+  return T.done(T.pix(S, S, (x, y) => {
+    const j = Math.floor(y / rh), ly = y - j * rh, off = (j % 2) * 64, lx = (x + off) % 128, bi = Math.floor(((x + off) % S) / 128) + j * 4;
+    const e = Math.min(ly, rh - ly, lx, 128 - lx), n = N[y * S + x], st = St[y * S + x];
+    if (e < 2) return [96, 88, 74, 0.1];
+    const k = tint[bi % 64] * (0.88 + n * 0.22) * (1 - Math.max(0, st - 0.55) * 0.55) * (e < 5 ? 0.92 : 1);
+    return [B[0] * k, B[1] * k, B[2] * k, 0.7 + n * 0.15 - (e < 5 ? 0.2 : 0)];
+  }));
+}
+function terLeafTex() {
+  const S = 256, N = T.fbm(S, S, { scale: 22, oct: 2, seed: 131 }), N2 = T.fbm(S, S, { scale: 5, oct: 3, seed: 132 });
+  return T.done(T.pix(S, S, (x, y) => { const k = 0.55 + N[y * S + x] * 0.85, d = 0.85 + N2[y * S + x] * 0.3; return [118 * k * d, 148 * k * d, 70 * k * d, N[y * S + x]]; }));
+}
+function terWaterTex() {
+  const S = 256, A = T.fbm(S, S, { scale: 3, oct: 4, seed: 141, sx: 1, sy: 7 }), B = T.fbm(S, S, { scale: 5, oct: 3, seed: 142, sx: 2, sy: 9 });
+  return T.done(T.pix(S, S, (x, y) => { const a = A[y * S + x], b = B[y * S + x], k = 0.82 + a * 0.3 + (b > 0.66 ? 0.14 : 0); return [235 * k, 240 * k, 238 * k, 0.3 + a * 0.4 + b * 0.3]; }));
+}
+function terBirchTex() {
+  const S = 128, N = T.fbm(S, S, { scale: 4, oct: 3, seed: 151 }), r = T.rng(152), marks = Array.from({ length: 16 }, () => [r() * S, r() * S, 6 + r() * 22, 2 + r() * 5]);
+  return T.done(T.pix(S, S, (x, y) => {
+    let k = 0.86 + N[y * S + x] * 0.2, d = 0;
+    for (const [mx, my, mw, mh] of marks) { const dx = Math.min(Math.abs(x - mx), S - Math.abs(x - mx)), dy = Math.min(Math.abs(y - my), S - Math.abs(y - my)); if (dx < mw && dy < mh * (1 - dx / mw * 0.5)) d = 1; }
+    const v = d ? 0.3 + N[y * S + x] * 0.25 : k;
+    return [236 * v, 232 * v, 220 * v, d ? 0.2 : 0.7];
+  }));
+}
+function terReedTex() {
+  const t = T.textCanvas(128, 256, g => {
+    const r = T.rng(161);
+    for (let i = 0; i < 26; i++) {
+      const x0 = 14 + r() * 100, lean = (r() - 0.5) * 50, h = 120 + r() * 130;
+      g.strokeStyle = ['#5d7a3a', '#6f8c42', '#8a9a4a', '#a39a58', '#4c6a34'][Math.floor(r() * 5)]; g.lineWidth = 2 + r() * 2.5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(x0, 256); g.quadraticCurveTo(x0 + lean * 0.3, 256 - h * 0.55, x0 + lean, 256 - h); g.stroke();
+      if (i % 9 === 0) { g.strokeStyle = '#5a3a22'; g.lineWidth = 7; g.beginPath(); g.moveTo(x0 + lean * 0.9, 256 - h + 6); g.lineTo(x0 + lean, 256 - h - 24); g.stroke(); }
+    }
+  });
+  return t;
+}
+function terPoolTex(rgb) {
+  return T.textCanvas(128, 128, g => {
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(0.35, `rgba(${rgb},.45)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  });
+}
+
+// merge static pieces per material
+function terUV(geo, su, sv) { const u = geo.attributes.uv; if (u) for (let i = 0; i < u.count; i++) u.setXY(i, u.getX(i) * su, u.getY(i) * sv); return geo; }
+function terBake() {
+  const mats = new Map(), o = new THREE.Object3D(); o.rotation.order = 'YXZ';
+  return {
+    add(geo, m, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0, s = 1) {
+      o.position.set(x, y, z); o.rotation.set(rx, ry, rz); if (Array.isArray(s)) o.scale.set(s[0], s[1], s[2]); else o.scale.setScalar(s);
+      o.updateMatrix();
+      const g = geo.index ? geo.toNonIndexed() : geo; g.applyMatrix4(o.matrix);
+      if (!mats.has(m)) mats.set(m, []); mats.get(m).push(g);
+    },
+    box(w, h, d, m, x, y, z, ry = 0, tile = 0, rx = 0, rz = 0) {
+      const g = new THREE.BoxGeometry(w, h, d); if (tile) terUV(g, Math.max(w, d) / tile, Math.max(h, Math.min(w, d)) / tile);
+      this.add(g, m, x, y, z, ry, rx, rz);
+    },
+    lathe(pts, m, x, y, z, seg = 12, s = 1) { this.add(new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), seg), m, x, y, z, 0, 0, 0, s); },
+    cyl(rt, rb, h, m, x, y, z, seg = 12, ry = 0, rx = 0, rz = 0) { this.add(new THREE.CylinderGeometry(rt, rb, h, seg), m, x, y, z, ry, rx, rz); },
+    sph(r, m, x, y, z, s = 1, seg = 8) { this.add(new THREE.SphereGeometry(r, seg, Math.max(3, seg - 2)), m, x, y, z, 0, 0, 0, s); },
+    flush(parent, { nocast = false } = {}) {
+      const out = [];
+      for (const [m, list] of mats) {
+        let n = 0; for (const g of list) n += g.attributes.position.count;
+        const P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = new Float32Array(n * 2); let i = 0;
+        for (const g of list) { P.set(g.attributes.position.array, i * 3); N.set(g.attributes.normal.array, i * 3); if (g.attributes.uv) U.set(g.attributes.uv.array, i * 2); i += g.attributes.position.count; g.dispose(); }
+        const G = new THREE.BufferGeometry(); G.setAttribute('position', new THREE.BufferAttribute(P, 3)); G.setAttribute('normal', new THREE.BufferAttribute(N, 3)); G.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+        const mesh = new THREE.Mesh(G, m); if (nocast) mesh.userData.nocast = 1; parent.add(mesh); out.push(mesh);
+      }
+      mats.clear(); return out;
+    },
+  };
+}
+const terTube = (pts, r, seg = 12, rad = 5) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(p[0], p[1], p[2]))), seg, r, rad, false);
+function terArch(w, h) {   // an arched opening outline, base on y=0
+  const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(-w / 2, h - w / 2); s.absarc(0, h - w / 2, w / 2, Math.PI, 0, true); s.lineTo(w / 2, 0); s.closePath(); return s;
+}
+
 function buildTerrace() {
-  const R = mkRoom('terrace', { p: [-14, 20, -6], t: [0, 0, -4], s: 22, day: [0xffe8c8, 2.6], night: [0x8a9ac8, 0.45] });
+  const R = mkRoom('terrace', { p: [-14, 20, -6], t: [0, 0, -4], s: 22, day: [0xffe8c8, 2.6], night: [0x9aaad8, 0.8] });
   R.outdoor = true;
-  const flag = M(0xffffff, 0.8, 0, { t: once('flags', () => T.tiles({ base: '#b0a894', grout: '#6a6454', n: 4, vary: 0.18, grime: 0.4, seed: 21 })), rep: [5, 3], bump: 0.03 });
-  struct(add(R.g, new THREE.PlaneGeometry(18, 12), flag, 0, 0.01, 2)).rotation.x = -Math.PI / 2;
-  const grass = M(0xffffff, 0.95, 0, { t: once('grass', () => T.plaster({ base: '#4c6a36', seed: 31 })), rep: [40, 40], bump: 0.04 });
-  struct(add(R.g, new THREE.PlaneGeometry(90, 90), grass, 0, -0.01, 30)).rotation.x = -Math.PI / 2;
-  const gravel = M(0xffffff, 0.95, 0, { t: once('gravel', () => T.concrete({ base: '#9a9282', seed: 41 })), rep: [2, 6], bump: 0.05 });
-  struct(add(R.g, new THREE.PlaneGeometry(2.4, 6.4), gravel, 0, 0.005, -7.2)).rotation.x = -Math.PI / 2;
-  struct(add(R.g, new THREE.PlaneGeometry(1.6, 8), gravel, -4.2, 0.004, -8.6)).rotation.set(-Math.PI / 2, 0, -0.6);
-  // the lake, with a stone shore wall
-  const water = struct(add(R.g, new THREE.PlaneGeometry(160, 70, 60, 30), new THREE.MeshStandardMaterial({ color: 0x16303a, roughness: 0.22, metalness: 0.35 }), 0, -0.35, -45.5));
-  water.rotation.x = -Math.PI / 2; water.userData.nocast = 1;
-  const wp = water.geometry.attributes.position;
-  updaters.push((dt, t) => { if (!R.g.visible) return; for (let i = 0; i < wp.count; i++) wp.setZ(i, Math.sin(wp.getX(i) * 0.6 + t * 0.8) * 0.03 + Math.cos(wp.getY(i) * 0.8 + t * 0.6) * 0.03); wp.needsUpdate = true; water.geometry.computeVertexNormals(); });
-  struct(box(R.g, 60, 0.5, 0.5, mat.stone([30, 1]), 0, -0.2, -10.3));
-  // balustrade round the terrace, open in the middle for the path to the lake
-  const bal = (x0, z0, x1, z1) => {
-    const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0), n = Math.round(len / 0.32);
-    box(R.g, 0.2, 0.1, len, mat.stone([1, 6]), (x0 + x1) / 2, 0.92, (z0 + z1) / 2).rotation.y = ang;
-    box(R.g, 0.24, 0.12, len, mat.stone([1, 6]), (x0 + x1) / 2, 0.06, (z0 + z1) / 2).rotation.y = ang;
-    for (let i = 0; i <= n; i++) { const t = i / n; lathe(R.g, [[0.001, 0.12], [0.05, 0.12], [0.03, 0.3], [0.065, 0.55], [0.03, 0.8], [0.05, 0.87], [0.001, 0.87]], mat.stone(), x0 + (x1 - x0) * t, 0, z0 + (z1 - z0) * t, 10); }
+  const b = terBake(), rr = T.rng(171), DEG = Math.PI / 180;
+  const tex = (k, f) => once(k, f);
+  // ----- materials -----
+  const mPave = M(0xffffff, 0.86, 0, { t: tex('tPave', terPaveTex), rep: [5, 3.4], bump: 0.05 });
+  const mPaveB = M(0xe2dac8, 0.86, 0, { t: tex('tPave', terPaveTex), bump: 0.05 });
+  const mGravel = M(0xffffff, 0.95, 0, { t: tex('tGravel', terGravelTex), bump: 0.06 });
+  const mBank = M(0xe8dfc8, 0.95, 0, { t: tex('tGravel', terGravelTex), bump: 0.08 });
+  const mStone = M(0xf2ebdc, 0.8, 0, { t: TX.stone(), bump: 0.03 });
+  const mRock = M(0xb4aea0, 0.9, 0, { t: TX.stone(), bump: 0.06 });
+  const mTrim = M(0xffffff, 0.7, 0, { t: tex('tTrim', () => T.plaster({ base: '#e9e2d0', seed: 19 })), bump: 0.01 });
+  const mAshlar = M(0xffffff, 0.85, 0, { t: tex('tAsh', terAshlarTex), rep: [16, 2.1], bump: 0.05 });
+  const mSlate = M(0x4a4c54, 0.65, 0.1);
+  const lampM = M(0xfff0c8, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 0.3 });
+  const mLeaf = (c) => M(c, 0.95, 0, { t: tex('tLeaf', terLeafTex), bump: 0.06 });
+  const mHedge = mLeaf(0x5d7a48), mBush = mLeaf(0x6c8c46), mPine1 = mLeaf(0x3a5c34), mPine2 = mLeaf(0x466a3a), mBirchA = mLeaf(0xd4d070), mBirchB = mLeaf(0xa8c060);
+  const mSoil = M(0x3a2a1c, 0.98), mBark = M(0x4a3626, 0.95), mBirch = M(0xffffff, 0.8, 0, { t: tex('tBirch', terBirchTex), bump: 0.04 });
+  const flw = c => M(c, 0.7), FL = { red: flw(0xb53a42), pink: flw(0xd97ca2), yellow: flw(0xe2b62e), purple: flw(0x7c4ca2), white: flw(0xece6d8), orange: flw(0xd4722c) };
+  const mOak = mat.oak();
+
+  // ----- ground: lawn (mown stripes + patches), terrace paving, paths, shore -----
+  struct(add(R.g, new THREE.PlaneGeometry(200, 120), M(0xffffff, 0.95, 0, { t: tex('tGrass', terGrassTex), rep: [53, 32], bump: 0.05 }), 0, -0.01, 45.8)).rotation.x = -Math.PI / 2;
+  const patches = add(R.g, new THREE.PlaneGeometry(110, 110), new THREE.MeshStandardMaterial({ map: tex('tPatch', terPatchTex), transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }), 0, -0.005, 28);
+  patches.rotation.x = -Math.PI / 2; patches.userData.nocast = 1; patches.renderOrder = 1;
+  struct(add(R.g, new THREE.PlaneGeometry(18, 12), mPave, 0, 0.01, 2)).rotation.x = -Math.PI / 2;
+  const flat = (w, d, m, x, y, z, ry = 0, tile = 3.6) => b.add(terUV(new THREE.PlaneGeometry(w, d), w / tile, d / tile), m, x, y, z, ry, -Math.PI / 2);
+  flat(18, 0.7, mPaveB, 0, 0.013, -3.65); flat(18, 0.7, mPaveB, 0, 0.013, 7.65); flat(0.7, 10.6, mPaveB, -8.65, 0.013, 2); flat(0.7, 10.6, mPaveB, 8.65, 0.013, 2);
+  // paths run along the two walking lines (E1 to E2, E1 to E3) so nothing stands in the way
+  const frame = (x0, z0, x1, z1) => { const dx = x1 - x0, dz = z1 - z0, l = Math.hypot(dx, dz); return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, l, dx: dx / l, dz: dz / l, nx: -dz / l, nz: dx / l, ry: Math.atan2(-dx, -dz) }; };
+  const P1 = frame(1.1, -4.0, 2.23, -10.9), P2 = frame(-3.4, -4.0, -8.3, -12.3);
+  const path = (F, w, y) => { flat(w, F.l, mGravel, F.cx, y, F.cz, F.ry, 1.6); for (const s of [-1, 1]) b.box(0.1, 0.07, F.l - (F === P2 ? 1.8 : 0), mStone, F.cx + F.nx * s * (w / 2 + 0.03) - (F === P2 ? F.dx * 0.9 : 0), 0.03, F.cz + F.nz * s * (w / 2 + 0.03) - (F === P2 ? F.dz * 0.9 : 0), F.ry, 0); };
+  path(P1, 2.4, 0.006); path(P2, 2.0, 0.006);
+  flat(3.4, 1.7, mGravel, 2.7, 0.007, -10.7, 0, 1.6);
+  flat(3.6, 2.2, mGravel, -8.2, 0.007, -12.08, 0.6202, 1.6);
+  // the shore: a bank that slides under the water, rocks and reeds
+  const bank = add(R.g, terUV(new THREE.PlaneGeometry(200, 1.65), 125, 1), mBank, 0, -0.215, -15.0); bank.rotation.x = -Math.PI / 2 - 0.251; bank.userData.nocast = 1;
+  for (let x = -30; x <= 30; x += 0.7 + rr() * 0.8) {
+    if ((x > 2.4 && x < 5.6) || (x > -13.5 && x < -6.5)) continue;
+    for (let k = 0, n = 1 + (rr() < 0.45 ? 1 : 0); k < n; k++) { const s = 0.06 + rr() * 0.16; b.add(new THREE.IcosahedronGeometry(1, 1), mRock, x + rr() * 0.6, -0.2 + s * 0.15, -14.4 - rr() * 1.1, rr() * 6, 0, 0, [s * 1.3, s * 0.7, s]); }
+  }
+  const reedM = new THREE.MeshStandardMaterial({ map: tex('tReed', terReedTex), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 });
+  for (const x of [-22, -17, -15.5, -6.2, -5.4, -2.6, -1.7, 0.3, 7, 7.8, 9.4, 13, 16.5, 21]) for (let k = 0; k < 2; k++) {
+    const z = -15.1 - rr() * 0.7, s = 0.8 + rr() * 0.6; b.add(new THREE.PlaneGeometry(1.1 * s, 1.5 * s), reedM, x + k * 0.2, 0.3 + s * 0.1, z, k * 1.2 + rr() * 0.5);
+  }
+  // the lake: dark blue-green, paler towards the far shore, slow ripples
+  const wg = new THREE.PlaneGeometry(200, 65, 1, 13); wg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(wg.attributes.position.count * 3), 3));
+  const waterM = M(0xffffff, 0.2, 0.05, { t: tex('tWater', terWaterTex), rep: [44, 13], bump: 0.07, vertexColors: true });
+  const water = struct(add(R.g, wg, waterM, 0, -0.35, -46.5)); water.rotation.x = -Math.PI / 2; water.userData.nocast = 1;
+  const wcols = (n) => {
+    const A = T.hexRGB(n ? "#0e1c2a" : "#173a40"), B = T.hexRGB(n ? "#2a3658" : "#5f8790"), col = wg.attributes.color;
+    for (let i = 0; i < col.count; i++) { const f = Math.pow(1 - Math.floor(i / 2) / 13, 1.4); col.setXYZ(i, (A[0] + (B[0] - A[0]) * f) / 255, (A[1] + (B[1] - A[1]) * f) / 255, (A[2] + (B[2] - A[2]) * f) / 255); }
+    col.needsUpdate = true;
   };
-  bal(-9, -4, -1.4, -4); bal(1.4, -4, 9, -4); bal(-9, -4, -9, 7); bal(9, -4, 9, 7);
-  const lampPost = (x, z) => {
-    const g = new THREE.Group(); g.position.set(x, 0, z); R.g.add(g);
-    lathe(g, [[0.001, 0], [0.14, 0], [0.1, 0.12], [0.05, 0.3], [0.04, 2.6], [0.07, 2.62], [0.001, 2.64]], IRON, 0, 0, 0, 12);
-    box(g, 0.24, 0.32, 0.24, M(0xfff0c8, 0.3, 0, { emissive: 0xffc070, emissiveIntensity: 1.3 }), 0, 2.82, 0).userData.nocast = 1;
-    lathe(g, [[0.001, 3.14], [0.2, 2.98], [0.18, 2.96], [0.001, 3.1]], IRON, 0, 0, 0, 4);
+  let wasNight = null;
+  updaters.push((dt, t) => {
+    if (!R.g.visible) return;
+    waterM.map.offset.x = t * 0.0035; waterM.bumpMap.offset.set(t * 0.003, -t * 0.0045);
+    const n = night(); if (n !== wasNight) { wasNight = n; wcols(n); }
+  });
+
+  // ----- balustrade with newel posts, open for the three paths -----
+  const BAL = [[-9, -4, -4.4, -4], [-2.4, -4, -1.4, -4], [1.4, -4, 9, -4], [-9, -4, -9, 7], [9, -4, 9, 7]];
+  for (const [x0, z0, x1, z1] of BAL) {
+    const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(x1 - x0, z1 - z0), n = Math.round(len / 0.3), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    b.box(0.26, 0.1, len, mStone, cx, 0.1, cz, ang, 1.5); b.box(0.3, 0.07, len, mStone, cx, 0.035, cz, ang, 1.5);
+    b.box(0.25, 0.1, len, mStone, cx, 0.87, cz, ang, 1.5); b.box(0.31, 0.05, len, mStone, cx, 0.945, cz, ang, 1.5);
+    for (let i = 1; i < n; i++) { const t = i / n; b.lathe([[0.001, 0], [0.06, 0], [0.06, 0.04], [0.04, 0.1], [0.032, 0.16], [0.07, 0.33], [0.075, 0.37], [0.04, 0.45], [0.04, 0.55], [0.06, 0.62], [0.001, 0.62]], mStone, x0 + (x1 - x0) * t, 0.15, z0 + (z1 - z0) * t, 10); }
+  }
+  for (const [x, z] of [[-9, -4], [-4.4, -4], [-2.4, -4], [-1.4, -4], [1.4, -4], [4.6, -4], [9, -4], [-9, 1.5], [9, 1.5], [-9, 7], [9, 7]]) {
+    b.box(0.36, 1.0, 0.36, mStone, x, 0.5, z, 0, 1.5); b.box(0.44, 0.08, 0.44, mStone, x, 1.04, z, 0, 1.5); b.box(0.3, 0.1, 0.3, mStone, x, 0.12, z, 0, 1.5);
+    b.add(new THREE.SphereGeometry(0.13, 10, 8), mStone, x, 1.2, z); b.cyl(0.07, 0.1, 0.08, mStone, x, 1.12, z, 10);
+  }
+
+  // ----- lamp posts (lit at night, with pools of light) -----
+  const poolM = new THREE.MeshBasicMaterial({ map: terPoolTex('255,196,120'), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2 });
+  const pools = [];
+  const LAMPS = [[-8.6, -3.6], [8.6, -3.6], [-1.8, -4.2], [1.8, -4.2], [2.75, -10.2]];
+  for (const [x, z] of LAMPS) {
+    b.lathe([[0.001, 0], [0.21, 0], [0.21, 0.08], [0.16, 0.14], [0.12, 0.26], [0.1, 0.42], [0.06, 0.55], [0.045, 0.7], [0.045, 2.3], [0.07, 2.36], [0.07, 2.42], [0.05, 2.46], [0.06, 2.5], [0.001, 2.5]], IRON, x, 0, z, 14);
+    b.box(0.3, 0.04, 0.3, IRON, x, 2.52, z); b.box(0.24, 0.36, 0.24, lampM, x, 2.72, z);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.03, 0.4, 0.03, IRON, x + sx * 0.125, 2.72, z + sz * 0.125);
+    b.lathe([[0.001, 2.92], [0.26, 2.9], [0.2, 2.97], [0.1, 3.08], [0.04, 3.15], [0.001, 3.2]], IRON, x, 0, z, 8); b.sph(0.04, IRON, x, 3.22, z);
+    const p = add(R.g, new THREE.PlaneGeometry(4.6, 4.6), poolM, x, 0.03, z); p.rotation.x = -Math.PI / 2; p.userData.nocast = 1; p.renderOrder = 2; pools.push(p);
+  }
+  const poolB = poolM.clone(), poolC = poolM.clone(); poolB.opacity = poolC.opacity = 0;
+  updaters.push(() => { if (!R.g.visible) return; const n = night(); lampM.emissiveIntensity = n ? 2.4 : 0.35; poolM.opacity = n ? 0.62 : 0; poolB.opacity = n ? 0.3 : 0; poolC.opacity = n ? 0.16 : 0; });
+
+  // ----- planters, beds, hedges, trees -----
+  const bloom = (cx, cz, y, lx, lz, ry, c, r0 = 0.05) => { const co = Math.cos(ry), si = Math.sin(ry); b.sph(r0 + rr() * 0.025, c, cx + lx * co + lz * si, y, cz - lx * si + lz * co, 1, 6); };
+  const urn = (x, z, s, pal) => {
+    b.lathe([[0.001, 0], [0.26, 0], [0.26, 0.06], [0.2, 0.12], [0.18, 0.2], [0.28, 0.42], [0.34, 0.58], [0.36, 0.64], [0.33, 0.66], [0.3, 0.64], [0.001, 0.6]], mStone, x, 0, z, 16, s);
+    b.cyl(0.3 * s, 0.3 * s, 0.03, mSoil, x, 0.62 * s, z, 12);
+    for (let i = 0; i < 6; i++) { const a = i * 1.05; b.add(new THREE.SphereGeometry(0.2, 7, 5), mBush, x + Math.cos(a) * 0.14 * s, 0.76 * s, z + Math.sin(a) * 0.14 * s, 0, 0, 0, [s, 0.75 * s, s]); }
+    for (let i = 0; i < 16; i++) { const a = rr() * 6.28, d = rr() * 0.26 * s; b.sph(0.05 * s, FL[pal[i % pal.length]], x + Math.cos(a) * d, (0.8 + (0.26 * s - d) * 0.55) * s, z + Math.sin(a) * d, 1, 6); }
   };
-  for (const [x, z] of [[-8.6, -3.6], [8.6, -3.6], [-1.8, -4.2], [1.8, -4.2], [3.3, -10.6]]) lampPost(x, z);
-  for (const [x, z] of [[-6, -3.2], [6, -3.2], [-8.3, 5.5], [8.3, 5.5]]) { lathe(R.g, [[0.001, 0], [0.28, 0], [0.22, 0.1], [0.3, 0.55], [0.34, 0.62], [0.001, 0.6]], mat.stone(), x, 0, z, 20); sph(R.g, 0.5, M(0x3a5a2a, 0.9, 0, { t: TX.velvet(), rep: [3, 3] }), x, 1.1, z, 18); }
-  const bench = (x, z, ry) => {
+  for (const [x, z, s, p] of [[-6, -3.2, 1.15, ['red', 'white']], [6, -3.2, 1.15, ['red', 'white']], [-8.3, 5.5, 1.15, ['pink', 'white']], [8.3, 5.5, 1.15, ['pink', 'white']], [-4.9, 5.4, 1.0, ['yellow', 'orange']], [4.9, 5.4, 1.0, ['yellow', 'orange']]]) urn(x, z, s, p);
+  const bed = (cx, cz, w, d, ry, pal) => {
+    const co = Math.cos(ry), si = Math.sin(ry);
+    b.box(w, 0.14, d, mSoil, cx, 0.06, cz, ry, 0);
+    for (const [ew, ed, ex, ez] of [[w + 0.12, 0.1, 0, d / 2], [w + 0.12, 0.1, 0, -d / 2], [0.1, d, w / 2, 0], [0.1, d, -w / 2, 0]]) b.box(ew, 0.14, ed, mStone, cx + ex * co + ez * si, 0.07, cz - ex * si + ez * co, ry, 1.5);
+    for (let i = 0, n = Math.ceil(w * d / 0.2); i < n; i++) { const lx = (rr() - 0.5) * (w - 0.25), lz = (rr() - 0.5) * (d - 0.25); b.add(new THREE.SphereGeometry(0.17 + rr() * 0.08, 7, 5), mBush, cx + lx * co + lz * si, 0.19, cz - lx * si + lz * co, 0, 0, 0, [1, 0.7, 1]); }
+    for (let i = 0, n = Math.ceil(w * d * 40); i < n; i++) bloom(cx, cz, 0.26 + rr() * 0.14, (rr() - 0.5) * (w - 0.15), (rr() - 0.5) * (d - 0.15), ry, FL[pal[i % pal.length]]);
+  };
+  const along = (F, t, off) => [F.cx - F.dx * F.l / 2 + F.dx * t + F.nx * off, F.cz - F.dz * F.l / 2 + F.dz * t + F.nz * off];
+  // beds beside the main path and under the balustrade, clipped hedges and topiary leading to the lake
+  for (const s of [-1, 1]) {
+    const [hx, hz] = along(P1, 3.3, s * 1.75); b.box(0.75, 0.9, 4.6, mHedge, hx, 0.45, hz, P1.ry, 1.2); b.box(0.6, 0.12, 4.5, mHedge, hx, 0.94, hz, P1.ry, 1.2);
+    const [tx, tz] = along(P1, 0.6, s * 1.75); b.cyl(0.15, 0.2, 0.5, mStone, tx, 0.25, tz, 10); b.sph(0.36, mHedge, tx, 0.86, tz, 1, 10);
+    const [qx, qz] = along(P1, 6.1, s * 1.75); b.cyl(0.15, 0.2, 0.5, mStone, qx, 0.25, qz, 10); b.sph(0.36, mHedge, qx, 0.86, qz, 1, 10);
+  }
+  bed(-1.3, -7.9, 1.3, 3.0, P1.ry, ['red', 'yellow', 'purple']); bed(4.9, -7.0, 1.3, 3.0, P1.ry, ['pink', 'white', 'purple']);
+  bed(-6.9, -4.9, 3.0, 0.8, 0, ['yellow', 'orange', 'red']); bed(6.9, -4.9, 3.0, 0.8, 0, ['pink', 'white', 'yellow']);
+  bed(-9.3, -8.0, 1.2, 2.4, 0.5, ['white', 'purple', 'pink']); bed(6.0, 9.0, 3.0, 0.9, 0, ['red', 'yellow', 'white']); bed(-6.0, 9.0, 3.0, 0.9, 0, ['purple', 'pink', 'white']);
+  bed(9.6, 12.5, 1.2, 3, 0.3, ['yellow', 'orange', 'red']); bed(-9.6, 12.5, 1.2, 3, -0.3, ['pink', 'white', 'purple']);
+  const pine = (x, z, h) => {
+    b.cyl(0.07 * h / 6, 0.14 * h / 6, h * 0.3, mBark, x, h * 0.15, z, 7);
+    for (let i = 0; i < 6; i++) { const r = h * 0.2 * (1 - i * 0.14), hh = h * 0.27; b.add(new THREE.ConeGeometry(r, hh, 11), i % 2 ? mPine1 : mPine2, x, h * (0.2 + i * 0.125) + hh / 2, z, rr() * 6, 0, 0, [1, 1, 1]); }
+  };
+  const birch = (x, z, h, lean) => {
+    b.add(new THREE.CylinderGeometry(0.05 * h / 5, 0.1 * h / 5, h * 0.72, 8), mBirch, x - lean * h * 0.18, h * 0.36, z, 0, 0, lean);
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + rr(); b.add(new THREE.CylinderGeometry(0.015, 0.03, h * 0.3, 5), mBirch, x + Math.cos(a) * h * 0.09, h * (0.55 + i * 0.06), z + Math.sin(a) * h * 0.09, 0, Math.sin(a) * 0.55, Math.cos(a) * 0.55); }
+    for (let i = 0; i < 26; i++) { const a = i * 2.4, v = (i % 7) / 6, d = h * (0.05 + Math.sin(v * 3.1) * 0.13) * (0.5 + (i % 3) * 0.3); b.add(new THREE.SphereGeometry(h * (0.05 + rr() * 0.04), 8, 6), i % 2 ? mBirchA : mBirchB, x + Math.cos(a) * d, h * (0.5 + v * 0.45), z + Math.sin(a) * d, rr() * 6, 0, 0, [1.2, 0.8, 1.2]); }
+  };
+  for (const [x, z, h] of [[-14.5, -1.5, 7.5], [-16.5, 3, 9], [-13.5, 7.5, 6.5], [14.5, -2, 8], [16.5, 2.5, 6.5], [14, 8, 8.5], [-15, 14, 9.5], [15, 15, 9], [-19, -4, 8.5], [19, -3, 9], [21, 5, 7.5]]) pine(x, z, h);
+  for (const [x, z, h, l] of [[-14.2, -10, 6, 0.05], [-12.6, -11.6, 5, -0.06], [9.6, -12.4, 5.5, 0.04], [12.3, -8.2, 6.2, -0.05], [11.5, -11, 4.6, 0.07], [-8.2, 9.8, 5, 0.03]]) birch(x, z, h, l);
+
+  // ----- benches (the first is the one to inspect) -----
+  const bench = (x, z, ry, tagged) => {
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; R.g.add(g);
-    for (let i = 0; i < 4; i++) box(g, 1.6, 0.03, 0.09, mat.oak(), 0, 0.45, -0.18 + i * 0.12);
-    for (let i = 0; i < 3; i++) box(g, 1.6, 0.09, 0.03, mat.oak(), 0, 0.62 + i * 0.12, -0.26);
-    for (const s of [-1, 1]) { box(g, 0.05, 0.45, 0.5, IRON, s * 0.72, 0.225, -0.02); box(g, 0.05, 0.5, 0.05, IRON, s * 0.72, 0.7, -0.26); }
-    return g;
+    const bb = terBake();
+    for (let i = 0; i < 4; i++) bb.box(1.6, 0.03, 0.09, mOak, 0, 0.45, -0.18 + i * 0.12);
+    for (let i = 0; i < 3; i++) bb.box(1.6, 0.09, 0.03, mOak, 0, 0.64 + i * 0.12, -0.27 - i * 0.03, 0, 0, -0.18);
+    for (const s of [-1, 1]) {
+      bb.box(0.04, 0.45, 0.04, IRON, s * 0.72, 0.225, 0.2); bb.box(0.04, 0.95, 0.04, IRON, s * 0.72, 0.47, -0.27, 0, 0, -0.14);
+      bb.box(0.04, 0.04, 0.55, IRON, s * 0.72, 0.43, -0.03); bb.box(0.04, 0.04, 0.5, IRON, s * 0.72, 0.68, -0.05);
+      bb.add(new THREE.TorusGeometry(0.075, 0.014, 6, 14, Math.PI * 1.5), IRON, s * 0.72, 0.6, 0.2, Math.PI / 2, 0, 0.8); bb.box(0.06, 0.03, 0.12, IRON, s * 0.72, 0.015, 0.2);
+    }
+    bb.flush(g, { nocast: false }); if (tagged) tag(g, 'tbench', 'Bench'); return g;
   };
-  tag(bench(-4.5, 1.5, 0.3), 'tbench', 'Bench');
-  bench(4.5, 1.5, -0.3);
-  // the dock, a rowboat and the padlocked boathouse
-  for (let i = 0; i < 26; i++) box(R.g, 1.6, 0.06, 0.38, mat.oak(), 4, 0.02, -10.4 - i * 0.42);
-  for (let i = 0; i < 6; i++) for (const s of [-1, 1]) cyl(R.g, 0.07, 0.07, 1.3, M(0x4a3a2a, 0.9), 4 + s * 0.8, -0.35, -10.6 - i * 2, 8);
-  box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 4.75, 0.45, -20.9); box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 3.25, 0.45, -20.9);
-  tag(box(R.g, 0.1, 0.9, 0.1, M(0x4a3a2a, 0.9), 4.75, 0.45, -15), 'dockpost', 'Dock post');
+  bench(-4.5, 1.5, 0.3, true); bench(4.5, 1.5, -0.3, false);
+
+  // ----- the dock, with posts and rope, a life ring and the rowboat -----
+  const mDeck = M(0xffffff, 0.88, 0, { t: tex('tDeck', () => T.wood({ base: '#7f6f5a', dark: '#3b3228', planks: 6, seed: 23 })), bump: 0.04 });
+  const mPost = M(0x4a3c2e, 0.92, 0, { t: TX.oak(), bump: 0.03 }), mRope = M(0xb59f72, 0.95, 0, { t: TX.cloth(), bump: 0.05 });
+  b.add(terUV(new THREE.BoxGeometry(1.6, 0.08, 10.9), mDeck.map ? 1 : 1, 10.9 / 1.2), mDeck, 4, 0.02, -15.85);
+  for (const s of [-1, 1]) { b.box(0.08, 0.16, 10.9, mPost, 4 + s * 0.82, -0.04, -15.85); b.box(0.12, 0.16, 10.9, mPost, 4 + s * 0.45, -0.12, -15.85); }
+  const dockZ = [0, 1, 2, 3, 4, 5].map(i => -10.6 - i * 2);
+  for (const z of dockZ) for (const s of [-1, 1]) { b.cyl(0.08, 0.09, 1.3, mPost, 4 + s * 0.8, -0.35, z, 8); b.cyl(0.095, 0.095, 0.04, mPost, 4 + s * 0.8, 0.31, z, 8); }
+  for (const s of [-1, 1]) for (let i = 0; i < dockZ.length - 1; i++) b.add(terTube([[4 + s * 0.8, 0.27, dockZ[i]], [4 + s * 0.8, 0.14, (dockZ[i] + dockZ[i + 1]) / 2], [4 + s * 0.8, 0.27, dockZ[i + 1]]], 0.02, 10, 5), mRope);
+  b.box(0.1, 0.9, 0.1, mPost, 4.75, 0.45, -20.9); b.box(0.1, 0.9, 0.1, mPost, 3.25, 0.45, -20.9);
+  { // the post with the rope burn
+    const g = new THREE.Group(); g.position.set(4.75, 0, -15); R.g.add(g);
+    box(g, 0.14, 0.9, 0.14, mPost, 0, 0.45, 0);
+    for (let i = 0; i < 4; i++) add(g, new THREE.TorusGeometry(0.1, 0.018, 6, 14), mRope, 0, 0.5 + i * 0.045, 0).rotation.x = Math.PI / 2 + (i - 1.5) * 0.06;
+    add(g, terTube([[0.1, 0.55, 0], [0.2, 0.3, 0.1], [0.28, 0.06, 0.05], [0.4, 0.03, 0.12]], 0.02, 8, 5), mRope);
+    tag(g, 'dockpost', 'Dock post');
+  }
+  { // life ring on its own post
+    const x = 3.05, z = -11.6; b.box(0.1, 1.3, 0.1, mPost, x, 0.65, z); b.box(0.2, 0.05, 0.2, mPost, x, 1.32, z); b.box(0.04, 0.04, 0.12, IRON, x, 1.1, z - 0.08);
+    const ring = flw(0xece6d8), red = flw(0xb02a2a);
+    b.add(new THREE.TorusGeometry(0.3, 0.075, 8, 22), ring, x, 0.9, z - 0.16);
+    for (let i = 0; i < 4; i++) b.add(new THREE.TorusGeometry(0.3, 0.08, 8, 6, Math.PI / 4), red, x, 0.9, z - 0.16, 0, 0, i * Math.PI / 2 + Math.PI / 8);
+    b.add(terTube([[x - 0.3, 0.9, z - 0.2], [x - 0.36, 0.6, z - 0.24], [x - 0.1, 0.5, z - 0.2], [x + 0.1, 0.62, z - 0.2], [x + 0.3, 0.9, z - 0.2]], 0.012, 12, 4), mRope);
+  }
   const boat = new THREE.Group(); boat.position.set(5.8, -0.28, -16); boat.rotation.y = 0.12; R.g.add(boat);
-  lathe(boat, [[0.001, -0.3], [0.45, -0.26], [0.62, 0], [0.64, 0.08]], M(0x7a3a2a, 0.6, 0, { side: THREE.DoubleSide }), 0, 0.3, 0, 24).scale.set(0.9, 1, 2.6);
-  box(boat, 1.05, 0.04, 0.22, mat.oak(), 0, 0.3, 0.3); box(boat, 1.05, 0.04, 0.22, mat.oak(), 0, 0.3, -0.6);
+  const bp = [[0.001, -0.3], [0.45, -0.26], [0.62, 0], [0.64, 0.08]];
+  lathe(boat, bp, M(0x7a3a2a, 0.55, 0, { t: TX.oak(), bump: 0.02 }), 0, 0.3, 0, 24).scale.set(0.9, 1, 2.6);
+  lathe(boat, bp, M(0xd4c6a2, 0.75, 0, { side: THREE.BackSide }), 0, 0.3, 0, 24).scale.set(0.87, 0.97, 2.52);
+  lathe(boat, [[0.62, 0.015], [0.645, 0.015], [0.645, 0.075], [0.62, 0.075]], M(0xe6dcc0, 0.6), 0, 0.3, 0, 24).scale.set(0.9, 1, 2.6);
+  add(boat, new THREE.TorusGeometry(0.64, 0.025, 6, 32), mOak, 0, 0.385, 0).rotation.x = Math.PI / 2;
+  boat.children[boat.children.length - 1].scale.set(0.9, 2.6, 1);
+  for (const z of [0.7, 0, -0.7]) box(boat, 1.05, 0.04, 0.2, mOak, 0, 0.27, z);
+  for (const s of [-1, 1]) { cyl(boat, 0.018, 0.018, 1.9, mOak, s * 0.3, 0.3, 0.1, 6).rotation.set(Math.PI / 2, 0, s * 0.05); box(boat, 0.1, 0.01, 0.32, mOak, s * 0.3, 0.3, 1.08); }
+  add(boat, new THREE.TorusGeometry(0.1, 0.03, 6, 12), mRope, 0.1, 0.25, -0.5).rotation.x = Math.PI / 2;
   updaters.push((dt, t) => { boat.position.y = -0.28 + Math.sin(t * 1.1) * 0.025; boat.rotation.z = Math.sin(t * 0.8) * 0.03; });
   tag(boat, 'rowboat', 'Rowboat');
+
+  // ----- the boathouse: stone footing, clapboard walls, shingled roof closed at the ridge, padlocked doors -----
   const bh = new THREE.Group(); bh.position.set(-10, 0, -14.6); faceTo(bh, -6, -9); R.g.add(bh);
-  const plank = M(0xffffff, 0.8, 0, { t: once('planks', () => T.wood({ base: '#6a5a48', dark: '#3a2e22', planks: 10, seed: 17 })), rep: [2, 1], bump: 0.03 });
-  box(bh, 4.6, 2.8, 4, plank, 0, 1.4, 0);
-  for (const s of [-1, 1]) box(bh, 2.7, 0.08, 4.4, M(0x3a3a3e, 0.8), s * 1.2, 3.35, 0).rotation.z = s * -0.62;
-  const bd = new THREE.Group(); bd.position.set(0, 0, 2.02); bh.add(bd);
-  box(bd, 2.2, 2.2, 0.06, M(0x4a3e30, 0.8), 0, 1.1, 0);
-  box(bd, 0.02, 2.2, 0.07, M(0x2a2018, 0.8), 0, 1.1, 0.01);
-  box(bd, 0.5, 0.05, 0.04, IRON, 0, 1.2, 0.05);
-  box(bd, 0.08, 0.1, 0.03, BRASS, 0.04, 1.12, 0.08);
+  const mSide = M(0xffffff, 0.82, 0, { t: tex('tSide', terSidingTex), bump: 0.04 }), mShing = M(0xffffff, 0.8, 0, { t: tex('tShing', terShingleTex), bump: 0.06 });
+  const mWhite = M(0xd9d6c6, 0.75), mDoorW = M(0xffffff, 0.8, 0, { t: tex('tDoorW', () => T.wood({ base: '#53493a', dark: '#2a231a', planks: 8, vertical: true, seed: 27 })), bump: 0.03 });
+  const bb = terBake(), W = 4.6, D = 4.0, WH = 2.6, Y0 = 0.3;
+  const sd = (w, h, d, x, y, z) => { const g = new THREE.BoxGeometry(w, h, d); terUV(g, Math.max(w, d) / 2.0, h / 1.28); bb.add(g, mSide, x, y, z); };
+  bb.box(W + 0.4, 0.9, D + 0.4, mStone, 0, -0.05, 0, 0, 1.5); bb.box(W + 0.5, 0.06, D + 0.5, mStone, 0, 0.43, 0, 0, 1.5);
+  sd(0.12, WH, D, -W / 2 + 0.06, Y0 + WH / 2 + 0.1, 0); sd(0.12, WH, D, W / 2 - 0.06, Y0 + WH / 2 + 0.1, 0); sd(W, WH, 0.12, 0, Y0 + WH / 2 + 0.1, -D / 2 + 0.06);
+  const FY = Y0 + 0.1;
+  sd(1.1, WH, 0.12, -1.75, FY + WH / 2, D / 2 - 0.06); sd(1.1, WH, 0.12, 1.75, FY + WH / 2, D / 2 - 0.06); sd(2.4, 0.3, 0.12, 0, FY + WH - 0.15, D / 2 - 0.06);
+  for (const z of [D / 2 - 0.06, -D / 2 + 0.06]) {   // gable triangles
+    const s = new THREE.Shape(); s.moveTo(-W / 2, 0); s.lineTo(W / 2, 0); s.lineTo(0, 1.5); s.closePath();
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: false }); terUV(g, 1 / 2.0, 1 / 1.28); bb.add(g, mSide, 0, FY + WH, z - 0.06);
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) bb.box(0.14, WH + 0.1, 0.14, mWhite, sx * (W / 2 - 0.02), FY + WH / 2, sz * (D / 2 - 0.02));   // corner boards
+  bb.box(0.14, 2.35, 0.14, mWhite, -1.27, Y0 + 1.175, D / 2 + 0.02); bb.box(0.14, 2.35, 0.14, mWhite, 1.27, Y0 + 1.175, D / 2 + 0.02); bb.box(2.7, 0.16, 0.16, mWhite, 0, Y0 + 2.4, D / 2 + 0.02); bb.box(2.5, 0.06, 0.4, mStone, 0, Y0 + 0.02, D / 2 + 0.15);
+  const ra = Math.atan2(1.5, 2.3), Ls = 3.2;
+  for (const s of [-1, 1]) {
+    const g = new THREE.BoxGeometry(Ls, 0.08, D + 0.5); terUV(g, Ls / 1.12, (D + 0.5) / 1.5);
+    bb.add(g, mShing, s * 1.298, FY + WH + 1.5 + 0.04 - 0.847, 0, 0, 0, -s * ra);
+    const f = (Ls - 0.05) * Math.cos(ra); bb.box(0.05, 0.16, D + 0.5, mWhite, s * (f + 0.02), FY + WH + 1.54 - (Ls - 0.05) * Math.sin(ra) - 0.06, 0);
+  }
+  bb.box(0.2, 0.2, D + 0.6, mSlate, 0, FY + WH + 1.5 + 0.08, 0, 0, 0, 0, Math.PI / 4);
+  // small windows with sills and muntins, a vent in the gable
+  const mGlass = M(0x1c262c, 0.1, 0.5, { emissive: 0xffc070, emissiveIntensity: 0 }); R.bhGlass = mGlass;
+  for (const sx of [-1, 1]) {
+    const x = sx * 1.75, y = FY + 1.45;
+    bb.box(0.72, 0.8, 0.05, mGlass, x, y, D / 2 + 0.03); bb.box(0.84, 0.06, 0.06, mWhite, x, y + 0.43, D / 2 + 0.04); bb.box(0.84, 0.06, 0.1, mWhite, x, y - 0.43, D / 2 + 0.06);
+    bb.box(0.06, 0.88, 0.06, mWhite, x - 0.4, y, D / 2 + 0.04); bb.box(0.06, 0.88, 0.06, mWhite, x + 0.4, y, D / 2 + 0.04); bb.box(0.04, 0.8, 0.04, mWhite, x, y, D / 2 + 0.06); bb.box(0.72, 0.04, 0.04, mWhite, x, y, D / 2 + 0.06);
+  }
+  bb.add(new THREE.CylinderGeometry(0.24, 0.24, 0.05, 16), mWhite, 0, FY + WH + 0.6, D / 2 + 0.06, 0, Math.PI / 2, 0); bb.add(new THREE.CylinderGeometry(0.17, 0.17, 0.06, 16), mGlass, 0, FY + WH + 0.6, D / 2 + 0.08, 0, Math.PI / 2, 0);
+  // crates, a barrel and an oar by the door
+  bb.box(0.7, 0.5, 0.5, mOak, -2.1, 0.25, D / 2 + 0.65, 0.2); bb.box(0.55, 0.4, 0.45, mOak, -2.15, 0.7, D / 2 + 0.6, -0.1);
+  bb.lathe([[0.001, 0], [0.26, 0], [0.31, 0.3], [0.33, 0.5], [0.31, 0.75], [0.26, 0.9], [0.001, 0.9]], mOak, 2.15, 0, D / 2 + 0.7, 14); bb.cyl(0.325, 0.325, 0.03, IRON, 2.15, 0.28, D / 2 + 0.7, 14); bb.cyl(0.33, 0.33, 0.03, IRON, 2.15, 0.62, D / 2 + 0.7, 14);
+  bb.flush(bh);
+  // the double doors: planks, braces, a rusted chain and a shiny new padlock (hotspot)
+  const bd = new THREE.Group(); bd.position.set(0, Y0, D / 2 + 0.02); bh.add(bd);
+  const dm = (w, h, d, m, x, y, z, rz = 0) => { const o = box(bd, w, h, d, m, x, y, z); o.rotation.z = rz; return o; };
+  for (const s of [-1, 1]) { const g = new THREE.BoxGeometry(1.14, 2.28, 0.07); terUV(g, 1, 1); add(bd, g, mDoorW, s * 0.58, 1.14, 0); dm(0.12, 2.0, 0.04, mPost, s * 1.0, 1.1, 0.05); dm(1.0, 0.1, 0.04, mPost, s * 0.58, 0.45, 0.05); dm(1.0, 0.1, 0.04, mPost, s * 0.58, 1.9, 0.05); dm(1.2, 0.09, 0.04, mPost, s * 0.58, 1.17, 0.055, s * 0.62); }
+  dm(0.02, 2.28, 0.075, M(0x1a140c, 0.9), 0, 1.14, 0.005);
+  const rust = M(0x5c3a26, 0.85, 0.7), steel = M(0xd9d4c4, 0.22, 1);
+  for (const s of [-1, 1]) add(bd, new THREE.TorusGeometry(0.06, 0.012, 6, 14), rust, s * 0.24, 1.18, 0.1);
+  dm(0.7, 0.07, 0.02, rust, 0, 1.18, 0.09);
+  for (let i = 0; i < 12; i++) { const t = i / 11, x = -0.3 + t * 0.6, y = 1.12 - 0.13 * (1 - Math.pow((x / 0.3), 2) * 0.0) * Math.sin(t * Math.PI); add(bd, new THREE.TorusGeometry(0.03, 0.008, 5, 8), rust, x, y, 0.13).rotation.set(0, i % 2 ? Math.PI / 2 : 0, 0.3 * Math.sin(t * Math.PI)); }
+  box(bd, 0.1, 0.12, 0.05, steel, 0, 0.93, 0.13); const sh = add(bd, new THREE.TorusGeometry(0.035, 0.011, 6, 12, Math.PI), steel, 0, 0.99, 0.13); sh.rotation.z = 0;
+  box(bd, 0.025, 0.025, 0.012, IRON, 0, 0.93, 0.16);
   tag(bd, 'boathouse', 'Boathouse doors');
-  // the Aquadome from outside: stone drum, glass dome, portico and front doors
-  const dome = new THREE.Group(); dome.position.set(0, 0, 18); R.g.add(dome);
-  struct(add(dome, new THREE.CylinderGeometry(9.3, 9.4, 4.6, 64, 1, true), mat.stone([12, 2]), 0, 2.3, 0));
-  add(dome, new THREE.TorusGeometry(9.35, 0.18, 8, 64), mat.stone(), 0, 4.6, 0).rotation.x = Math.PI / 2;
-  const glow = M(0xd8e0d8, 0.08, 0.2, { transparent: true, opacity: 0.55, emissive: 0xffc070, emissiveIntensity: 0 });
-  add(dome, new THREE.SphereGeometry(9.2, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), glow, 0, 4.6, 0).userData.nocast = 1;
-  R.domeGlow = glow;
-  for (let i = 0; i < 8; i++) add(dome, new THREE.TorusGeometry(9.25, 0.07, 6, 48, Math.PI), BRONZE, 0, 4.6, 0).rotation.y = (i / 8) * Math.PI;
-  const lit = M(0x2a2418, 0.3, 0, { emissive: 0xffb860, emissiveIntensity: 0 }); R.winGlow = lit;
-  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; if (Math.cos(a) < -0.85) continue; const w = box(R.g, 1.1, 1.7, 0.1, lit, Math.sin(a) * 9.42, 2.3, 18 + Math.cos(a) * 9.42); w.rotation.y = a; }
-  for (const x of [-3, -1.2, 1.2, 3]) lathe(R.g, [[0.001, 0], [0.34, 0], [0.34, 0.2], [0.26, 0.3], [0.24, 4.2], [0.34, 4.35], [0.36, 4.5], [0.001, 4.5]], mat.stone([2, 3]), x, 0, 7.6, 24);
-  box(R.g, 7.4, 0.5, 2.2, mat.stone([6, 1]), 0, 4.75, 8.2);
-  const ped = new THREE.Shape(); ped.moveTo(-3.8, 0); ped.lineTo(3.8, 0); ped.lineTo(0, 1.2); ped.closePath();
-  add(R.g, new THREE.ExtrudeGeometry(ped, { depth: 2.2, bevelEnabled: false }), mat.stone([2, 1]), 0, 5.0, 7.1);
-  plaqueMesh(R.g, 'THE AQUADOME', 3.2, 0.42, 0, 5.45, 7.06, Math.PI, { size: 0.5, bg: '#8a7a5a', fg: '#2a2014' });
-  door(R, 0, 9.05, 'Lobby', 'exit_terrace', [0, 0]);
-  for (let i = 0; i < 3; i++) box(R.g, 7 - i * 0.6, 0.12, 0.5, mat.stone([4, 1]), 0, 0.06 + i * 0.12, 6.9 + i * 0.5);
+  { const gp = add(bh, new THREE.PlaneGeometry(4.6, 4.6), poolB, 0, 0.05, D / 2 + 1.7); gp.rotation.x = -Math.PI / 2; gp.userData.nocast = 1; gp.renderOrder = 2;
+    const wp2 = add(bh, new THREE.PlaneGeometry(3.0, 3.0), poolC, 0, Y0 + 2.1, D / 2 + 0.2); wp2.userData.nocast = 1; wp2.renderOrder = 2; }
+  // lantern by the door and a weathervane
+  { const lg = new THREE.Group(); lg.position.set(0, Y0 + 2.78, D / 2 + 0.12); bh.add(lg);
+    const lb = terBake(); lb.box(0.1, 0.3, 0.03, IRON, 0, 0, 0); lb.box(0.04, 0.04, 0.2, IRON, 0, 0.1, 0.1); lb.box(0.14, 0.2, 0.14, lampM, 0, 0.02, 0.2); lb.add(new THREE.ConeGeometry(0.12, 0.1, 4), IRON, 0, 0.17, 0.2, Math.PI / 4); lb.flush(lg); }
+  { const wv = new THREE.Group(); wv.position.set(0, FY + WH + 1.5 + 0.2, 0); bh.add(wv);
+    cyl(wv, 0.012, 0.012, 0.75, IRON, 0, 0.37, 0, 6); sph(wv, 0.045, BRASS, 0, 0.78, 0, 8);
+    for (const [ry, l] of [[0, 0.3], [Math.PI / 2, 0.3]]) box(wv, 0.02, 0.02, l * 2, IRON, 0, 0.5, 0).rotation.y = ry;
+    const ar = new THREE.Group(); ar.position.y = 0.88; wv.add(ar); box(ar, 0.015, 0.012, 0.5, BRASS, 0, 0, 0); const hd = add(ar, new THREE.ConeGeometry(0.05, 0.14, 4), BRASS, 0, 0, 0.3); hd.rotation.x = Math.PI / 2; box(ar, 0.012, 0.18, 0.14, BRASS, 0, 0.04, -0.25);
+    updaters.push((dt, t) => { ar.rotation.y = 0.6 + Math.sin(t * 0.35) * 0.5; }); }
+  // the stone footing meets the water: a few rocks and reeds round the back
+  for (let i = 0; i < 9; i++) { const a = Math.PI + 0.3 + rr() * 2.5, s = 0.12 + rr() * 0.2; b.add(new THREE.IcosahedronGeometry(1, 1), mRock, -10 + Math.cos(a) * 3.3, -0.15 + s * 0.2, -15.2 + Math.sin(a) * 2.8, rr() * 6, 0, 0, [s * 1.3, s * 0.7, s]); }
+
+  // ----- the Aquadome from outside: ashlar drum with pilasters and arched windows, cornice, glazed dome, portico and steps -----
+  const Z0 = 18, RD = 9.3, px = (a, r) => [Math.sin(a) * r, Z0 + Math.cos(a) * r];
+  const dome = new THREE.Group(); dome.position.set(0, 0, Z0); R.g.add(dome);
+  struct(add(dome, new THREE.CylinderGeometry(9.85, 9.95, 0.6, 72), mStone, 0, 0.3, 0));
+  struct(add(dome, new THREE.CylinderGeometry(RD, RD, 6.1, 72, 1, true), mAshlar, 0, 3.65, 0));
+  const mWin = M(0x2e3a42, 0.12, 0.5, { emissive: 0xffb860, emissiveIntensity: 0 }); R.winGlow = mWin;
+  for (let k = 0; k < 16; k++) {   // pilasters with bases and capitals
+    const a = k / 16 * Math.PI * 2; if (Math.abs(a - Math.PI) < 0.5) continue;
+    const [x, z] = px(a, RD + 0.14), [x1, z1] = px(a, RD + 0.2);
+    b.box(0.64, 5.4, 0.38, mTrim, x, 3.3, z, a); b.box(0.86, 0.36, 0.56, mTrim, x1, 0.78, z1, a); b.box(0.84, 0.3, 0.52, mTrim, x1, 6.15, z1, a); b.box(0.96, 0.1, 0.6, mTrim, x1, 6.37, z1, a);
+  }
+  for (let k = 0; k < 16; k++) {
+    const a = (k + 0.5) / 16 * Math.PI * 2; if (Math.abs(a - Math.PI) < 0.5) continue;
+    const w = 1.25, h = 3.4, y0 = 1.25, [fx, fz] = px(a, RD - 0.03), [gx, gz] = px(a, RD + 0.03), [mx, mz] = px(a, RD + 0.05), [sx, sz] = px(a, RD + 0.12);
+    const outer = terArch(w + 0.36, h + 0.18); outer.holes.push(new THREE.Path(terArch(w, h).getPoints(20)));
+    b.add(new THREE.ExtrudeGeometry(outer, { depth: 0.17, bevelEnabled: false, curveSegments: 10 }), mTrim, fx, y0, fz, a);
+    b.add(new THREE.ShapeGeometry(terArch(w, h), 10), mWin, gx, y0, gz, a);
+    b.box(0.04, h - 0.3, 0.05, BRONZE, mx, y0 + (h - 0.3) / 2, mz, a); b.box(w, 0.04, 0.05, BRONZE, mx, y0 + 1.15, mz, a); b.box(w, 0.04, 0.05, BRONZE, mx, y0 + 2.2, mz, a);
+    b.box(w + 0.62, 0.12, 0.36, mTrim, sx, y0 - 0.06, sz, a);
+  }
+  // cornice: frieze, architrave, dentils, corona, cap
+  b.cyl(9.4, 9.4, 0.4, mTrim, 0, 6.8, Z0, 72); b.cyl(9.55, 9.55, 0.14, mTrim, 0, 7.07, Z0, 72);
+  for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, [x, z] = px(a, 9.64); b.box(0.15, 0.13, 0.16, mTrim, x, 7.2, z, a); }
+  b.cyl(9.85, 9.85, 0.2, mTrim, 0, 7.34, Z0, 72); b.cyl(10.0, 9.9, 0.12, mTrim, 0, 7.5, Z0, 72); b.cyl(9.4, 9.4, 0.06, mSlate, 0, 7.58, Z0, 72);
+  // glazed dome with bronze ribs and an oculus
+  const DR = 8.9, DY = 7.6, DS = 0.88;
+  const glass = M(0x9bbcc4, 0.5, 0.1, { transparent: true, opacity: 0.58, emissive: 0xffc070, emissiveIntensity: 0, envMapIntensity: 1.6, depthWrite: false });
+  const dg = add(dome, new THREE.SphereGeometry(DR, 56, 24, 0, Math.PI * 2, 0.1, Math.PI / 2 - 0.1), glass, 0, DY, 0); dg.scale.y = DS; dg.userData.nocast = 1; R.domeGlow = glass;
+  for (let i = 0; i < 16; i++) {
+    const ph = i / 16 * Math.PI * 2, pts = [];
+    for (let j = 0; j <= 14; j++) { const th = 0.1 + j / 14 * (Math.PI / 2 - 0.1); pts.push([Math.sin(th) * Math.cos(ph) * (DR + 0.03), DY + Math.cos(th) * DR * DS + 0.03, Z0 + Math.sin(th) * Math.sin(ph) * (DR + 0.03)]); }
+    b.add(terTube(pts, 0.07, 14, 5), BRONZE);
+  }
+  for (const th of [0.42, 0.78, 1.08, 1.34]) b.add(new THREE.TorusGeometry(Math.sin(th) * (DR + 0.03), 0.055, 5, 56), BRONZE, 0, DY + Math.cos(th) * DR * DS, Z0, 0, Math.PI / 2);
+  b.add(new THREE.TorusGeometry(DR, 0.17, 6, 56), BRONZE, 0, DY + 0.05, Z0, 0, Math.PI / 2); b.add(new THREE.TorusGeometry(Math.sin(0.1) * DR, 0.1, 6, 24), BRONZE, 0, DY + Math.cos(0.1) * DR * DS, Z0, 0, Math.PI / 2);
+  { const y = DY + Math.cos(0.1) * DR * DS; b.cyl(0.62, 0.7, 0.8, BRONZE, 0, y + 0.4, Z0, 12); b.cyl(0.64, 0.64, 0.4, mWin, 0, y + 0.55, Z0, 12); b.cyl(0.05, 0.8, 0.6, BRONZE, 0, y + 1.1, Z0, 12); b.sph(0.12, BRASS, 0, y + 1.45, Z0, 1, 10); b.cyl(0.015, 0.03, 0.9, BRASS, 0, y + 1.9, Z0, 6); }
+  // portico: platform, steps, four columns, entablature with the name, pediment and a roof behind it
+  b.box(8.6, 0.36, 3.7, mStone, 0, 0.18, 8.0, 0, 1.5); b.box(9.0, 0.12, 0.9, mStone, 0, 0.06, 5.85, 0, 1.5); b.box(8.8, 0.24, 0.45, mStone, 0, 0.12, 6.1, 0, 1.5);
+  for (const x of [-3.2, -1.4, 1.4, 3.2]) { b.lathe([[0.001, 0], [0.5, 0], [0.5, 0.14], [0.4, 0.2], [0.34, 0.3], [0.3, 0.45], [0.28, 3.9], [0.31, 4.0], [0.36, 4.08], [0.46, 4.16], [0.52, 4.2], [0.52, 4.3], [0.001, 4.3]], mStone, x, 0.36, 7.0, 20); }
+  b.box(8.7, 0.4, 2.65, mTrim, 0, 4.86, 7.675, 0, 1.5); b.box(8.6, 0.42, 2.6, mTrim, 0, 5.27, 7.7, 0, 1.5); b.box(9.0, 0.22, 2.95, mTrim, 0, 5.59, 7.72, 0, 1.5);
+  { const s = new THREE.Shape(); s.moveTo(-4.45, 0); s.lineTo(4.45, 0); s.lineTo(0, 1.15); s.closePath(); b.add(new THREE.ExtrudeGeometry(s, { depth: 0.4, bevelEnabled: false }), mTrim, 0, 5.7, 6.3); }
+  { const s = new THREE.Shape(); s.moveTo(-3.7, 0.12); s.lineTo(3.7, 0.12); s.lineTo(0, 0.95); s.closePath(); b.add(new THREE.ShapeGeometry(s), M(0xcfc6b0, 0.8, 0, { t: TX.stone(), bump: 0.04 }), 0, 5.7, 6.71); }
+  const pa = Math.atan2(1.15, 4.45);
+  for (const s of [-1, 1]) { b.box(4.6, 0.12, 0.5, mTrim, s * 2.225, 6.33, 6.35, 0, 0, 0, -s * pa); b.box(4.6, 0.1, 3.2, mSlate, s * 2.225, 6.28, 8.3, 0, 0, 0, -s * pa); }
+  b.box(0.2, 0.14, 3.2, mSlate, 0, 6.88, 8.3);
+  b.box(3.9, 5.4, 1.6, mTrim, 0, 3.06, 9.0, 0, 1.5);
+  for (const s of [-1, 1]) { b.box(0.26, 3.1, 0.1, mStone, s * 1.1, 1.91, 8.2, 0, 1.5); b.box(0.5, 0.28, 0.14, mStone, s * 1.55, 1.2, 8.19, 0, 1.5); }
+  b.box(2.5, 0.22, 0.16, mStone, 0, 3.6, 8.19, 0, 1.5); b.box(2.0, 0.34, 0.12, mStone, 0, 3.8, 8.16, 0, 1.5);
+  for (const s of [-1, 1]) { b.box(0.1, 0.3, 0.03, IRON, s * 1.75, 2.8, 8.18); b.box(0.04, 0.04, 0.2, IRON, s * 1.75, 2.9, 8.08); b.box(0.14, 0.2, 0.14, lampM, s * 1.75, 2.82, 8.0); b.add(new THREE.ConeGeometry(0.12, 0.1, 4), IRON, s * 1.75, 3.0, 8.0, Math.PI / 4); }
+  plaqueMesh(R.g, 'THE AQUADOME', 3.2, 0.36, 0, 5.27, 6.37, Math.PI, { size: 0.5, bg: '#8a7a5a', fg: '#2a2014' });
+  door(R, 0, 8.17, 'Lobby', 'exit_terrace', [0, 0]).position.y = 0.36;
+  b.flush(R.g);
   lamps(R, [0, 3, -4, 0xffc890, 10, 14], [4, 2.5, -12, 0xffc890, 6, 10]);
   return R;
 }
+
 
 // ---------- Collectible postcards from 2003 (optional) ----------
 export const POSTCARDS = [
