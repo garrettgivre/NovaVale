@@ -1,5 +1,9 @@
 // Inventory items (with little SVG icons) and documents.
 export const ITEMS = {
+  letter: {
+    n: 'Celeste\'s letter', d: 'The letter from Celeste Arden that brought you to the Aquadome.',
+    svg: '<rect x="8" y="14" width="48" height="36" rx="3" fill="#efe6cf" stroke="#8a7a58" stroke-width="2.5"/><path d="M8 16l24 18 24-18" fill="none" stroke="#8a7a58" stroke-width="2.5"/><circle cx="32" cy="38" r="5" fill="#9a2a2a"/><path d="M29.6 38l1.6 1.6 2.8-3" stroke="#e8c070" stroke-width="1.5" fill="none"/>',
+  },
   magnet: {
     n: 'Speaker magnet', d: 'A heavy round magnet from one of Dex\'s old speakers. It nearly took a filing cabinet with it.',
     svg: '<circle cx="32" cy="32" r="20" fill="#3a3a44" stroke="#15151a" stroke-width="3"/><circle cx="32" cy="32" r="9" fill="#9aa0aa"/><path d="M22 14l4 6M42 14l-4 6" stroke="#ff4a4a" stroke-width="4" stroke-linecap="round"/>',

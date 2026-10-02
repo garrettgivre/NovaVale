@@ -98,8 +98,10 @@ Suite 2 advances once `REST_NEED` is met.
   wording. Eight optional 2003 postcards, a newspaper clipping, the crew photo.
 
 **Bookends and quality of life (Oct 2026).** Cutscenes: `cine(node, keys, lines)` in main.js (camera keyframes, letterbox
-`#cine`, narration as captions, tap/Escape skips; `E.cine` from story.js). The arrival flies in over the lake to the portico
-after the letter; gala night (`galaNight`, phase 'end' counts as night) gathers the cast round the fountain (`GALA` in
+`#cine`, narration as captions, tap/Escape skips; `E.cine` from story.js). New Game goes straight into the arrival flyover (over the lake to the
+portico; its three narration lines carry the whole setup), then one line in the lobby; Celeste's letter is an inventory item
+(`letter`, opens the doc) instead of a panel up front. Automated runs (`navigator.webdriver`) skip the flyover unless
+`localStorage['novavale.cinetest']` is set; gala night (`galaNight`, phase 'end' counts as night) gathers the cast round the fountain (`GALA` in
 world.js, facing set per person), Regent wears the crown (built on the head bone in `sync`), before Celeste's letter.
 Three save slots (`SLOTS`, slot 1 keeps the old key; Continue = most recent, Load Game, New Game asks which slot when any
 exists and confirms overwrites), `S.play` seconds played, `S.pz` remembers unfinished puzzle settings (`mem()` in

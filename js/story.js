@@ -751,7 +751,7 @@ export function openNotebook(tab = 'tasks') {
 }
 
 export function examineItem(id) {
-  if (id === 'blueprint') return showDoc('blueprint');
+  if (id === 'blueprint' || id === 'letter') return showDoc(id);
   panel(`<div class="nb-item big">${icon(id)}<div><b>${ITEMS[id].n}</b><p>${ITEMS[id].d}</p></div></div>`, { cls: 'doc', title: ITEMS[id].n });
 }
 
@@ -795,14 +795,15 @@ export function recap() {
 
 // ---------- Start ----------
 export async function intro() {
-  addDoc('letter');
-  panel(DOCS.letter.html + '<button class="btn big" id="lgo">Take the case</button>', { cls: 'doc', title: 'A letter arrives...', noClose: true })
-    .querySelector('#lgo').onclick = async () => {
-      closePanel(true);
-      // arriving: in over the lake to the portico
-      await E.cine('E2', [{ p: [6, 3.6, -46], l: [0, 6, 18], t: 0 }, { p: [3, 2.4, -26], l: [0, 5.2, 18], t: 5 }, { p: [1.6, 1.75, -9], l: [0, 4, 14], t: 10 }, { p: [0, 1.62, 3.2], l: [0, 2.6, 10], t: 14 }],
-        ['The Aquadome. A glass dome on a stone drum, built out over the lake in 2003 and shut for the last nine years.', 'On Saturday it reopens with a gala. On Tuesday night, somebody walked off with the gala\'s crown.', 'Celeste Arden wants it back before anyone finds out it\'s gone. That\'s where I come in.']);
-      sfx('door'); await fade(() => { E.place('L1'); E.refresh(); onRoom('lobby'); }, 600);
-      await think(['So this is the Aquadome. Nine years closed, and it still smells like chlorine and old money.', 'Celeste\'s letter said the empty planetarium has been lit up at night, and something sings over speakers nobody switched on. Her staff think it\'s a ghost.','As far as anyone here knows, I\'m Celeste\'s summer intern. People say all sorts of things in front of the intern.', 'Marble floors, brass everywhere, and dust on the chandelier. Whoever cleaned for the relaunch skipped everything you have to look up to see. People always do.', 'The display case should be here in the lobby. Crime scenes don\'t investigate themselves.']);
-    };
+  // the letter that brought Nova here is in her things, to read whenever she likes
+  addDoc('letter'); giveItem('letter'); E.refresh();
+  // arriving: in over the lake to the portico; the flyover tells the setup once (automated test runs skip it)
+  if (!navigator.webdriver || localStorage.getItem('novavale.cinetest'))
+    await E.cine('E2', [{ p: [6, 3.6, -46], l: [0, 6, 18], t: 0 }, { p: [3, 2.4, -26], l: [0, 5.2, 18], t: 5.5 }, { p: [1.6, 1.75, -9], l: [0, 4, 14], t: 11 }, { p: [0, 1.62, 3.2], l: [0, 2.6, 10], t: 16 }],
+      ['The Aquadome. A glass dome on the lake, closed for nine years, reopening on Saturday with a gala.',
+        'On Tuesday night the gala\'s crown vanished from a locked case. Since then, something has been singing over the speakers at night.',
+        'The owner, Celeste Arden, wants it all solved quietly. So as far as anyone here knows, I\'m her new summer intern.']);
+  sfx('door'); await fade(() => { E.place('L1'); E.refresh(); onRoom('lobby'); }, 600);
+  await think(['Marble, brass, and dust on the chandelier. The display case should be right over there.']);
+  toast('Celeste\'s letter is in your inventory.');
 }
