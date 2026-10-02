@@ -197,6 +197,7 @@ const DM = () => once('doormats', () => ({
   oak: M(0x7a6048, 0.6, 0, { t: TX.oak(), bump: 0.02 }), oakFr: M(0x4a3626, 0.6, 0, { t: TX.oak(), bump: 0.02 }), oakGap: M(0x120a05, 0.9),
   frostBrass: M(0x8f7436, 0.4, 0.8), glassWarm: M(0xe0cfa0, 0.2, 0, { emissive: 0xa88c4a, emissiveIntensity: 0.7 }),
   glassDark: M(0x16302e, 0.1, 0.1, { emissive: 0x0c1f1e, emissiveIntensity: 0.6 }),
+  sill: M(0xcfc6b0, 0.6, 0, { t: TX.stone(), bump: 0.02 }),
   ledG: new THREE.MeshBasicMaterial({ color: 0x4cd860 }), ledR: new THREE.MeshBasicMaterial({ color: 0xd84c3c }),
 }));
 
@@ -274,18 +275,33 @@ function dSign(g, b, kind, lines, w, h, x, y, z, frameMt, rz = 0) {
   if (frameMt) b.box(frameMt, w + 0.035, h + 0.035, 0.014, x, y, z - 0.009, 0, 0, rz);
   const p = add(g, new THREE.PlaneGeometry(w, h), dSignMat(kind, lines, w, h), x, y, z); p.rotation.z = rz; p.userData.nocast = 1; return p;
 }
-function dFrame(b, mt, w = 0.14) {
-  b.box(mt, w, 2.6, 0.18, -0.78, 1.3, 0).box(mt, w, 2.6, 0.18, 0.78, 1.3, 0).box(mt, 1.74, 0.16, 0.2, 0, 2.62, 0);
+function dFrame(b, mt, w = 0.14, cap = 2.73) {
+  for (const s of [-1, 1]) {
+    b.box(mt, w, 2.6, 0.18, s * 0.78, 1.3, 0);
+    b.box(mt, 0.035, 2.56, 0.215, s * (0.78 + w / 2 - 0.012), 1.32, 0);          // raised back band on the outer edge
+    b.box(mt, 0.012, 2.5, 0.2, s * (0.78 - w / 2 + 0.03), 1.3, 0.004);           // a bead along the inner edge
+    b.box(mt, w + 0.05, 0.24, 0.225, s * 0.78, 0.12, 0);                        // plinth block
+  }
+  b.box(mt, 1.74, 0.16, 0.2, 0, 2.62, 0);
+  if (cap > 2.8) for (const s of [-1, 1]) b.box(mt, 0.1, cap - 2.68, 0.19, s * 0.84, (cap + 2.68) / 2, 0);   // pilasters up beside a fanlight
+  b.box(mt, 1.86, 0.06, 0.24, 0, cap, 0.01).box(mt, 1.94, 0.035, 0.27, 0, cap + 0.045, 0.015);   // frieze and cap
 }
+// a stone threshold and barrel hinges (knuckles on the hinge side), shared by most doors
+const dSill = (b, mt = null) => b.box(mt || DM().sill, 1.62, 0.025, 0.3, 0, 0.012, 0.03);
+const dHinges = (b, mt, x = -0.715, ys = [0.36, 1.26, 2.16]) => { for (const y of ys) for (const xx of x === 'pair' ? [-0.715, 0.715] : [x]) { const x = xx; b.cyl(mt, 0.014, 0.014, 0.13, x, y, 0.035, 0, 0); b.cyl(mt, 0.017, 0.017, 0.012, x, y + 0.07, 0.035); b.cyl(mt, 0.017, 0.017, 0.012, x, y - 0.07, 0.035); } };
 const dPulls = (b, mt, y = 1.05, len = 0.5) => { for (const s of [-1, 1]) { b.cyl(mt, 0.016, 0.016, len, s * 0.09, y, 0.085); for (const k of [-1, 1]) b.cyl(mt, 0.008, 0.008, 0.05, s * 0.09, y + k * len * 0.4, 0.06, Math.PI / 2); } };
 const dLever = (b, mt, x = 0.56, y = 1.0) => { b.box(mt, 0.05, 0.2, 0.012, x, y, 0.04).cyl(mt, 0.011, 0.011, 0.15, x - 0.05, y - 0.02, 0.075, 0, 0, Math.PI / 2).cyl(mt, 0.016, 0.016, 0.03, x, y, 0.055, Math.PI / 2); };
 
 // What each lobby door's sign says.
+// how big each kind of door is, as a scale on the standard 1.6 x 2.8 m opening: grand, tall planetarium doors; tall French
+// doors to the terrace; wide service doors to the kitchen; a narrower, heavier archive door
+const D_SIZE = { planetarium: [1.1, 1.12], stairs: [1.08, 1.0], terrace: [1.0, 1.1], kitchen: [1.14, 1.0], archive: [0.84, 1.02], tech: [0.94, 1.0], suite: [0.92, 1.0], spa: [1.05, 1.04] };
 const D_TEXT = { planetarium: ['PLANETARIUM'], spa: ['SPA & POOLS'], tech: ['STAFF ONLY', 'TECHNICAL OFFICE'], stairs: ['GRAND STAIRCASE', 'GUEST WING'], terrace: ['TERRACE'], kitchen: ['KITCHEN', 'STAFF ONLY'], archive: ['ARCHIVE'] };
 
 const D_STYLE = {
   planetarium(g, b, m, c) {
-    dFrame(b, m.midnight); for (const s of [-1, 1]) b.box(m.gilt, 0.02, 2.6, 0.01, s * 0.78, 1.3, 0.096);
+    dFrame(b, m.midnight, 0.14, 3.06); for (const s of [-1, 1]) b.box(m.gilt, 0.02, 2.6, 0.01, s * 0.78, 1.3, 0.096);
+    for (const s of [-1, 1]) b.box(m.gilt, 0.66, 0.16, 0.012, s * 0.358, 0.1, 0.036);   // kick plates
     b.box(m.gilt, 1.42, 0.025, 0.01, 0, 2.54, 0.1);
     for (const s of [-1, 1]) {
       const x = s * 0.358; b.box(m.midnight, 0.712, 2.5, 0.06, x, 1.25, 0);
@@ -315,6 +331,8 @@ const D_STYLE = {
   },
   tech(g, b, m, c) {
     dFrame(b, m.techFr); b.box(m.tech, 1.42, 2.5, 0.06, 0, 1.25, 0);
+    b.box(m.glassDark, 0.5, 0.3, 0.01, 0, 2.1, 0.032).ring(m.steelDk, 0.54, 0.34, 0.025, 0, 2.1, 0.036);
+    for (let i = 1; i < 5; i++) b.box(m.steel, 0.003, 0.3, 0.004, -0.25 + i * 0.1, 2.1, 0.034);
     b.box(m.steel, 1.3, 0.3, 0.012, 0, 0.17, 0.036).box(m.steel, 0.3, 0.06, 0.05, 0.1, 2.4, 0.05).box(m.steel, 0.2, 0.012, 0.012, 0.28, 2.4, 0.05);
     for (const y of [0.35, 1.25, 2.15]) b.box(m.steelDk, 0.04, 0.14, 0.04, -0.72, y, 0.03);
     dLever(b, m.steel, 0.56, 1.0);
@@ -324,7 +342,7 @@ const D_STYLE = {
     return { text: c.text, kind: 'plastic', at: [0, 1.72, 0.04], w: 0.72, h: 0.3, frame: m.steelDk };
   },
   stairs(g, b, m, c) {
-    dFrame(b, m.mah);
+    dFrame(b, m.mah, 0.14, 3.02);
     for (const s of [-1, 1]) {
       const x = s * 0.358; b.box(m.panel, 0.712, 0.84, 0.07, x, 0.42, 0).ring(m.mah, 0.58, 0.6, 0.03, x, 0.42, 0.036).box(BRASS, 0.64, 0.14, 0.012, x, 0.1, 0.04);
       b.box(m.glassWarm, 0.6, 1.66, 0.01, x, 1.65, 0);
@@ -388,7 +406,7 @@ const D_STYLE = {
   suite(g, b, m, c) {
     dFrame(b, m.mah); b.box(m.panel, 1.42, 2.5, 0.06, 0, 1.25, 0);
     for (const [px, py, ph] of [[-0.34, 1.8, 0.8], [0.34, 1.8, 0.8], [-0.34, 0.65, 0.95], [0.34, 0.65, 0.95]]) {
-      b.box(m.inset, 0.5, ph, 0.02, px, py, 0.035).box(m.panel, 0.54, 0.03, 0.03, px, py + ph / 2, 0.04).box(m.panel, 0.54, 0.03, 0.03, px, py - ph / 2, 0.04);
+      b.box(m.inset, 0.5, ph, 0.02, px, py, 0.035).box(m.panel, 0.38, ph - 0.12, 0.02, px, py, 0.042).box(m.panel, 0.54, 0.03, 0.03, px, py + ph / 2, 0.04).box(m.panel, 0.54, 0.03, 0.03, px, py - ph / 2, 0.04);
     }
     for (const y of [0.4, 1.3, 2.2]) b.box(BRASS, 0.04, 0.12, 0.03, -0.72, y, 0.03);
     b.box(BRASS, 1.3, 0.16, 0.012, 0, 0.1, 0.05);
@@ -434,10 +452,17 @@ function door(R, x, z, label, hot, face = [0, 0], o = {}) {
   const sign = o.sign != null ? [].concat(o.sign) : exit || !D_TEXT[style] ? [(label || 'Door').toUpperCase()] : D_TEXT[style];
   const mark = new THREE.Object3D();
   if (D_STYLE[style]) {
-    const b = dBatch(), r = D_STYLE[style](g, b, DM(), { R, text: sign, exit, dnd: o.dnd });
-    mark.position.set(...r.at);
-    dSign(g, b, r.kind, r.text, r.w, r.h, r.at[0], r.at[1], r.at[2] + 0.012, r.frame);
-    b.flush(g);
+    const [sx, sy] = D_SIZE[style] || [1, 1], body = new THREE.Group(); body.scale.set(sx, sy, 1); g.add(body);
+    const b = dBatch(), r = D_STYLE[style](body, b, DM(), { R, text: sign, exit, dnd: o.dnd });
+    if (style !== 'archive' && style !== 'terrace') dSill(b); else if (style === 'archive') dSill(b, IRON);
+    const pair = ['planetarium', 'spa', 'stairs', 'terrace', 'kitchen'].includes(style);
+    if (style !== 'archive') dHinges(b, style === 'tech' || style === 'service' || style === 'kitchen' ? DM().steelDk : BRASS, pair ? 'pair' : -0.715);
+    b.flush(body);
+    // the sign at its real size, placed where the scaled door puts it
+    const at = [r.at[0] * sx, Math.min(2.05, r.at[1] * sy), r.at[2]], sb = dBatch();
+    mark.position.set(...at);
+    dSign(g, sb, r.kind, r.text, r.w, r.h, at[0], at[1], at[2] + 0.012, r.frame);
+    sb.flush(g);
   } else { doorClassic(g, label, o); mark.position.set(0, 2.95, 0.03); }
   g.add(mark); g.userData.sign = mark;
   tag(g, hot, label || 'Door');
