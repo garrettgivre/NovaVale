@@ -104,6 +104,7 @@ const basePitch = () => innerWidth < innerHeight ? -0.14 : PITCH0;
 function place(nodeId, look) {
   const n = NODES[nodeId];
   V.node = nodeId; S.node = nodeId; V.walk = null; mark.material.opacity = 0;
+  if (V.focus) { V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); } V.inspect = null; ui.speech.focus = null;
   camera.position.set(n.p[0], EYE, n.p[1]);
   const l = look || n.look;
   V.yaw = yawTo(n.p, l[0], l[1]); V.pitch = basePitch(); V.yawT = null;
@@ -161,6 +162,7 @@ function unfocus() { ui.speech.focus = null; if (V.focus) { V.focus.dir = -1; } 
 
 // ---------- Picking ----------
 const ray = new THREE.Raycaster();
+let pickObj = null;   // the tagged object the last pick hit
 const ndc = new THREE.Vector2();
 function pick(x, y) {
   const R = roomOf(); if (!R) return null;
@@ -176,7 +178,7 @@ function pick(x, y) {
     if (hidden) continue;
     const m = h.object.material;
     if (!tagged && m && m.transparent && m.opacity < 0.4) continue;
-    return tagged ? tagged.userData : null;
+    pickObj = tagged; return tagged ? tagged.userData : null;
   }
   return null;
 }
@@ -206,12 +208,59 @@ function walkTo(p) {
   scene.add(mark); mark.position.set(p.x, p.y + 0.02, p.z); mark.material.opacity = 0.9; mark.scale.setScalar(1);
 }
 
-function activate(u) {
+// Things and doors are walked up to. A door: walk to it and face it, so its sign is in front of you; tap again (now
+// close) to go through. A thing: walk up if it's far, then a close-up on it while it's described or its panel is open.
+const isDoor = h => /^(door_|exit_)/.test(h) || h === 'hatch';
+const _c = new THREE.Vector3(), _bx = new THREE.Box3();
+function walkNear(x, z, stop) {
+  return new Promise(res => {
+    const p = camera.position, dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+    if (d <= stop + 0.05) return res();
+    walkTo(new THREE.Vector3(x - dx / d * stop, 0, z - dz / d * stop));
+    const t0 = performance.now(), iv = setInterval(() => { if (!V.walk || performance.now() - t0 > 7000) { clearInterval(iv); V.walk = null; res(); } }, 50);
+  });
+}
+function faceTo(x, z, pitch = basePitch()) { V.yawT = yawTo([camera.position.x, camera.position.z], x, z); V.pitch = pitch; }
+async function activate(u, obj = pickObj) {
   if (!u) return;
   sfx('click');
   if (u.go) return go(u.go);
   if (u.who) return story.onTalk(u.who);
-  if (u.hot) return story.onHot(u.hot);
+  if (!u.hot) return;
+  if (!obj) return story.onHot(u.hot);
+  _bx.setFromObject(obj); _bx.getCenter(_c);
+  const c = _c.clone(), size = _bx.getSize(new THREE.Vector3()), far = Math.hypot(c.x - camera.position.x, c.z - camera.position.z);
+  if (isDoor(u.hot)) {
+    if (far > 2.4) {   // walk up to the door and read it
+      V.approach = true; await walkNear(c.x, c.z, 1.7); V.approach = false;
+      faceTo(c.x, c.z, -0.02);
+      ui.caption(u.name ? `${u.name} · tap the door to go in` : 'Tap the door to go in', 2600);
+      return;
+    }
+    return story.onHot(u.hot);
+  }
+  // a thing: walk over if it's out of reach, then look closely
+  const reach = Math.max(1.3, Math.min(2.4, Math.max(size.x, size.z) * 1.2 + 0.9));
+  if (far > reach + 0.5) { V.approach = true; await walkNear(c.x, c.z, reach); V.approach = false; }
+  inspect(c, size);
+  story.onHot(u.hot);
+}
+// a close-up on a thing: the camera moves in on it (like a conversation close-up) and comes back when you're done
+function inspect(c, size) {
+  const span = Math.max(size.x, size.y, size.z, 0.12), dir = new THREE.Vector3(camera.position.x - c.x, 0, camera.position.z - c.z);
+  if (dir.lengthSq() < 1e-4) dir.set(0, 0, 1); dir.normalize();
+  const fov = Math.max(24, Math.min(46, FOV0 * 0.72)), dist = Math.max(0.55, Math.min(2.2, span * 0.75 / Math.tan(fov * Math.PI / 360) + 0.15));
+  const lift = Math.min(0.9, 0.25 + dist * 0.35), p = new THREE.Vector3(c.x + dir.x * dist, Math.max(0.45, Math.min(1.8, c.y + lift)), c.z + dir.z * dist);
+  const from = { p: camera.position.clone(), yaw: V.yaw, pitch: V.pitch };
+  V.focus = { from, to: { p, yaw: Math.atan2(-(c.x - p.x), -(c.z - p.z)), pitch: Math.atan2(c.y - p.y, Math.hypot(c.x - p.x, c.z - p.z)), fov }, t: 0, dir: 1 };
+  V.inspect = { t: 0 };
+}
+// end the close-up once nothing is being said or shown any more
+function inspectStep(dt) {
+  const I = V.inspect; if (!I || !V.focus) { V.inspect = null; return; }
+  I.t += dt;
+  const busy = ui.talking() || ui.panelOpen() || $('#caption').classList.contains('on') || document.querySelector('#screen.on');
+  if (busy) I.quiet = 0; else if ((I.quiet = (I.quiet || 0) + dt) > 0.35 && I.t > 0.9) { V.inspect = null; unfocus(); }
 }
 
 // ---------- Input ----------
@@ -242,7 +291,7 @@ canvas.addEventListener('pointermove', e => {
 canvas.addEventListener('pointerup', e => {
   if (!down || down.id !== e.pointerId) return;
   const d = down; down = null;
-  if (d.moved || V.busy || V.focus || ui.talking() || ui.panelOpen() || V.title) return;
+  if (d.moved || V.busy || V.approach || V.focus || ui.talking() || ui.panelOpen() || V.title) return;
   if (d.longp) return;
   const touch = e.pointerType !== 'mouse';
   const u = pick(e.clientX, e.clientY) || (touch ? pickNear(e.clientX, e.clientY) : null);
@@ -448,6 +497,7 @@ function loop() {
   const dt = Math.min(0.05, clock.getDelta()); t += dt;
   if (V.title) V.yaw += dt * 0.05; else if (V.node && !document.hidden) S.play = (S.play || 0) + dt;
   cineStep(dt);
+  inspectStep(dt);
   walk(dt);
   if (V.move) {
     const m = V.move; m.t += dt / m.dur;

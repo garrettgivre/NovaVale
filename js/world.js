@@ -1390,10 +1390,12 @@ function buildPlanetarium() {
   dkExitSign(R.g, 0, 3.2, 7.8, 0, 0);
   dkPool(R.g, 3.3, 0.01, -6.4, 2.4, 1.8, 0xffd8a0, 0.3);
   dkPool(R.g, 0, 1.4, -7.4, 6, 2.6, 0xff9050, 0.2, 0, false);
-  // Dex's hologram card (night 1)
-  const hc = new THREE.Group(); hc.position.set(0.55, 0.01, -0.7); R.g.add(hc);
-  box(hc, 0.09, 0.006, 0.06, M(0x2a4a5a, 0.3, 0.3, { emissive: 0x3aa0c0, emissiveIntensity: 0.9 }), 0, 0, 0).rotation.y = 0.5;
-  hit(hc, 0, 0.1, 0, 0.3, 'holocard', 'Something glowing');
+  // Dex's CD-R (night 1): a burned disc in a slim clear case, catching the light under the projector
+  const hc = new THREE.Group(); hc.position.set(0.55, 0.01, -0.7); hc.rotation.y = 0.5; R.g.add(hc);
+  box(hc, 0.142, 0.005, 0.125, M(0xd8e0e8, 0.15, 0, { transparent: true, opacity: 0.5 }), 0, 0.0035, 0);
+  add(hc, new THREE.CylinderGeometry(0.06, 0.06, 0.002, 32), M(0xc8ccd4, 0.12, 1, { emissive: 0x404858, emissiveIntensity: 0.4 }), 0, 0.007, 0);
+  add(hc, new THREE.CylinderGeometry(0.008, 0.008, 0.003, 12), M(0xf0f0ec, 0.6), 0, 0.008, 0);
+  hit(hc, 0, 0.1, 0, 0.3, 'holocard', 'Something shiny');
   R.holo = hc;
   // the code on the dome (after the constellation)
   const code = add(R.g, new THREE.PlaneGeometry(6, 4.1), new THREE.MeshBasicMaterial({
@@ -3847,7 +3849,10 @@ const DAY = {
   dex: ['tech', 2, -1.6], juniper: ['kitchen', -1.8, -1.4], jojo: ['kitchen', 2.9, 0.4], opal: ['archive', -0.9, -1.6],
   priya: ['plan', -2.4, 1.3], regent: ['plan', 1.3, -6.0, 0.5], rashad: ['wing', 0.95, -8.0],
   gus: ['terrace', -3.4, -2.6], silas: ['terrace', 6.0, 0.6], nate: ['terrace', 4.4, -13.5],
+  celeste: ['lobby', -3.3, 2.0],   // beside the empty case (not in front of it)
 };
+// arriving for the gala over the next day: not in the building on Day 1
+const LATER = ['jojo', 'priya', 'regent', 'silas', 'nate'];
 const NIGHT1 = { cherry: ['plan', -1.7, -5.9, 0.5], silas: ['lobby', -2.8, -4.6], gus: ['wing', 0.9, -2.0], nate: ['terrace', 4.4, -13.5] };
 // gala night (the ending): the cast round the fountain, facing the terrace doors; [room, x, z, y, facing]
 const GALA = {
@@ -3860,6 +3865,7 @@ export function whereIs(who) {
   const p = S.phase;
   if (p === 'd1' || p === 'd2' || p === 'g') {
     if (who === 'opal' && p === 'd2' && has('opal_left')) return null;
+    if (p === 'd1' && LATER.includes(who)) return null;
     return DAY[who] || null;
   }
   if (p === 'n1') return NIGHT1[who] || null;

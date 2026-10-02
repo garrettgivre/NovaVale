@@ -34,7 +34,7 @@ export function aquaOS(onRead) {
       <div class="aq-icons">
         <button data-a="log"><span class="ai ai-lock"></span>SecureLog</button>
         <button data-a="mail"><span class="ai ai-mail"></span>Mail</button>
-        <button data-a="holo"><span class="ai ai-holo"></span>Hologram</button>
+        <button data-a="holo"><span class="ai ai-holo"></span>GhostShow</button>
         <button data-a="trash"><span class="ai ai-trash"></span>Recycle Bin</button>
       </div>
       <div class="aq-win" id="aqw"><div class="aq-bar"><span>Welcome</span></div><div class="aq-c">Welcome back, Dex! You have <b>3</b> new messages.</div></div>
@@ -57,7 +57,7 @@ export function aquaOS(onRead) {
           W.querySelector('#aqback').onclick = () => b.onclick();
         });
       }
-      if (a === 'holo') win('Hologram Studio', '<p>GHOST_v3.holo</p><p class="err">File not found. Last exported to: <b>memory card</b>.</p>');
+      if (a === 'holo') win('GhostShow 1.2', '<p>GHOST_v3.mpg</p><p class="err">File not found. Last burned to: <b>CD-R (drive E:)</b>.</p>');
       if (a === 'trash') win('Recycle Bin', '<p>old_passwords.txt — <i>empty</i></p><p>good job dex :)</p>');
     });
   };

@@ -46,6 +46,7 @@ export function sfx(k) {
     n.buffer = b; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(400, t); f.frequency.linearRampToValueAtTime(1600, t + 0.5);
     const g = ctx.createGain(); g.gain.value = 0.18; n.connect(f); f.connect(g); g.connect(master); n.start(t);
   } else if (k === 'switch') tone(180, t, 0.05, 'square', 0.1, 0);
+  else if (k === 'knock') [0, 0.22, 0.44].forEach(d => { tone(120, t + d, 0.12, 'sine', 0.22, 0.3); tone(240, t + d, 0.05, 'triangle', 0.06, 0.2); });
   else if (k === 'bad') [220, 207, 196, 185].forEach((f, i) => tone(f, t + i * 0.25, 0.6, 'sawtooth', 0.05));
   // music cues: a breakthrough (an alibi, a confession), nightfall, morning
   else if (k === 'reveal') [[392, 0], [494, .16], [587, .32], [784, .5]].forEach(([f, d]) => tone(f, t + d, 1.4, 'sine', 0.07, 0.7));

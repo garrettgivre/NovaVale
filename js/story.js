@@ -14,6 +14,13 @@ const junior = () => S.diff === 'junior';
 const SUSPECTS = ['vesper', 'cherry', 'dex', 'juniper', 'opal'];
 const OTHERS = ['regent', 'harper', 'kenji', 'priya', 'jojo', 'rashad', 'gus', 'silas', 'nate'];
 const metAll = () => SUSPECTS.every(w => has('met_' + w));
+// the other guests and staff who are around today (people arrive over the first two days)
+const ROOMNAME = { lobby: 'the lobby', kitchen: 'the kitchen', plan: 'the planetarium', wing: 'the Guest Wing', terrace: 'out on the terrace', spa: 'the spa', tech: 'the tech office', archive: 'the archive' };
+function othersTask() {
+  const here = OTHERS.filter(w => has('met_' + w) || whereIs(w)), met = here.filter(w => has('met_' + w)).length;
+  const unmet = here.filter(w => !has('met_' + w) && whereIs(w)).map(w => `${PEOPLE[w].n} (${ROOMNAME[whereIs(w)[0]] || whereIs(w)[0]})`);
+  return [`Optional: get to know the other guests (${met}/${here.length})`, met === here.length, here.length > 0, [unmet.length ? 'Still to meet: ' + unmet.join(', ') + '.' : 'You\'ve met everyone who\'s here so far.', 'The staff and the other guests see a lot.']];
+}
 const pcCount = () => POSTCARDS.filter(([n]) => has('pc_' + n)).length;
 
 // ---------- Nova thinking out loud ----------
@@ -29,7 +36,10 @@ const SUITE = 'Your room is Suite 2, up the Grand Staircase in the Guest Wing. C
 function taskList() {
   const p = S.phase, T = [];
   const add = (t, d, show = true, hint) => { if (show) T.push({ t, d: !!d, hint }); };
-  if (p === 'd1') {
+  if (p === 'd1' && !has('met_celeste')) {
+    add('Meet Celeste in the lobby', false, true,
+      ['Celeste is waiting by the display case in the lobby: out of your suite, down the Guest Wing corridor and the Grand Staircase.', 'Your client is waiting.']);
+  } else if (p === 'd1') {
     add('Examine the empty display case in the lobby', has('case_seen'), true,
       ['The display case is in the lobby, between the Kitchen door and the Terrace doors.', 'Start where the crown was last seen.']);
     const n = SUSPECTS.filter(w => has('met_' + w)).length;
@@ -40,8 +50,7 @@ function taskList() {
     add('Find out who dropped the brass star pin', has('opal_pin') || has('pin_known'), hasItem('pin'),
       ['Ask people about the pin, or look at the old photograph in the Guest Wing.', 'Someone will recognise it.']);
     add('Rest in your suite until tonight', false, has('case_seen') && metAll() && has('log_read'), [SUITE, 'You\'ve done enough for one day.']);
-    const m2 = OTHERS.filter(w => has('met_' + w)).length;
-    add(`Optional: get to know the other guests (${m2}/${OTHERS.length})`, m2 === OTHERS.length, true, ['Kenji and Harper are in the lobby, Jojo in the kitchen, Priya and Velvet Regent in the planetarium, Rashad in the Guest Wing, and Gus, Silas and Ranger Begay out on the terrace.', 'The staff and the other guests see a lot.']);
+    add(...othersTask());
   } else if (p === 'n1') {
     add('Find out where the singing is coming from', has('switch_done'), true,
       ['The speakers are controlled from the switchboard in the tech office. Turn zones off one at a time until the singing stops.', 'Somebody controls those speakers.']);
@@ -52,7 +61,7 @@ function taskList() {
     add('Rest in your suite until morning', false, REST_NEED.n1(), [SUITE, 'Get some sleep.']);
   } else if (p === 'd2') {
     add('Get the truth out of Dex', has('dex_confess'), true,
-      ['Dex is in the tech office. Ask him about the hologram card from the planetarium.', 'That card belongs to someone.']);
+      ['Dex is in the tech office. Ask him about the CD-R from the planetarium.', 'That card belongs to someone.']);
     add('Find out what Vesper is hiding', has('vesper_clear'), true,
       [has('vesper_mail') ? 'Vesper\'s lyric sheet is on the table by the loungers in the spa. She wrote "first letters in gold". Read the first letter of each line.' : 'Vesper\'s lyric sheet is in the spa. Also, Dex\'s Mail program has an email to her.', 'Songs can hide things.']);
     add('Check Juniper\'s alibi', has('juniper_clear'), true,
@@ -93,7 +102,7 @@ function nextHint() {
 
 // ---------- Days ----------
 const REST_NEED = {
-  d1: () => has('case_seen') && metAll() && has('log_read'),
+  d1: () => has('met_celeste') && has('case_seen') && metAll() && has('log_read'),
   n1: () => has('switch_done') && has('holo_card') && has('cherry_night'),
   d2: () => has('dex_confess') && has('vesper_clear') && has('juniper_clear') && has('drawer_open'),
 };
@@ -110,7 +119,7 @@ async function rest() {
   sfx(next === 'd2' ? 'dawn' : 'night');
   if (next === 'n1') await think(['*You fall asleep to the old building ticking as it cools.', '*Hours later, you wake with a start.', 'Someone is singing. Not in the walls. In the speakers.', 'No words, just "ooh" and "aah", slightly flat. If that\'s a ghost, it needs a vocal coach.']);
   if (next === 'd2') {
-    await think(['*Grey morning light comes in through the dome.', has('cherry_light') ? 'Recap: Cherry has a secret rehearsal, somebody in a long coat has a flashlight, and "D.H." has a hologram card with his initials on it.' : 'Recap: Cherry has a secret rehearsal, and "D.H." has a hologram card with his initials on it.', 'Today, everybody tells me the truth. Whether they plan to or not.']);
+    await think(['*Grey morning light comes in through the dome.', has('cherry_light') ? 'Recap: Cherry has a secret rehearsal, somebody in a long coat has a flashlight, and "D.H." left a CD-R with his initials on it.' : 'Recap: Cherry has a secret rehearsal, and "D.H." left a CD-R with his initials on it.', 'Today, everybody tells me the truth. Whether they plan to or not.']);
     ring('dot');
   }
   if (next === 'n2') await think(['*The Aquadome goes quiet. Even the fountain is switched off.', 'A key to the service door and a blueprint for a room that isn\'t on any other plan.', has('note_read') ? 'Opal thinks the stars remember. Let\'s see if they remember me.' : 'Whatever Opal hid down there, tonight I find it.']);
@@ -147,10 +156,22 @@ export function openMap() {
 const goRoom = (node, look) => E.go(node, { fade: true, look });
 function showDoc(id) { addDoc(id); E.refresh(); panel(DOCS[id].html, { cls: 'doc', title: DOCS[id].t }); }
 
+// Doors open once Nova has a reason to go through them (Celeste unlocks the suspects' rooms when she says who was here;
+// the planetarium stays shut for the projector removal until the singing on Night 1 leads Nova in)
+const LOCKED = {
+  door_spa: () => !has('met_celeste') && 'I should find Celeste before I start wandering into the spa.',
+  door_tech: () => !has('met_celeste') && 'A staff door. I\'m not barging into offices before I\'ve even met my client.',
+  door_kitchen: () => !has('met_celeste') && 'The kitchen. Celeste first, snacks later.',
+  door_archive: () => !has('met_celeste') && 'Locked, with a card on it: "PRIVATE." I\'ll ask Celeste.',
+  door_terrace: () => !has('met_celeste') && 'Fresh air can wait. Celeste is expecting me.',
+  door_plan: () => S.phase === 'd1' && 'Locked. A card in the brass frame: "CLOSED FOR PROJECTOR REMOVAL." Celeste said Dr. Anand is working in there.',
+};
+const enter = (hot, fn) => () => { const why = LOCKED[hot] && LOCKED[hot](); if (why) { sfx('fail'); return think(why); } fn(); };
 const HOT = {
   // doors and ways through
-  door_plan: () => goRoom('P1'), door_spa: () => goRoom('S1'), door_tech: () => goRoom('T1'), door_kitchen: () => goRoom('K1'), door_archive: () => goRoom('A1'),
-  door_stairs: () => goRoom('W1'), door_terrace: () => goRoom('E1'), door_suite: () => goRoom('R1'),
+  door_plan: enter('door_plan', () => goRoom('P1')), door_spa: enter('door_spa', () => goRoom('S1')), door_tech: enter('door_tech', () => goRoom('T1')),
+  door_kitchen: enter('door_kitchen', () => goRoom('K1')), door_archive: enter('door_archive', () => goRoom('A1')),
+  door_stairs: () => goRoom('W1'), door_terrace: enter('door_terrace', () => goRoom('E1')), door_suite: () => goRoom('R1'),
   exit_spa: () => goRoom('L3', [0, 0]), exit_tech: () => goRoom('L3', [0, 0]), exit_kitchen: () => goRoom('L2', [0, 0]), exit_archive: () => goRoom('L2', [0, 0]),
   exit_plan: () => goRoom('L4', [0, 0]), exit_wing: () => goRoom('L1', [0, 0]), exit_terrace: () => goRoom('L1', [0, 0]), exit_suite: () => goRoom('W2', [0, -12]),
   exit_tunnel: () => goRoom('P2', [0, 0]), exit_star: () => goRoom('U2', [0, 4]),
@@ -221,7 +242,7 @@ const HOT = {
   },
   holocard: async () => {
     giveItem('holocard'); set('holo_card'); sfx('take'); sync(); E.refresh();
-    await think(['A glowing memory card, tucked under the projector.', '"GHOST OF THE DOME, test v3, D.H." D.H. as in Dex Halloway. Subtle.']);
+    await think(['A burned CD-R, tucked under the projector. Marker on the label.', '"GHOST OF THE DOME, test v3, D.H." D.H. as in Dex Halloway. Subtle.']);
   },
   hatch: async () => {
     if (has('hatch_open')) return goRoom('U1', [0, -15]);
@@ -329,6 +350,7 @@ function openSwitchboard() {
 
 // ---------- Conversations ----------
 const hiLine = {
+  celeste: () => S.phase === 'g' ? 'Nova. The crown is back where it belongs, and I still can\'t stop looking at it.' : S.phase === 'd2' ? 'Day two. The press arrives tomorrow. Tell me you\'re close.' : 'Anything yet?',
   vesper: () => has('vesper_clear') ? 'Nova, darling. My secret keeper.' : has('vesper_mail') ? 'You again. Ask quickly, the steam is getting cold.' : 'The intern. Again.',
   cherry: () => S.phase === 'n1' ? 'Still up? Me too. The stage never sleeps.' : has('cherry_night') ? 'Nova! My favourite little know-it-all!' : 'Intern! Come to measure my hair against the fire code again?',
   dex: () => has('dex_confess') ? 'Hey, Nova. It\'s a ghost-free zone in here now. For real.' : 'Oh. Hi. Hi again. Is this... about me?',
@@ -342,10 +364,15 @@ const hiLine = {
   gus: () => S.phase === 'n1' ? 'Rounds. Don\'t mind me.' : has('gus_key') ? 'Miss Vale.' : 'Intern.',
   harper: () => has('harper_alibi') ? 'My favourite intern. Say something quotable.' : 'The intern! Carried any interesting boxes today?',
   regent: () => has('regent_clear') && S.asked['regent:coat'] ? 'My alibi\'s favourite detective.' : 'My critic returns.',
-  nate: () => has('nate_alibis') ? 'Nova.' : 'Morning.',
+  nate: () => has('nate_alibis') ? 'Nova.' : night() ? 'Evening.' : 'Morning.',
 };
 
 const INTRO = {
+  celeste: ['*Celeste Arden stands by the empty display case, turning a ring of keys over in her hands.*', 'Nova. Thank you for coming. I\'d hug you, but you\'re the intern, and I don\'t hug interns.',
+    'N: Ms. Arden. So this is where it was.', 'Right there on the velvet until Tuesday night. Locked, with Dex\'s keypad on it, and gone by morning.',
+    'Everyone who was in the building that night is still here. Vesper Vox is in the spa. Dex Halloway set up that keypad; he\'s in the tech office. Juniper runs the kitchen. Opal Finch, who designed all this, works in the archive. And Cherry is somewhere near the fountain. You can\'t miss her.',
+    'N: And everyone else?', 'Staff, a conservator restoring our old automaton, and a podcaster I\'d like you to keep away from. More guests arrive tomorrow for the gala. The planetarium is shut while the projector comes out.',
+    'I\'ve unlocked the other doors for you. Please, Nova. Before Saturday.', 'N: Then I\'ll start with the case.'],
   vesper: ['*A tall woman in a silver gown lounges by the pool, sunglasses on indoors.*', 'If you\'re bringing towels, darling, put them on the lounger and go.', 'N: I\'m Nova Vale. Ms. Arden\'s intern.', 'Celeste has an intern now. How lovely for her.', 'N: She asked me to check everyone has what they need before Saturday.', 'What I need is quiet, darling. You may chat until my steam cycle ends, and then you may go away.'],
   cherry: ['*A drag queen in hot pink stands by the fountain, beehive first.*', 'Well, hello. You\'re new. Miss Cherry Pop: host of the Starfall Revue, and the reason anyone bought a ticket.', 'N: Nova Vale. I\'m Ms. Arden\'s intern for the relaunch.', 'Celeste said she was getting an intern. She didn\'t say you\'d stare at my wig like it owes you money.', 'N: It\'s about three inches over the fire code.', '*Cherry blinks. Then she laughs, loud enough to echo off the dome.*', 'Oh, I\'m going to keep my eye on you.'],
   dex: ['*A young man in a teal hoodie jumps and nearly knocks over a lava lamp.*', 'Oh! Hi! Sorry, nobody comes in here. Are you lost? The spa\'s the other way.', 'N: Nova Vale. Ms. Arden\'s intern. The insurers want to know how the display case works, and she said you\'d know.', 'Oh. Yeah. Sure. The insurers. Right.', '*He laughs, a bit too high.*', 'I\'m Dex. I do the tech. All of it. I can explain the case. It\'s a very normal case. Nothing weird about it.', 'N: I didn\'t say it was weird.', '...No. You didn\'t.'],
@@ -359,11 +386,16 @@ const INTRO = {
   gus: ['*A heavyset man with a ring of keys the size of a dinner plate is checking the lamps.*', 'You\'ll be the intern. Celeste said. Gus Haddad, caretaker.', 'N: Nova Vale. You kept this place going the whole nine years it was closed?', 'Me and the raccoons. Kept it dry. Kept it locked.', 'N: Kept it locked. I bet you\'ve got a key for every door in the place.', 'Near enough.', '*He squints at you.*', 'Funny thing for an intern to bet on.'],
   harper: ['*A woman in a red blazer is recording the fountain with a professional microphone.*', '...the quiet of a building that\'s been asleep for nine years. Cut. Oh, hello. Harper Vance, "Lakeshore Unsolved". And you are?', 'N: Nova Vale. Ms. Arden\'s intern.', 'An intern. At a spa that isn\'t open yet, the same week a crown walks out of a locked case. What interesting timing.', 'N: I mostly carry boxes.', '*She smiles, and clearly doesn\'t believe a word of it.*', 'Of course you do. Come and find me when you\'ve got something better to carry. I pay in coffee.'],
   regent: ['*A performer in a white tailcoat lined with lavender is rehearsing a bow, cane first.*', 'Oh! An audience. Well? How was the bow?', 'N: The cane came down a beat early.', '*They freeze mid-bow.*', '...It did. Nobody has noticed that in three weeks. Velvet Regent. Favourite to win the Revue, and to wear the crown, once somebody finds it.', 'N: Nova Vale. Ms. Arden\'s intern.', 'An intern with notes. How alarming.'],
-  nate: ['*A ranger in a green fleece vest is scanning the lake with binoculars.*', 'Morning. Nate Begay, Lakeshore State Park. The lake\'s my patch, the dome isn\'t. You with the hotel?', 'N: Nova Vale. Ms. Arden\'s intern. Anything interesting on the water?', 'Loons. Two kids in a rowboat last summer. And a light in the boathouse at two in the morning, which is either interesting or none of my business.'],
+  nate: ['*A ranger in a green fleece vest is scanning the lake with binoculars.*', 'Nate Begay, Lakeshore State Park. The lake\'s my patch, the dome isn\'t. You with the hotel?', 'N: Nova Vale. Ms. Arden\'s intern. Anything interesting on the water?', 'Loons. Two kids in a rowboat last summer. And a light in the boathouse at two in the morning, which is either interesting or none of my business.'],
 };
 
 const pinQ = { q: 'Do you recognise this pin?', when: () => hasItem('pin') };
 const TOPICS = {
+  celeste: [
+    { id: 'why', q: 'Why me, honestly?', lines: ['Because of Mae. My sister. She still talks about the girl who worked out who was cutting maps out of the library\'s atlases, three weeks before the police would have.', 'And because the police mean a report, a report means the papers, and the papers mean no gala. A private investigator would be spotted in an hour, with a podcaster staying under my roof.', 'Nobody looks twice at a sixteen-year-old intern. That\'s the whole idea.', 'N: People should look twice at me. But I see the strategy.'] },
+    { id: 'keypad', q: 'Who knows the codes for the case?', lines: ['Dex set them all up. Each of the staff has their own. He\'ll know who used what, and when.', 'N: Then Dex is my next stop.'] },
+    { id: 'crown', q: 'Tell me about the crown itself.', lines: ['Silver plate, seven points, and a real meteorite set in the front. Kenji Morimoto appraised it for the insurers on Monday. It\'s worth more than the roof.', 'It\'s the only thing about this relaunch that the newspapers are actually excited about.'] },
+  ],
   vesper: [
     { id: 'crown', q: 'What do you know about the Prism Crown?', lines: ['It\'s a crown, darling, and I adore a crown. I was going to place it on the winner\'s head myself.', 'Then someone stole my big moment. Rude.', 'N: Ms. Arden\'s making a timeline for the insurance people. Where were you on Tuesday, around midnight?', 'Asleep in the Spa Suite, with cucumber on my eyes and a humidifier going like a jet engine.', 'N: I\'ll put down that your witnesses were vegetables.', 'The cucumbers were VERY discreet.'] },
     { id: 'ghost', q: 'Have you heard the singing at night?', lines: ['The "ghost"? Honey, if a ghost is singing in this building it had better be singing MY songs.', 'It\'s thin. Wobbly. No breath support.', '*She says it lightly, but her hand drifts to her throat.'] },
@@ -387,7 +419,7 @@ const TOPICS = {
     { id: 'callout', q: '"Asleep by eleven"? Your own email says ghost test, Tuesday, 11pm.', hot: 1, when: () => has('holo_mail') && !has('dex_confess') && !has('dex_partial'), lines: ['You read my... okay, that\'s a privacy thing, we should talk about—', 'N: We can talk about privacy right after we talk about lying to me.', 'Wait. Interns don\'t read people\'s email. Who ARE you?', 'N: Somebody Celeste trusts to find her crown. Quietly. Keep it that way.', 'Fine! FINE. I was in the planetarium until about 11:40. Testing a thing. A secret thing. I can\'t say what.', 'N: You\'ll tell me. They always do.'], after: () => set('dex_partial') },
     { id: 'ghost', q: 'What do you make of the ghost?', when: () => !has('dex_confess'), lines: ['Ghosts aren\'t real. It\'s probably a feedback loop in the old speakers. Technically.', '*He laughs a little too loudly.*', 'N: Technically, you\'re sweating.'] },
     { id: 'maint', q: 'Who is MAINT-0?', when: () => has('log_read'), lines: ['MAINT-0 is an old master code from when the dome was built. I thought I deleted it when I rebuilt the system!', 'N: You thought. That\'s the problem with thinking. You have to actually check.', 'Somebody who knew it opened the case at 11:52. That wasn\'t me. I promise.'] },
-    { id: 'holo', q: 'I found your hologram card in the planetarium.', hot: 1, when: () => hasItem('holocard') && S.phase === 'd2', lines: () => ['...Oh no.', 'Okay. OKAY. Yes. The ghost is me. It\'s a hologram show for the gala: the singing ghost of the dome. Spooky, fun, very 2003.', 'I was testing it Tuesday and it glitched. Now it switches itself on every night. I didn\'t want Celeste to know until it worked.',
+    { id: 'holo', q: 'I found your CD-R under the projector.', hot: 1, when: () => hasItem('holocard') && S.phase === 'd2', lines: () => ['...Oh no.', 'Okay. OKAY. Yes. The ghost is me. It\'s a Pepper\'s ghost for the gala: a projector bounced off a big sheet of glass, so a singing lady floats over the stage. Theatres did it in Victorian times. I just added a laptop.', 'I was testing it Tuesday and it glitched. Now it switches itself on every night. I didn\'t want Celeste to know until it worked.',
       ...(has('dex_partial') ? ['N: So you were in the planetarium until 11:40. Told you you\'d tell me.', 'The projector log stops at 11:41, you can check. Then I went to bed. For real this time.']
         : S.asked['dex:tuesday'] ? ['N: So much for asleep by eleven. How late were you in there?', 'Until about 11:40. The projector log stops at 11:41, you can check. Then I went to bed. For real this time.']
           : ['N: How late were you in there on Tuesday?', 'Until about 11:40. The projector log stops at 11:41, you can check. Then I went to bed.']), 'N: And MAINT-0?', 'Only the 2003 build team ever knew that code. Four of them. Three moved away years ago.', 'The fourth is Opal.'], after: () => { set('dex_confess'); (toast('Dex has an alibi'), sfx('reveal')); } },
@@ -420,7 +452,7 @@ const TOPICS = {
     { id: 'scrub', q: 'Can I step through your tape frame by frame?', hot: 1, when: () => has('tape_seen') && !has('tape_pin'), lines: ['Frame by frame? You\'re hardcore. I respect that.', '*He hands you the camcorder and leans in.*'], puzzle: 'tape' },
     { id: 'coat', q: 'Your ghost has a long coat and an ordinary white flashlight.', when: () => has('tape_seen'), lines: ['Ghosts can wear coats.', 'N: Ghosts don\'t need flashlights.', '...Okay. That\'s a really good point. That\'s going in the episode.'] },
     { id: 'singing', q: 'Did you hear the singing tonight?', when: () => S.phase === 'n1', lines: ['Heard it, recorded it, backed it up twice. It\'s loudest in the planetarium.', 'I\'m too scared to go in there. That stays between us.', 'N: Your secret\'s safe. Your subscribers already know.'] },
-    { id: 'hologram', q: 'The ghost is Dex\'s hologram, Silas.', hot: 1, when: () => has('dex_confess'), lines: ['...No.', 'N: Yes. Test version three.', '*Silas stares at his camcorder like it betrayed him.*', 'This is the worst day of my life. I\'m still getting an episode out of it.'] },
+    { id: 'hologram', q: 'The ghost is a projection, Silas. Dex made it.', hot: 1, when: () => has('dex_confess'), lines: ['...No.', 'N: Yes. Test version three.', '*Silas stares at his camcorder like it betrayed him.*', 'This is the worst day of my life. I\'m still getting an episode out of it.'] },
     { id: 'pin', ...pinQ, lines: ['Is it haunted?', 'N: No.', 'Then no.'] },
   ],
   jojo: [
@@ -675,7 +707,7 @@ const CALLS = {
     { id: 'opal', q: 'Anything on Opal Finch?', when: () => has('met_opal'), lines: ['She fought hard against the Aquadome closing. I found an old magazine interview.', 'Quote: "I built a secret into that dome that only the stars know about."', 'Spooky, right?', 'N: Spooky, and useful. She\'s telling people where to look.'] },
     { id: 'boathouse', q: 'Why would a boathouse have a brand new padlock?', when: () => has('boat_seen'), lines: ['Uh, because somebody doesn\'t want anyone in the boathouse?', 'N: Brilliant, Remy. Truly. Look up who owned the Aquadome\'s boats before it closed.', 'On it. That might take a while.', 'N: That\'s fine. It\'s not this case.'] },
   ],
-  celeste: () => [{ id: 'why', q: 'Why me, honestly?', when: () => S.phase === 'd1', lines: ['Because of Mae. My sister. She still talks about the girl who worked out who was cutting maps out of the library\'s atlases, three weeks before the police would have.', 'And because the police mean a report, a report means the papers, and the papers mean no gala. A private investigator would be spotted in an hour, with a podcaster staying under my roof.', 'Nobody looks twice at a sixteen-year-old intern. That\'s the whole idea.', 'N: People should look twice at me. But I see the strategy.'] },
+  celeste: () => [{ id: 'why', q: 'Why me, honestly?', when: () => false, lines: ['Because of Mae. My sister. She still talks about the girl who worked out who was cutting maps out of the library\'s atlases, three weeks before the police would have.', 'And because the police mean a report, a report means the papers, and the papers mean no gala. A private investigator would be spotted in an hour, with a podcaster staying under my roof.', 'Nobody looks twice at a sixteen-year-old intern. That\'s the whole idea.', 'N: People should look twice at me. But I see the strategy.'] },
     { id: 'update', q: 'Just checking in.', lines: () => S.phase === 'd1' ? ['Nova. Any progress? The gala is on Saturday and I haven\'t slept.', 'N: Progress is my whole personality. Give me a day.'] : S.phase === 'n1' ? ['You\'re up too? That singing again. I\'m starting to believe in ghosts.', 'N: Don\'t. It\'s a speaker. I\'ll prove it.'] : S.phase === 'g' ? ['It\'s gala day and the crown is back. I could kiss you. I won\'t, I\'m your client.', 'N: Hold that thought. Something about the crown isn\'t finished.'] : S.phase === 'd2' ? ['Day two. The press arrives tomorrow. Please tell me you\'re close.', 'N: I\'m close. I\'m always close. Today I\'m closer.'] : ['Be careful down there, Nova.'] }],
 };
 
@@ -708,7 +740,7 @@ export function openPhone() {
 const NOTES = {
   vesper: () => [has('met_vesper') && 'Pop diva headlining the gala. Says she was asleep on Tuesday night. Her witnesses are cucumbers.', has('vesper_mail') && 'Her manager wrote: "the backup track is loaded... no one will know."', has('vesper_clear') && 'CLEARED: she\'s lip-syncing the gala (voice rest). On a video call with her coach at 11:52.'],
   cherry: () => [has('met_cherry') && 'Drag queen hosting the Starfall Revue. Says she was alone in her suite on Tuesday night.', has('cherry_night') && 'Secretly rehearsing a tribute number for Vesper on the planetarium stage at night.', has('cherry_light') && 'Saw a flashlight and a long coat go behind the stage around midnight on Tuesday.', has('cherry_night') && 'Not our thief. Too loud to be sneaky.'],
-  dex: () => [has('met_dex') && 'Tech manager. Set the display case codes himself. Nervous about Tuesday night.', has('holo_mail') && 'Emailed himself about a "ghost test" in the planetarium on Tuesday at 11pm.', has('dex_partial') && 'Admitted he was in the planetarium until 11:40, "testing a thing".', has('dex_confess') && 'CLEARED: the ghost is his hologram show. Left at 11:41. Says only the 2003 build team knew MAINT-0, and the only one still here is Opal.'],
+  dex: () => [has('met_dex') && 'Tech manager. Set the display case codes himself. Nervous about Tuesday night.', has('holo_mail') && 'Emailed himself about a "ghost test" in the planetarium on Tuesday at 11pm.', has('dex_partial') && 'Admitted he was in the planetarium until 11:40, "testing a thing".', has('dex_confess') && 'CLEARED: the ghost is his projected Pepper\'s ghost show. Left at 11:41. Says only the 2003 build team knew MAINT-0, and the only one still here is Opal.'],
   juniper: () => [has('met_juniper') && 'Chef. Says she was baking "nearly all night" on Tuesday.', has('oven_seen') && 'Oven log: baking from 11:40 PM to 12:30 AM.', has('juniper_clear') && 'CLEARED: remade the cake vegan at 11:40. Saw a flashlight and a long coat cross the lobby just before midnight.'],
   opal: () => [has('met_opal') && 'Designed the Aquadome in 2002. Wears a long lavender coat.', has('gus_key') && 'Has the only key to the planetarium Service door.', has('rashad_saw') && 'Came up at 12:20 with something heavy in her pocket.', has('opal_pin') && 'Got flustered when I showed her the brass pin.', has('pin_known') && 'The brass pins went to the 2003 build crew. Opal\'s is missing.', has('memo_read') && 'Celeste plans to turn Opal\'s planetarium into a VIP lounge after the gala.', has('dex_confess') && 'Knew the MAINT-0 code.', has('drawer_open') && 'Kept a key and a secret blueprint: the Star Room at the end of the service tunnel.'],
   regent: () => [has('met_regent') && 'Favourite to win the Starfall Revue. Wants the crown more than anyone, and wears a long white coat.', has('regent_clear') && 'CLEARED: Harper Vance recorded an interview with Regent in the spa lounge from 11:40 to 12:10.'],
@@ -775,8 +807,8 @@ export function onRoom(room) {
 const MILESTONES = [
   ['case_seen', 'The display case was opened with a code, not forced.'], ['pin', 'You found a brass star pin by the case.'],
   ['log_read', 'The keypad log shows MAINT-0, the 2003 build crew\'s code, at 11:52 on Tuesday.'], ['pin_known', 'The pin belongs to the 2003 build crew. Opal\'s is missing.'],
-  ['switch_done', 'You silenced the singing at the switchboard: it came from the planetarium.'], ['holo_card', 'Under the projector: a hologram card marked D.H.'],
-  ['cherry_light', 'Cherry saw a flashlight and a long coat near the stage at midnight.'], ['dex_confess', 'Dex confessed: the ghost is his hologram show.'],
+  ['switch_done', 'You silenced the singing at the switchboard: it came from the planetarium.'], ['holo_card', 'Under the projector: a CD-R marked D.H.'],
+  ['cherry_light', 'Cherry saw a flashlight and a long coat near the stage at midnight.'], ['dex_confess', 'Dex confessed: the ghost is his projection show.'],
   ['vesper_clear', 'Vesper is miming her comeback song. She was on a video call at 11:52.'], ['juniper_clear', 'Juniper was baking, and saw the long coat cross the lobby.'],
   ['tape_pin', 'Silas\'s tape shows a lavender coat with a brass star pin.'], ['drawer_open', 'Opal\'s drawer held a service key and a blueprint for a hidden Star Room.'],
   ['finale_done', 'In the Star Room, Opal admitted taking the crown. She swears she never touched the star.'], ['star_fake', 'The star in the crown is a fake.'],
@@ -803,7 +835,11 @@ export async function intro() {
       ['The Aquadome. A glass dome on the lake, closed for nine years, reopening on Saturday with a gala.',
         'On Tuesday night the gala\'s crown vanished from a locked case. Since then, something has been singing over the speakers at night.',
         'The owner, Celeste Arden, wants it all solved quietly. So as far as anyone here knows, I\'m her new summer intern.']);
-  sfx('door'); await fade(() => { E.place('L1'); E.refresh(); onRoom('lobby'); }, 600);
-  await think(['Marble, brass, and dust on the chandelier. The display case should be right over there.']);
+  await fade(() => { E.place('R1'); E.refresh(); onRoom('suite'); }, 700);
+  await think(['Suite 2. Clean towels, a view of the lake, and a bed I won\'t be using much.']);
   toast('Celeste\'s letter is in your inventory.');
+  await new Promise(r => setTimeout(r, 1400));
+  sfx('knock');
+  await think(['*Three knocks. A young man\'s voice through the door.*', '*"Miss Vale? Ms. Arden says she\'s ready for you. She\'s in the lobby, by the display case."*', 'Time to go and be an intern.']);
+  E.refresh();
 }

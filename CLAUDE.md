@@ -108,6 +108,15 @@ exists and confirms overwrites), `S.play` seconds played, `S.pz` remembers unfin
 puzzles.js), "Previously" recap on continuing (`recap`, `MILESTONES`), Text speed Normal/Fast/Instant in the menu,
 topics heard before appear without typing (`speech.instant`).
 
+**Directed start (Oct 2026, Beau's notes).** After the flyover Nova wakes in Suite 2; a bellhop knocks: Celeste is waiting in
+the lobby by the case. Celeste is in the world (`DAY.celeste`, `INTRO/TOPICS/hiLine.celeste`) and her introduction names who
+was in the building, which unlocks the spa, tech office, kitchen, archive and terrace doors (`LOCKED` in story.js, each with
+a line); the planetarium is shut for the projector removal until Night 1. People arrive over time: `LATER` (Jojo, Priya,
+Regent, Silas, Nate) are absent on Day 1 (Silas turns up filming on Night 1). The optional "other guests" task counts only
+people who are around (`othersTask`). Interaction: tapping a door walks Nova up to it and shows its name; tap again to go in.
+Tapping a thing walks over if it's out of reach and moves the camera in on it (`inspect`) until nothing is being said or
+shown (`inspectStep`). Dex's ghost is a Pepper's ghost (projector + glass), his test show a CD-R (flags still `holo_*`).
+
 ## Design rules (from research into what Nancy Drew fans love and hate)
 Love: atmospheric places, suspects who each hide something, lore, Nancy's sass, phone friends, puzzles woven into the
 story, Second Chance. Hate: chores/padding, backtracking, unclear next steps, hard-to-find hotspots, repeated puzzles,

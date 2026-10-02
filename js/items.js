@@ -17,8 +17,8 @@ export const ITEMS = {
     svg: '<path d="M32 6l7.6 15.4 17 2.5-12.3 12 2.9 16.9L32 44.8 16.8 52.8l2.9-16.9L7.4 23.9l17-2.5z" fill="#ffc95c" stroke="#b07a1e" stroke-width="3" stroke-linejoin="round"/>',
   },
   holocard: {
-    n: 'Hologram card', d: 'A glowing memory card: "GHOST OF THE DOME — test v3 — D.H."',
-    svg: '<rect x="10" y="16" width="44" height="32" rx="5" fill="#7fe8ff" stroke="#1aa6d9" stroke-width="3"/><path d="M20 26h24M20 34h16" stroke="#fff" stroke-width="4" stroke-linecap="round"/>',
+    n: 'Labelled CD-R', d: 'A burned CD-R in a slim case, labelled in marker: "GHOST OF THE DOME — test v3 — D.H."',
+    svg: '<circle cx="32" cy="32" r="24" fill="#d8dce2" stroke="#8a9098" stroke-width="2"/><circle cx="32" cy="32" r="24" fill="none" stroke="#b8c8e0" stroke-width="6" opacity=".5"/><circle cx="32" cy="32" r="5" fill="#f4f4f0" stroke="#8a9098" stroke-width="2"/><path d="M18 22l14 -4 12 3" stroke="#2a2a2a" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
   },
   sketch: {
     n: 'Opal\'s star sketch', d: 'Five stars joined in a cross. A tall line of three, crossed by a wider line through the second star. "Opening night, 2003."',
@@ -96,7 +96,7 @@ export const DOCS = {
   },
   mail_holo: {
     t: 'Email: Dex to Dex',
-    html: `<div class="paper mono"><p>From: dex@aquadome.net<br>To: dex@aquadome.net<br>Subject: GHOST TEST TUES 11PM</p><p>projector + speakers, planetarium only. v3 of the voice. DO NOT tell Celeste until it looks good.</p></div>`,
+    html: `<div class="paper mono"><p>From: dex@aquadome.net<br>To: dex@aquadome.net<br>Subject: GHOST TEST TUES 11PM</p><p>projector + glass + speakers, planetarium only. v3 of the voice. burn it to CD for the show laptop. DO NOT tell Celeste until it looks good.</p></div>`,
   },
   mail_vesper: {
     t: 'Email: to Vesper Vox',
