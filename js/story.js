@@ -113,7 +113,7 @@ async function rest() {
     await think(['*Grey morning light comes in through the dome.', has('cherry_light') ? 'Recap: Cherry has a secret rehearsal, somebody in a long coat has a flashlight, and "D.H." has a hologram card with his initials on it.' : 'Recap: Cherry has a secret rehearsal, and "D.H." has a hologram card with his initials on it.', 'Today, everybody tells me the truth. Whether they plan to or not.']);
     ring('dot');
   }
-  if (next === 'n2') await think(['*The Aquadome goes quiet. Even the fountain is switched off.', 'A key to the service door and a blueprint for a room that isn\'t on any other plan.', 'Opal thinks the stars remember. Let\'s see if they remember me.']);
+  if (next === 'n2') await think(['*The Aquadome goes quiet. Even the fountain is switched off.', 'A key to the service door and a blueprint for a room that isn\'t on any other plan.', has('note_read') ? 'Opal thinks the stars remember. Let\'s see if they remember me.' : 'Whatever Opal hid down there, tonight I find it.']);
 }
 
 // ---------- The map: fast travel between places you've been ----------
@@ -267,12 +267,12 @@ const HOT = {
   // the guest wing
   door_vsuite: () => think(has('vesper_clear')
     ? ['*You knock.*', 'From inside: "Darling. I adore you. Go away."', 'Fair.']
-    : ['A card on the handle: "VOCAL REST. DO NOT KNOCK. THIS MEANS YOU."', '*You knock anyway. Nothing.*', 'She\'s in the spa, steaming her secrets. I\'ll find her there.']),
+    : ['A card on the handle: "VOCAL REST. DO NOT KNOCK. THIS MEANS YOU."', '*You knock anyway. Nothing.*', has('met_vesper') ? 'She\'s in the spa, steaming her secrets. I\'ll find her there.' : 'Vocal rest. That\'ll be Vesper Vox, then. Not in, apparently.']),
   door_csuite: () => think(S.phase === 'n1'
-    ? ['*No answer, and no light under the door.*', 'Cherry\'s not in bed. At this hour. Interesting.']
+    ? ['*No answer, and no light under the door.*', has('met_cherry') ? 'Cherry\'s not in bed. At this hour. Interesting.' : 'Whoever owns that costume bag isn\'t in bed. At this hour. Interesting.']
     : ['A garment bag hangs on the handle: "COSTUME. DO NOT TOUCH. THIS MEANS YOU, VESPER."', 'Interesting that she felt she had to specify.']),
   door_linen: () => caption('The linen closet. Towels folded with military precision. That\'s either Juniper or someone with a lot of feelings about corners.'),
-  windowseat: () => think(['The whole lake from up here.', 'And the boathouse on the shore, with a shiny new padlock on a rusty old chain.', 'Nobody puts a new lock on something they don\'t care about. Filing that away.']),
+  windowseat: () => (set('boat_seen'), think(['The whole lake from up here.', 'And the boathouse on the shore, with a shiny new padlock on a rusty old chain.', 'Nobody puts a new lock on something they don\'t care about. Filing that away.'])),
   flowers: () => caption('Fresh lilies. Someone is trying very hard to make this place feel open again.'),
   cart: () => caption('A housekeeping cart. Clean towels, tiny soaps, and a mint I am absolutely taking.'),
   crewphoto: async () => {
@@ -287,8 +287,8 @@ const HOT = {
   tbench: () => caption('A bench facing the lake. Excellent for brooding. I\'ll come back and brood later.'),
   dockpost: () => caption('A dock post with a rope burn round it. Something was tied here, tightly, and not long ago.'),
   rowboat: () => caption('A rowboat called the Solstice. Oars stowed, rope dry. Nobody\'s rowed this in years.'),
-  boathouse: () => think(night() ? ['A light behind the boathouse window. At this hour.', 'And the padlock\'s off the chain. It\'s hanging open on the hasp.', 'Gus told me it has nothing to do with my case. Tonight I believe him. Tomorrow I\'m less sure.']
-    : ['Padlocked. The chain\'s rusted solid, but the padlock is brand new.', 'Somebody cares a lot about what\'s in there. Not my case.', '...Yet.']),
+  boathouse: () => (set('boat_seen'), think(night() ? ['A light behind the boathouse window. At this hour.', 'And the padlock\'s off the chain. It\'s hanging open on the hasp.', 'Gus told me it has nothing to do with my case. Tonight I believe him. Tomorrow I\'m less sure.']
+    : ['Padlocked. The chain\'s rusted solid, but the padlock is brand new.', 'Somebody cares a lot about what\'s in there. Not my case.', '...Yet.'])),
 
   // my suite
   bed: () => rest(),
@@ -446,8 +446,8 @@ const TOPICS = {
       : ['*Kenji goes very still.*', 'That\'s... not possible. I appraised it myself.', 'N: When?', 'On Monday, for the insurance. It was real then. I promise you.', 'N: You log everything, don\'t you? Show me Monday.', '*He hesitates a fraction too long, then hands over his notebook.*'], after: () => { set('repair_seen'); setTimeout(() => showDoc('repairlog'), 50); } },
     { id: 'g_catch', q: 'Your Monday doesn\'t add up.', hot: 1, when: () => S.phase === 'g' && has('repair_seen') && has('appraisal_read') && !has('kenji_caught'), lines: ['N: Let me show you something, Kenji. Two somethings.'], after: null, catch: 1 },
     { id: 'g_truth', q: 'I found the Star\'s Tear.', hot: 1, when: () => S.phase === 'g' && has('stella_open') && !has('g_done'), lines: ['*Kenji sees the dark star in your hand and closes his eyes.*'], fin: 1 },
-    { id: 'stella', q: 'A singing doll. The same week as a singing ghost.', lines: ['I know how it looks. But Stella sings in three-four time. A waltz. And she has been in pieces on my table all week.', 'Your ghost sings in four-four.', 'N: You checked the ghost\'s time signature.', 'Of course. Didn\'t you?', 'N: ...I respect that enormously.'] },
-    { id: 'crown', q: 'You appraised the crown?', lines: ['For the insurance. The band is silver plate, pretty and ordinary. The star is a real pallasite: olivine crystals set in meteoric iron. It\'s worth more than the roof.', 'N: Someone could retire on that.', 'A thief could. But nobody has tried. I have friends who would hear about it, and I\'ve heard nothing.', 'N: So whoever took it didn\'t take it for the money.', '*Kenji nods, pleased, like a teacher with a good student.*'], after: () => set('kenji_money') },
+    { id: 'stella', q: 'Ms. Arden says something\'s been singing at night. And here\'s a singing doll.', lines: ['I know how it looks. But Stella sings in three-four time. A waltz. And she has been in pieces on my table all week.', 'Your ghost sings in four-four.', 'N: You checked the ghost\'s time signature.', 'Of course. Didn\'t you?', 'N: ...I respect that enormously.'] },
+    { id: 'crown', q: 'Did you ever get a close look at the crown?', lines: ['Very close. I appraised it for the insurance. The band is silver plate, pretty and ordinary. The star is a real pallasite: olivine crystals set in meteoric iron. It\'s worth more than the roof.', 'N: Someone could retire on that.', 'A thief could. But nobody has tried. I have friends who would hear about it, and I\'ve heard nothing.', 'N: So whoever took it didn\'t take it for the money.', '*Kenji nods, pleased, like a teacher with a good student.*'], after: () => set('kenji_money') },
     { id: 'tuesday', q: 'Were you up late on Tuesday? I\'m doing a timeline for the insurers.', lines: ['In my room, gluing a porcelain finger back on under a magnifier. I log every repair.', '*He shows you a notebook: every repair recorded to the minute. 23:40 to 00:30, "Stella, left hand, third finger".*', 'N: That is the most boring alibi I\'ve ever heard. It\'s perfect.'] },
     { id: 'pin', ...pinQ, lines: ['Brass, die-stamped, 2003. Sentimental, not valuable. Someone will miss it for the feeling, not the price.'] },
   ],
@@ -464,14 +464,14 @@ const TOPICS = {
   gus: [
     { id: 'keys', q: 'Do you have a key to everything?', lines: ['Every door, every cabinet, every drawer.', '*He looks at you sidelong.*', 'You\'re not here to carry boxes, are you. Fine. Celeste trusts you, I\'ll trust you.', '*He jingles the ring.*', 'Except the Service door behind the planetarium stage. Ms. Finch has the only key to that one. Always has. Said it was a "crew thing".'], after: () => set('gus_key') },
     { id: 'tuesday', q: 'What does a night shift look like here? Tuesday, say.', lines: ['Rounds at ten, rounds at two. Asleep in between, like a sensible man.', 'N: With a flashlight, I suppose. It is dark out there.', 'It\'s a big dark building, miss. Everybody here\'s got a flashlight.'] },
-    { id: 'boathouse', q: 'Why is there a new padlock on the boathouse?', when: () => has('v_terrace'), lines: ['*Gus\'s face shuts like a door.*', 'Because I put one on it.', 'N: That isn\'t an answer.', 'It\'s the only one you\'re getting. It\'s got nothing to do with your crown. Leave it.', 'N: For now.'], after: () => set('boathouse_ask') },
+    { id: 'boathouse', q: 'Why is there a new padlock on the boathouse?', when: () => has('boat_seen'), lines: ['*Gus\'s face shuts like a door.*', 'Because I put one on it.', 'N: That isn\'t an answer.', 'It\'s the only one you\'re getting. It\'s got nothing to do with your crown. Leave it.', 'N: For now.'], after: () => set('boathouse_ask') },
     { id: 'rounds', q: 'What are you doing up here at this hour?', when: () => S.phase === 'n1', lines: ['Rounds. Somebody\'s been singing through the speakers all week and Celeste thinks it\'s me. It isn\'t me. The ghost has better range.'] },
     { id: 'pin', ...pinQ, lines: ['Crew pin. I wasn\'t crew. I came in \'05, after. They were a tight bunch.'] },
   ],
   harper: [
-    { id: 'press', q: 'Celeste said no press until after the gala.', lines: ['Celeste said no press WRITING until after the gala. I\'m only recording. My lawyer and I read that contract very carefully.', 'N: You have an answer for everything.', 'Takes one to know one, kid.'] },
+    { id: 'press', q: 'I thought the press had to wait until after the gala.', lines: ['Celeste said no press WRITING until after the gala. I\'m only recording. My lawyer and I read that contract very carefully.', 'N: You have an answer for everything.', 'Takes one to know one, kid.'] },
     { id: 'tuesday', q: 'Ms. Arden wants a list of who was where on Tuesday.', lines: () => ['Now why would an intern want to know that?', 'N: For the insurance forms.', 'The insurance forms. Sure.', '*She studies you, then shrugs and pulls out her recorder.*', 'Interviewing Velvet Regent in the spa lounge, 11:40 to 12:10. All recorded. All timestamped. Here, have a listen, and tell Celeste I was very helpful.', '*She plays a clip: Regent\'s voice, a big laugh, and underneath, very faint, a long metal groan.*', 'N: What\'s that noise at 11:57?', 'The plumbing? The ghost? It\'s great audio either way.', has('jojo_door') ? 'N: It\'s a heavy door. Somewhere under this building. Jojo heard one slam later that night.' : 'N: Neither. Plumbing gurgles. That\'s metal, and it\'s heavy.'], after: () => { set('harper_alibi'); set('regent_clear'); } },
-    { id: 'g_monday', q: 'Were you recording anything on Monday afternoon?', hot: 1, when: () => S.phase === 'g' && has('star_fake'),
+    { id: 'g_monday', q: 'Were you recording anything on Monday afternoon?', hot: 1, when: () => S.phase === 'g' && has('appraisal_read'),
       lines: ['Room tone for the episode. Monday after lunch, an hour of the lobby breathing. Why?', 'N: Because I need to know what the lobby was doing on Monday afternoon. Can I hear it?',
         '*She scrubs to the start. The fountain, the dome ticking in the sun, and at 13:36 a soft electronic chirp: the display case keypad.*',
         '*Then a chair rolling over marble. Nothing for an hour but a very small, patient scratching.*', '*At 14:51 the keypad chirps again, and the chair rolls back.*',
@@ -486,7 +486,7 @@ const TOPICS = {
       ...(has('harper_alibi')
         ? ['N: They\'d have mentioned the coat. Harper Vance has you on tape in the spa lounge at 11:57.', 'Then Harper Vance is my new favourite person and I\'m sending her flowers.']
         : ['N: Nobody wrote a poem. So where were you?', 'In the spa lounge with that podcast woman, Harper, and her microphone, from twenty to twelve until well after midnight. She records everything. Ask her for the tape.', 'N: I will.', 'Do. I sound wonderful on it.'])] },
-    { id: 'cherry', q: 'What do you think of Cherry?', lines: ['Cherry is the best host in this state and I will never say that to her face.', 'N: I\'ll tell her you said it.', 'You wouldn\'t DARE.'] },
+    { id: 'cherry', q: 'What do you think of Cherry?', when: () => has('met_cherry'), lines: ['Cherry is the best host in this state and I will never say that to her face.', 'N: I\'ll tell her you said it.', 'You wouldn\'t DARE.'] },
     { id: 'pin', ...pinQ, lines: ['Tacky. I\'d wear it.'] },
   ],
   nate: [
@@ -673,7 +673,7 @@ const CALLS = {
     { id: 'maint', q: 'What\'s a "MAINT-0" code?', when: () => has('log_read'), lines: ['Old building systems often had a maintenance master code for the people who installed them.', 'The 2003 press kit says the build team was four people, led by the designer, Opal Finch.'] },
     { id: 'vesper', q: 'Anything on Vesper Vox?', when: () => has('met_vesper'), lines: ['Her last album was huge. But she cancelled two shows last month. Her team said "vocal rest".'] },
     { id: 'opal', q: 'Anything on Opal Finch?', when: () => has('met_opal'), lines: ['She fought hard against the Aquadome closing. I found an old magazine interview.', 'Quote: "I built a secret into that dome that only the stars know about."', 'Spooky, right?', 'N: Spooky, and useful. She\'s telling people where to look.'] },
-    { id: 'boathouse', q: 'Why would a boathouse have a brand new padlock?', when: () => has('v_terrace'), lines: ['Uh, because somebody doesn\'t want anyone in the boathouse?', 'N: Brilliant, Remy. Truly. Look up who owned the Aquadome\'s boats before it closed.', 'On it. That might take a while.', 'N: That\'s fine. It\'s not this case.'] },
+    { id: 'boathouse', q: 'Why would a boathouse have a brand new padlock?', when: () => has('boat_seen'), lines: ['Uh, because somebody doesn\'t want anyone in the boathouse?', 'N: Brilliant, Remy. Truly. Look up who owned the Aquadome\'s boats before it closed.', 'On it. That might take a while.', 'N: That\'s fine. It\'s not this case.'] },
   ],
   celeste: () => [{ id: 'why', q: 'Why me, honestly?', when: () => S.phase === 'd1', lines: ['Because of Mae. My sister. She still talks about the girl who worked out who was cutting maps out of the library\'s atlases, three weeks before the police would have.', 'And because the police mean a report, a report means the papers, and the papers mean no gala. A private investigator would be spotted in an hour, with a podcaster staying under my roof.', 'Nobody looks twice at a sixteen-year-old intern. That\'s the whole idea.', 'N: People should look twice at me. But I see the strategy.'] },
     { id: 'update', q: 'Just checking in.', lines: () => S.phase === 'd1' ? ['Nova. Any progress? The gala is on Saturday and I haven\'t slept.', 'N: Progress is my whole personality. Give me a day.'] : S.phase === 'n1' ? ['You\'re up too? That singing again. I\'m starting to believe in ghosts.', 'N: Don\'t. It\'s a speaker. I\'ll prove it.'] : S.phase === 'g' ? ['It\'s gala day and the crown is back. I could kiss you. I won\'t, I\'m your client.', 'N: Hold that thought. Something about the crown isn\'t finished.'] : S.phase === 'd2' ? ['Day two. The press arrives tomorrow. Please tell me you\'re close.', 'N: I\'m close. I\'m always close. Today I\'m closer.'] : ['Be careful down there, Nova.'] }],
@@ -803,6 +803,6 @@ export async function intro() {
       await E.cine('E2', [{ p: [6, 3.6, -46], l: [0, 6, 18], t: 0 }, { p: [3, 2.4, -26], l: [0, 5.2, 18], t: 5 }, { p: [1.6, 1.75, -9], l: [0, 4, 14], t: 10 }, { p: [0, 1.62, 3.2], l: [0, 2.6, 10], t: 14 }],
         ['The Aquadome. A glass dome on a stone drum, built out over the lake in 2003 and shut for the last nine years.', 'On Saturday it reopens with a gala. On Tuesday night, somebody walked off with the gala\'s crown.', 'Celeste Arden wants it back before anyone finds out it\'s gone. That\'s where I come in.']);
       sfx('door'); await fade(() => { E.place('L1'); E.refresh(); onRoom('lobby'); }, 600);
-      await think(['So this is the Aquadome. Nine years closed, and it still smells like chlorine and old money.', 'As far as anyone here knows, I\'m Celeste\'s summer intern. People say all sorts of things in front of the intern.', 'Marble floors, brass everywhere, and dust on the chandelier. Whoever cleaned for the relaunch skipped everything you have to look up to see. People always do.', 'The display case should be here in the lobby. Crime scenes don\'t investigate themselves.']);
+      await think(['So this is the Aquadome. Nine years closed, and it still smells like chlorine and old money.', 'Celeste\'s letter said the empty planetarium has been lit up at night, and something sings over speakers nobody switched on. Her staff think it\'s a ghost.','As far as anyone here knows, I\'m Celeste\'s summer intern. People say all sorts of things in front of the intern.', 'Marble floors, brass everywhere, and dust on the chandelier. Whoever cleaned for the relaunch skipped everything you have to look up to see. People always do.', 'The display case should be here in the lobby. Crime scenes don\'t investigate themselves.']);
     };
 }
