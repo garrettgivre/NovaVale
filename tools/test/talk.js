@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
   const out = await p.evaluate(async sc => {
     const w = ms => new Promise(r => setTimeout(r, ms));
     document.querySelector('#lgo')?.click(); await w(200);
-    for (let i = 0; i < 40; i++) { const l = document.querySelector('#talk.on #talkLine'); if (!l) break; l.click(); await w(30); }
+    for (let i = 0; i < 160; i++) { const l = document.querySelector('#talk.on #talkLine'); if (l) l.click(); await w(50); }   // through the opening (suite, knock)
     const S = __dbg.S; S.phase = sc.phase || 'd1';
     for (const f of sc.flags || []) S.flags[f] = true;
     for (const i of sc.items || []) S.inv.includes(i) || S.inv.push(i);

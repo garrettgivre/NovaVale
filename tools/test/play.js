@@ -51,6 +51,7 @@ const { chromium } = require('playwright');
     // close the opening letter and Nova's first thoughts
     document.querySelector('#lgo')?.click(); await w(1500); document.querySelector('#cine.on')?.click(); await drive(20000);
     // ---- Day 1
+    await w(6000); await drive(20000);   // the opening in the suite and the knock
     await talk('celeste');
     await hot('case'); await hot('pin'); await hot('crewphoto'); await hot('books'); await hot('opalnote'); await hot('oven');
     flag('aqua_login', 'log_read', 'holo_mail', 'vesper_mail', 'memo_read'); doc('log', 'mail_holo', 'mail_vesper', 'memo');
