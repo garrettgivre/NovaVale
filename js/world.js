@@ -160,9 +160,256 @@ function plaqueMesh(p, text, w, h, x, y, z, ry = 0, o = {}) {
   pl.rotation.y = ry; return pl;
 }
 
-// A panelled wooden door with a brass sign above.
-function door(R, x, z, label, hot, face = [0, 0], o = {}) {
-  const g = new THREE.Group(); g.position.set(x, 0, z); faceTo(g, face[0], face[1]); R.g.add(g);
+// ---------- Doors: one look per destination ----------
+// Static pieces are batched per material (dBatch) so a door costs a handful of draw calls.
+function dBatch() {
+  const parts = new Map(), tmp = new THREE.Object3D();
+  const B = {
+    put(mt, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+      tmp.position.set(x, y, z); tmp.rotation.set(rx, ry, rz); tmp.updateMatrix(); geo.applyMatrix4(tmp.matrix);
+      let a = parts.get(mt); if (!a) parts.set(mt, a = []); a.push(geo); return B;
+    },
+    box(mt, w, h, d, x, y, z, rx, ry, rz) { return B.put(mt, new THREE.BoxGeometry(w, h, d), x, y, z, rx, ry, rz); },
+    cyl(mt, rt, rb, h, x, y, z, rx, ry, rz, seg = 12) { return B.put(mt, new THREE.CylinderGeometry(rt, rb, h, seg), x, y, z, rx, ry, rz); },
+    // an open rectangle of four bars, outer size w x h, bar thickness t
+    ring(mt, w, h, t, x, y, z, d = 0.02) {
+      B.box(mt, w, t, d, x, y + h / 2 - t / 2, z); B.box(mt, w, t, d, x, y - h / 2 + t / 2, z);
+      B.box(mt, t, h - 2 * t, d, x - w / 2 + t / 2, y, z); B.box(mt, t, h - 2 * t, d, x + w / 2 - t / 2, y, z); return B;
+    },
+    star(mt, r, x, y, z) { return B.put(mt, new THREE.ShapeGeometry(starShape(r, r * 0.45)), x, y, z); },
+    flush(g) {
+      for (const [mt, list] of parts) {
+        const geo = list.length > 1 ? mergeGeometries(list, false) : list[0];
+        const mesh = new THREE.Mesh(geo || list[0], mt); g.add(mesh);
+        if (!geo) for (const l of list.slice(1)) g.add(new THREE.Mesh(l, mt));
+      }
+    },
+  };
+  return B;
+}
+
+const DM = () => once('doormats', () => ({
+  mah: mat.mahog(), panel: mat.panel(), inset: M(0x3a2010, 0.5),
+  midnight: M(0x141b4a, 0.4, 0.15), midDark: M(0x0a0f2c, 0.5, 0.1), gilt: M(0xdbb04a, 0.26, 0.95),
+  white: M(0xece8dc, 0.4, 0), whiteSh: M(0xd9d5c8, 0.5, 0),
+  tech: M(0x6c7a72, 0.55, 0.05), techFr: M(0x5c6a63, 0.55, 0.05), black: M(0x1a1a1c, 0.5, 0.3),
+  steel: M(0xbcbfc1, 0.3, 0.9, { t: TX.steel(), bump: 0.004, emissive: 0x303234 }), steelDk: M(0x8c9094, 0.38, 0.9), cream: M(0xd8d6c4, 0.5, 0),
+  oak: M(0x7a6048, 0.6, 0, { t: TX.oak(), bump: 0.02 }), oakFr: M(0x4a3626, 0.6, 0, { t: TX.oak(), bump: 0.02 }), oakGap: M(0x120a05, 0.9),
+  frostBrass: M(0x8f7436, 0.4, 0.8), glassWarm: M(0xe0cfa0, 0.2, 0, { emissive: 0xa88c4a, emissiveIntensity: 0.7 }),
+  glassDark: M(0x16302e, 0.1, 0.1, { emissive: 0x0c1f1e, emissiveIntensity: 0.6 }),
+  ledG: new THREE.MeshBasicMaterial({ color: 0x4cd860 }), ledR: new THREE.MeshBasicMaterial({ color: 0xd84c3c }),
+}));
+
+// Frosted glass with an etched ripple, for the spa doors.
+function dFrost() {
+  return once('dfrost', () => {
+    const W = 256, H = 640, c = T.canvas(W, H), g = c.getContext('2d'), r = T.rng(5);
+    const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#c4e0dd'); gr.addColorStop(1, '#9cc6c3');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 2600; i++) { g.fillStyle = `rgba(${r() < 0.5 ? '255,255,255' : '90,140,140'},${0.05 + r() * 0.08})`; g.fillRect(r() * W, r() * H, 2, 2); }
+    g.lineCap = 'round';
+    for (let k = 0; k < 9; k++) {
+      const y0 = 70 + k * 58;
+      for (const [col, w, dy] of [['rgba(70,120,120,.35)', 5, 3], ['rgba(255,255,255,.95)', 3, 0]]) {
+        g.strokeStyle = col; g.lineWidth = w; g.beginPath();
+        for (let x = 24; x <= W - 24; x += 4) { const y = y0 + dy + Math.sin(x / 20 + k * 1.3) * 9; x === 24 ? g.moveTo(x, y) : g.lineTo(x, y); }
+        g.stroke();
+      }
+    }
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3; g.strokeRect(14, 14, W - 28, H - 28);
+    g.strokeStyle = 'rgba(70,120,120,.3)'; g.lineWidth = 2; g.strokeRect(20, 20, W - 40, H - 40);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    return new THREE.MeshStandardMaterial({ map: t, emissiveMap: t, emissive: 0x6a8a86, emissiveIntensity: 0.35, roughness: 0.35 });
+  });
+}
+
+// Sign textures. lines: strings (or [text, relative size]); kinds below. Cached by content.
+const D_SIGN = {
+  gilt: { bg: ['#1a2260', '#0b1033'], fg: '#e8c562', ln: '#d6ab42', font: 'Cinzel, Georgia, serif', wt: 600, rough: 0.3, met: 0.35, dbl: 1, sh: 'rgba(0,0,0,.6)' },
+  enamel: { bg: ['#2b8c88', '#1d6764'], fg: '#f3ead2', ln: '#f3ead2', font: 'Cinzel, Georgia, serif', wt: 700, rough: 0.18, met: 0, dbl: 1, wave: 1, sh: 'rgba(0,40,40,.4)' },
+  plastic: { bg: ['#34383a', '#25282a'], fg: '#ece8dc', ln: '#8d8d88', font: 'Arial, Helvetica, sans-serif', wt: 700, rough: 0.4, met: 0 },
+  brass: { bg: ['#d1ac5e', '#a98532'], fg: '#2c1f08', ln: '#4a3510', font: 'Cinzel, Georgia, serif', wt: 700, rough: 0.35, met: 0.55, dbl: 1, sh: 'rgba(255,240,200,.45)' },
+  hang: { bg: ['#27493a', '#192f25'], fg: '#e6c46c', ln: '#d4ad4c', font: 'Cinzel, Georgia, serif', wt: 600, rough: 0.35, met: 0.2, dbl: 1, sh: 'rgba(0,0,0,.5)' },
+  kitchen: { bg: ['#f4f2e8', '#dedbcf'], fg: '#1c1c1c', fg2: '#a8261f', ln: '#8a8a82', font: 'Arial, Helvetica, sans-serif', wt: 700, rough: 0.2, met: 0 },
+  card: { bg: ['#f1e9d2', '#e2d7bb'], fg: '#3a2a1c', ln: '#b8a888', font: '"EB Garamond", Georgia, serif', wt: 600, rough: 0.8, met: 0 },
+  dnd: { bg: ['#9a3030', '#7a2222'], fg: '#f3e8d0', ln: '#f3e8d0', font: 'Cinzel, Georgia, serif', wt: 700, rough: 0.7, met: 0 },
+  glass: { clear: 1, fg: '#e2b84e', ol: '#3a2608', font: 'Cinzel, Georgia, serif', wt: 700, rough: 0.5, met: 0.3 },
+  stencil: { clear: 1, fg: '#ece6d0', font: 'Arial Black, Arial, sans-serif', wt: 900, rough: 0.7, met: 0, stencil: 1 },
+};
+function dSignMat(kind, lines, w, h) {
+  const L = lines.map(l => Array.isArray(l) ? l : [l, 0]);
+  return once('dsign:' + kind + '|' + L.map(l => l.join('~')).join('/') + '|' + w + 'x' + h, () => {
+    const P = D_SIGN[kind], pw = Math.round(w * 640), ph = Math.round(h * 640), c = T.canvas(pw, ph), g = c.getContext('2d');
+    if (!P.clear) {
+      const gr = g.createLinearGradient(0, 0, 0, ph); gr.addColorStop(0, P.bg[0]); gr.addColorStop(1, P.bg[1]);
+      g.fillStyle = gr; g.fillRect(0, 0, pw, ph);
+      g.strokeStyle = P.ln; g.lineWidth = Math.max(3, ph * 0.025); g.strokeRect(ph * 0.06, ph * 0.06, pw - ph * 0.12, ph - ph * 0.12);
+      if (P.dbl) { g.lineWidth = 1.5; g.strokeRect(ph * 0.12, ph * 0.12, pw - ph * 0.24, ph - ph * 0.24); }
+      if (P.wave) { g.lineWidth = 3; g.beginPath(); for (let x = ph * 0.2; x <= pw - ph * 0.2; x += 3) { const y = ph * 0.86 + Math.sin(x / 11) * 3; x === ph * 0.2 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); }
+    }
+    const n = L.length, base = n === 1 ? [0.5] : n === 2 ? [0.34, 0.25] : [0.26, 0.26, 0.26];
+    const sizes = L.map((l, i) => (l[1] || base[i]) * ph), tot = sizes.reduce((a, b) => a + b * 1.18, 0);
+    let y = (ph - tot) / 2 + (P.wave ? -ph * 0.04 : 0);
+    g.textAlign = 'center'; g.textBaseline = 'middle'; if ('letterSpacing' in g) g.letterSpacing = Math.round(ph * 0.015) + 'px';
+    L.forEach(([t], i) => {
+      let sz = sizes[i]; const lh = sz * 1.18;
+      g.font = `${P.wt} ${sz}px ${P.font}`;
+      const mw = g.measureText(t).width, maxW = pw * 0.86; if (mw > maxW) { sz *= maxW / mw; g.font = `${P.wt} ${sz}px ${P.font}`; }
+      const cy = y + lh / 2;
+      if (P.ol) { g.lineJoin = 'round'; g.strokeStyle = P.ol; g.lineWidth = sz * 0.1; g.strokeText(t, pw / 2, cy); }
+      else if (P.sh) { g.fillStyle = P.sh; g.fillText(t, pw / 2 + 1.5, cy + 2.5); }
+      g.fillStyle = (i && P.fg2) || P.fg; g.fillText(t, pw / 2, cy);
+      y += lh;
+    });
+    if (P.stencil) { g.globalCompositeOperation = 'destination-out'; for (let i = 0; i < n; i++) g.fillRect(0, ph * (0.34 + i * 0.4), pw, 3); for (let x = 8; x < pw; x += 41) g.fillRect(x, 0, 3, ph); }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const m = new THREE.MeshStandardMaterial({ map: t, roughness: P.rough, metalness: P.met });
+    if (P.stencil) { m.emissiveMap = t; m.emissive = new THREE.Color(0x777777); }
+    if (P.clear) { m.transparent = true; m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; }
+    return m;
+  });
+}
+// A sign: backing frame goes in the batch, the printed face is its own plane.
+function dSign(g, b, kind, lines, w, h, x, y, z, frameMt, rz = 0) {
+  if (frameMt) b.box(frameMt, w + 0.035, h + 0.035, 0.014, x, y, z - 0.009, 0, 0, rz);
+  const p = add(g, new THREE.PlaneGeometry(w, h), dSignMat(kind, lines, w, h), x, y, z); p.rotation.z = rz; p.userData.nocast = 1; return p;
+}
+function dFrame(b, mt, w = 0.14) {
+  b.box(mt, w, 2.6, 0.18, -0.78, 1.3, 0).box(mt, w, 2.6, 0.18, 0.78, 1.3, 0).box(mt, 1.74, 0.16, 0.2, 0, 2.62, 0);
+}
+const dPulls = (b, mt, y = 1.05, len = 0.5) => { for (const s of [-1, 1]) { b.cyl(mt, 0.016, 0.016, len, s * 0.09, y, 0.085); for (const k of [-1, 1]) b.cyl(mt, 0.008, 0.008, 0.05, s * 0.09, y + k * len * 0.4, 0.06, Math.PI / 2); } };
+const dLever = (b, mt, x = 0.56, y = 1.0) => { b.box(mt, 0.05, 0.2, 0.012, x, y, 0.04).cyl(mt, 0.011, 0.011, 0.15, x - 0.05, y - 0.02, 0.075, 0, 0, Math.PI / 2).cyl(mt, 0.016, 0.016, 0.03, x, y, 0.055, Math.PI / 2); };
+
+// What each lobby door's sign says.
+const D_TEXT = { planetarium: ['PLANETARIUM'], spa: ['SPA & POOLS'], tech: ['STAFF ONLY', 'TECHNICAL OFFICE'], stairs: ['GRAND STAIRCASE', 'GUEST WING'], terrace: ['TERRACE'], kitchen: ['KITCHEN', 'STAFF ONLY'], archive: ['ARCHIVE'] };
+
+const D_STYLE = {
+  planetarium(g, b, m, c) {
+    dFrame(b, m.midnight); for (const s of [-1, 1]) b.box(m.gilt, 0.02, 2.6, 0.01, s * 0.78, 1.3, 0.096);
+    b.box(m.gilt, 1.42, 0.025, 0.01, 0, 2.54, 0.1);
+    for (const s of [-1, 1]) {
+      const x = s * 0.358; b.box(m.midnight, 0.712, 2.5, 0.06, x, 1.25, 0);
+      b.ring(m.gilt, 0.5, 0.84, 0.018, x, 1.36, 0.034).box(m.midDark, 0.48, 0.82, 0.01, x, 1.36, 0.031);
+      b.ring(m.gilt, 0.5, 0.8, 0.018, x, 0.5, 0.034).box(m.midDark, 0.48, 0.78, 0.01, x, 0.5, 0.031);
+      b.star(m.gilt, 0.17, x, 1.36, 0.04);
+      for (let k = -2; k <= 2; k++) b.star(m.gilt, 0.032, x + k * 0.12, 2.3, 0.04);
+      for (const [dx, dy, r] of [[-0.15, 1.68, 0.035], [0.14, 1.7, 0.03], [-0.16, 1.04, 0.03], [0.15, 1.06, 0.04], [0.0, 0.7, 0.04], [-0.12, 0.34, 0.03], [0.13, 0.28, 0.035]]) b.star(m.gilt, r, x + dx * s, dy, 0.04);
+      b.cyl(m.gilt, 0.016, 0.016, 0.5, s * 0.075, 1.1, 0.085);
+    }
+    b.box(m.gilt, 0.02, 2.5, 0.075, 0, 1.25, 0);
+    b.put(m.midDark, new THREE.CircleGeometry(0.87, 32, 0, Math.PI).scale(1, 0.34, 1), 0, 2.7, 0.02);
+    b.put(m.gilt, new THREE.TorusGeometry(0.87, 0.024, 6, 32, Math.PI).scale(1, 0.34, 1), 0, 2.7, 0.03);
+    for (let i = 1; i <= 5; i++) { const a = i / 6 * Math.PI; b.star(m.gilt, 0.045, Math.cos(a) * 0.55, 2.7 + Math.sin(a) * 0.55 * 0.34, 0.032); }
+    return { text: c.text, kind: 'gilt', at: [0, 1.95, 0.05], w: 1.2, h: 0.27, frame: m.gilt };
+  },
+  spa(g, b, m, c) {
+    dFrame(b, BRASS);
+    const fr = dFrost();
+    for (const s of [-1, 1]) {
+      const x = s * 0.358; b.box(m.frostBrass, 0.712, 2.5, 0.05, x, 1.25, 0);
+      b.ring(BRASS, 0.7, 2.46, 0.05, x, 1.25, 0.02, 0.05); b.box(BRASS, 0.66, 0.05, 0.04, x, 1.8, 0.03); b.box(BRASS, 0.66, 0.26, 0.03, x, 0.17, 0.03);
+      const p = add(g, new THREE.PlaneGeometry(0.6, 1.44), fr, x, 1.07, 0.033); p.userData.nocast = 1;
+    }
+    dPulls(b, BRASS, 1.05, 0.6);
+    return { text: c.text, kind: 'enamel', at: [0, 1.95, 0.045], w: 1.22, h: 0.3, frame: BRASS };
+  },
+  tech(g, b, m, c) {
+    dFrame(b, m.techFr); b.box(m.tech, 1.42, 2.5, 0.06, 0, 1.25, 0);
+    b.box(m.steel, 1.3, 0.3, 0.012, 0, 0.17, 0.036).box(m.steel, 0.3, 0.06, 0.05, 0.1, 2.4, 0.05).box(m.steel, 0.2, 0.012, 0.012, 0.28, 2.4, 0.05);
+    for (const y of [0.35, 1.25, 2.15]) b.box(m.steelDk, 0.04, 0.14, 0.04, -0.72, y, 0.03);
+    dLever(b, m.steel, 0.56, 1.0);
+    // card reader beside the door
+    b.box(m.black, 0.11, 0.17, 0.03, 1.06, 1.2, 0.02).box(m.ledR, 0.014, 0.014, 0.005, 1.06, 1.26, 0.037);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) b.box(m.steelDk, 0.018, 0.014, 0.006, 1.03 + i * 0.027, 1.18 - j * 0.022, 0.036);
+    return { text: c.text, kind: 'plastic', at: [0, 1.72, 0.04], w: 0.72, h: 0.3, frame: m.steelDk };
+  },
+  stairs(g, b, m, c) {
+    dFrame(b, m.mah);
+    for (const s of [-1, 1]) {
+      const x = s * 0.358; b.box(m.panel, 0.712, 0.84, 0.07, x, 0.42, 0).ring(m.mah, 0.58, 0.6, 0.03, x, 0.42, 0.036).box(BRASS, 0.64, 0.14, 0.012, x, 0.1, 0.04);
+      b.box(m.glassWarm, 0.6, 1.66, 0.01, x, 1.65, 0);
+      b.ring(m.mah, 0.712, 1.7, 0.085, x, 1.65, 0.02, 0.07);
+      b.box(m.mah, 0.02, 1.7, 0.02, x, 1.62, 0.04);
+      for (const y of [1.2, 1.62, 2.04]) b.box(m.mah, 0.6, 0.02, 0.02, x, y, 0.04);
+    }
+    dPulls(b, BRASS, 1.05, 0.5);
+    b.put(m.glassWarm, new THREE.CircleGeometry(0.85, 32, 0, Math.PI).scale(1, 0.3, 1), 0, 2.7, 0.0);
+    b.put(BRASS, new THREE.TorusGeometry(0.85, 0.022, 6, 32, Math.PI).scale(1, 0.3, 1), 0, 2.7, 0.03);
+    for (let i = 1; i <= 4; i++) { const a = i / 5 * Math.PI; b.box(m.mah, 0.016, 0.16, 0.02, Math.cos(a) * 0.42, 2.7 + Math.sin(a) * 0.12, 0.03, 0, 0, a - Math.PI / 2); }
+    for (const s of [-1, 1]) b.cyl(BRASS, 0.005, 0.005, 0.45, s * 0.36, 2.3, 0.13);
+    return { text: c.text, kind: 'hang', at: [0, 1.96, 0.13], w: c.text.length > 1 ? 0.78 : 0.9, h: 0.3, frame: BRASS };
+  },
+  terrace(g, b, m, c) {
+    dFrame(b, m.white);
+    for (const s of [-1, 1]) {
+      const x = s * 0.358;
+      b.box(m.white, 0.06, 2.46, 0.06, x - s * 0.33, 1.3, 0.01).box(m.white, 0.06, 2.46, 0.06, x + s * 0.33, 1.3, 0.01);
+      b.box(m.white, 0.7, 0.08, 0.06, x, 2.42, 0.01).box(m.white, 0.7, 0.22, 0.06, x, 0.14, 0.01);
+      for (const dx of [-0.1, 0.1]) b.box(m.whiteSh, 0.018, 2.2, 0.03, x + dx, 1.3, 0.02);
+      for (let k = 1; k <= 5; k++) b.box(m.whiteSh, 0.66, 0.018, 0.03, x, 0.25 + k * 0.367, 0.02);
+    }
+    b.box(BRASS, 1.42, 0.03, 0.2, 0, 0.015, 0.02).cyl(BRASS, 0.01, 0.01, 1.5, 0.03, 1.2, 0.05).cyl(BRASS, 0.01, 0.01, 1.5, -0.03, 1.2, 0.05);
+    for (const s of [-1, 1]) b.put(BRASS, new THREE.SphereGeometry(0.022, 10, 8), s * 0.03, 1.1, 0.06);
+    if (c.exit) b.box(m.glassWarm, 1.42, 2.3, 0.01, 0, 1.3, -0.005);
+    else {
+      const gm = new THREE.MeshBasicMaterial({ map: texDay }); gm.userData.view = null; c.R.skyMats.push(gm);
+      const pane = new THREE.PlaneGeometry(1.42, 2.3), uv = pane.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.30 + uv.getX(i) * 0.12, 0.34 + uv.getY(i) * 0.3);
+      add(g, pane, gm, 0, 1.3, -0.005).userData.nocast = 1;
+    }
+    return { text: c.text, kind: 'glass', at: [0, 1.68, 0.04], w: 1.2, h: 0.3, frame: null };
+  },
+  kitchen(g, b, m, c) {
+    dFrame(b, m.steelDk);
+    for (const s of [-1, 1]) {
+      const x = s * 0.358; b.box(m.cream, 0.712, 2.5, 0.06, x, 1.25, 0);
+      b.box(m.steel, 0.69, 0.38, 0.014, x, 0.2, 0.036).box(m.steel, 0.69, 0.05, 0.02, x, 0.46, 0.04).box(m.steel, 0.34, 0.28, 0.012, x - s * 0.15, 1.0, 0.036);
+      b.put(m.steel, new THREE.TorusGeometry(0.175, 0.024, 8, 28), x, 1.4, 0.04);
+      b.put(m.glassDark, new THREE.CircleGeometry(0.17, 28), x, 1.4, 0.034);
+      b.box(m.steel, 0.69, 0.04, 0.02, x, 2.46, 0.036);
+    }
+    b.box(m.steelDk, 0.012, 2.5, 0.07, 0, 1.25, 0.002);
+    return { text: c.text, kind: 'kitchen', at: [0, 1.96, 0.045], w: 1.1, h: 0.3, frame: m.steel };
+  },
+  archive(g, b, m, c) {
+    b.box(m.oakFr, 0.17, 2.62, 0.2, -0.79, 1.31, 0).box(m.oakFr, 0.17, 2.62, 0.2, 0.79, 1.31, 0).box(m.oakFr, 1.76, 0.18, 0.22, 0, 2.63, 0);
+    b.box(m.oak, 1.42, 2.5, 0.09, 0, 1.25, 0);
+    for (const x of [-0.47, -0.24, 0, 0.24, 0.47]) b.box(m.oakGap, 0.008, 2.48, 0.01, x, 1.25, 0.047);
+    for (const y of [0.45, 1.25, 2.1]) {
+      b.box(IRON, 0.72, 0.09, 0.016, -0.35, y, 0.054).box(IRON, 0.1, 0.14, 0.016, -0.74, y, 0.054);
+      for (let i = 0; i < 4; i++) b.put(IRON, new THREE.SphereGeometry(0.02, 8, 6), -0.62 + i * 0.17, y, 0.066);
+    }
+    for (const x of [-0.62, 0.62]) for (let j = 0; j < 7; j++) b.put(IRON, new THREE.SphereGeometry(0.018, 8, 6), x, 0.3 + j * 0.34, 0.058);
+    b.put(IRON, new THREE.TorusGeometry(0.055, 0.011, 6, 20), 0.5, 1.0, 0.085).put(IRON, new THREE.CircleGeometry(0.04, 16), 0.5, 1.065, 0.058);
+    b.box(BRASS, 0.04, 0.09, 0.012, 0.5, 1.2, 0.055);
+    if (!c.exit) dSign(g, b, 'card', ['PRIVATE'], 0.3, 0.11, -0.04, 1.43, 0.058, null, 0.03);
+    return { text: c.text, kind: 'brass', at: [0, 1.72, 0.057], w: 0.86, h: 0.21, frame: IRON };
+  },
+  suite(g, b, m, c) {
+    dFrame(b, m.mah); b.box(m.panel, 1.42, 2.5, 0.06, 0, 1.25, 0);
+    for (const [px, py, ph] of [[-0.34, 1.8, 0.8], [0.34, 1.8, 0.8], [-0.34, 0.65, 0.95], [0.34, 0.65, 0.95]]) {
+      b.box(m.inset, 0.5, ph, 0.02, px, py, 0.035).box(m.panel, 0.54, 0.03, 0.03, px, py + ph / 2, 0.04).box(m.panel, 0.54, 0.03, 0.03, px, py - ph / 2, 0.04);
+    }
+    for (const y of [0.4, 1.3, 2.2]) b.box(BRASS, 0.04, 0.12, 0.03, -0.72, y, 0.03);
+    b.box(BRASS, 1.3, 0.16, 0.012, 0, 0.1, 0.05);
+    dLever(b, BRASS, 0.56, 1.0); b.cyl(BRASS, 0.02, 0.02, 0.03, 0.56, 1.2, 0.06, Math.PI / 2).box(BRASS, 0.03, 0.05, 0.03, 0.56, 1.2, 0.08);
+    b.put(BRASS, new THREE.TorusGeometry(0.016, 0.005, 6, 14), 0, 1.45, 0.07).put(m.black, new THREE.CircleGeometry(0.012, 10), 0, 1.45, 0.066);
+    const num = /\d/.exec(c.text[0]);
+    const lines = num ? [['SUITE', 0.17], [num[0], 0.5]] : c.text;
+    if (c.dnd) { dSign(g, b, 'dnd', ['DO NOT', 'DISTURB'], 0.1, 0.26, 0.56, 0.82, 0.076, null); b.cyl(m.black, 0.003, 0.003, 0.07, 0.56, 0.98, 0.074); }
+    return { text: lines, kind: 'brass', at: [0, 1.82, 0.056], w: num ? 0.3 : (c.text[0].length > 6 ? 0.62 : 0.46), h: num ? 0.3 : 0.17, frame: BRASS };
+  },
+  service(g, b, m, c) {
+    dFrame(b, m.steelDk); b.box(m.steel, 1.42, 2.5, 0.06, 0, 1.25, 0);
+    for (const y of [0.1, 0.9, 1.7, 2.4]) b.box(m.steelDk, 1.42, 0.05, 0.065, 0, y, 0.005);
+    for (const x of [-0.65, 0.65]) for (const y of [0.3, 1.3, 2.2]) b.put(m.steelDk, new THREE.SphereGeometry(0.018, 8, 6), x, y, 0.035);
+    b.box(m.steelDk, 0.05, 0.3, 0.04, 0.55, 1.05, 0.06);
+    return { text: c.text, kind: 'stencil', at: [0, 1.75, 0.034], w: 1.2, h: 0.36, frame: null };
+  },
+};
+
+// A panelled wooden door with a brass sign above (the original look; kept for anything without a style).
+function doorClassic(g, label, o) {
   const trim = o.metal ? M(0x6e7276, 0.5, 0.7) : mat.mahog();
   box(g, 0.14, 2.6, 0.18, trim, -0.78, 1.3, 0); box(g, 0.14, 2.6, 0.18, trim, 0.78, 1.3, 0);
   box(g, 1.74, 0.16, 0.2, trim, 0, 2.62, 0);
@@ -176,6 +423,23 @@ function door(R, x, z, label, hot, face = [0, 0], o = {}) {
   const knob = sph(g, 0.04, BRASS, 0.56, 1.05, 0.08, 12); knob.scale.z = 0.7;
   box(g, 0.05, 0.16, 0.015, BRASS, 0.56, 1.05, 0.04);
   if (label) plaqueMesh(g, label, 1.2, 0.26, 0, 2.95, 0.02, 0, { size: 0.36 });
+}
+
+// Each door looks like where it leads. o.style: planetarium | spa | tech | stairs | terrace | kitchen | archive | suite | service | lobby.
+// o.sign overrides the sign text (string or array of lines); doors whose hot id starts with exit_ say where they go.
+// g.userData.sign is an empty Object3D at the centre of the sign, for a close-up.
+function door(R, x, z, label, hot, face = [0, 0], o = {}) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); faceTo(g, face[0], face[1]); R.g.add(g);
+  const style = o.style || (o.metal ? 'service' : 'lobby'), exit = /^exit_/.test(hot || '');
+  const sign = o.sign != null ? [].concat(o.sign) : exit || !D_TEXT[style] ? [(label || 'Door').toUpperCase()] : D_TEXT[style];
+  const mark = new THREE.Object3D();
+  if (D_STYLE[style]) {
+    const b = dBatch(), r = D_STYLE[style](g, b, DM(), { R, text: sign, exit, dnd: o.dnd });
+    mark.position.set(...r.at);
+    dSign(g, b, r.kind, r.text, r.w, r.h, r.at[0], r.at[1], r.at[2] + 0.012, r.frame);
+    b.flush(g);
+  } else { doorClassic(g, label, o); mark.position.set(0, 2.95, 0.03); }
+  g.add(mark); g.userData.sign = mark;
   tag(g, hot, label || 'Door');
   return g;
 }
@@ -804,9 +1068,9 @@ function buildLobby() {
   updaters.push(() => { poolM.opacity = night() ? 0.5 : 0.34; paneM.opacity = night() ? 0.3 : 1; });
 
   // doors: seven, each with a bronze-and-mahogany frame
-  const D = (deg, label, hot) => { const a = deg * Math.PI / 180; return lobbyBake(door(R, Math.sin(a) * 8.9, -Math.cos(a) * 8.9, label, hot, [0, 0])); };
-  D(0, 'Planetarium', 'door_plan'); D(55, 'Spa & Pools', 'door_spa'); D(110, 'Tech Office', 'door_tech');
-  D(150, 'Grand Staircase', 'door_stairs'); D(180, 'Terrace', 'door_terrace'); D(250, 'Kitchen', 'door_kitchen'); D(305, 'Archive', 'door_archive');
+  const D = (deg, label, hot, style) => { const a = deg * Math.PI / 180; return lobbyBake(door(R, Math.sin(a) * 8.9, -Math.cos(a) * 8.9, label, hot, [0, 0], { style })); };
+  D(0, 'Planetarium', 'door_plan', 'planetarium'); D(55, 'Spa & Pools', 'door_spa', 'spa'); D(110, 'Tech Office', 'door_tech', 'tech');
+  D(150, 'Grand Staircase', 'door_stairs', 'stairs'); D(180, 'Terrace', 'door_terrace', 'terrace'); D(250, 'Kitchen', 'door_kitchen', 'kitchen'); D(305, 'Archive', 'door_archive', 'archive');
   SB.flush(shell);
 
   lamps(R, [0, 7.2, 0, 0xffc98a, 30, 20], [0, 2.4, 0, 0xffd8a8, 6, 10]);
@@ -1194,7 +1458,7 @@ function buildSpa() {
 
   // ---- finish
   bc.done(); bn.done();
-  door(R, 0, 4.92, 'Lobby', 'exit_spa', [0, 0]);
+  door(R, 0, 4.92, 'Lobby', 'exit_spa', [0, 0], { style: 'spa' });
   lamps(R, [0, 3.4, -1, 0xffe8c8, 16, 14], [0, -0.6, -1.4, 0x7fc8c0, 3, 5]);
   return R;
 }
@@ -1385,7 +1649,7 @@ function buildPlanetarium() {
     add(R.g, new THREE.CylinderGeometry(7.52, 7.52, 0.05, 64, 1, true, PI - 0.46, 0.92), M(0xc9a15a, 0.32, 1, { side: THREE.DoubleSide }), 0, 2.58, 0);
   }
   // spare light pool where the curtain meets the wall
-  door(R, 3.3, -7.25, 'Service', 'hatch', [0, 0], { metal: 1 });
+  door(R, 3.3, -7.25, 'Service', 'hatch', [0, 0], { metal: 1, style: 'service', sign: ['SERVICE', 'ACCESS'] });
   dkExitSign(R.g, 3.3, 3.2, -7.2, 0, 0);
   dkExitSign(R.g, 0, 3.2, 7.8, 0, 0);
   dkPool(R.g, 3.3, 0.01, -6.4, 2.4, 1.8, 0xffd8a0, 0.3);
@@ -1409,7 +1673,7 @@ function buildPlanetarium() {
     }), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
   }), 0, 6.4, -4.4);
   code.lookAt(0, 1.6, 2); code.userData.nocast = 1; R.code = code;
-  door(R, 0, 7.9, 'Lobby', 'exit_plan', [0, 0]);
+  door(R, 0, 7.9, 'Lobby', 'exit_plan', [0, 0], { style: 'planetarium' });
   lamps(R, [0, 2.4, 2, 0xb0b8e0, 22, 14], [0, 2.6, -5.5, 0xffb070, 16, 9]);
   return R;
 }
@@ -1632,7 +1896,7 @@ function buildKitchen() {
       if (y > 0.3) for (let i = 0; i < 3; i++) bc.sph(X.loaf, 0.09, rx - 0.17 + i * 0.17, y + 0.06, rz + (i % 2 ? 0.07 : -0.07), 1.4, 0.65, 0.8, 10); }
   }
   bk.done(); bc.done();
-  door(R, 0, 3.95, 'Lobby', 'exit_kitchen', [0, 0]);
+  door(R, 0, 3.95, 'Lobby', 'exit_kitchen', [0, 0], { style: 'kitchen' });
   // ---- the story props (kept from before): recipe board and the gala cake on the island
   const rb = new THREE.Group(); rb.position.set(-4.96, 1.65, -0.6); rb.rotation.y = Math.PI / 2; R.g.add(rb);
   box(rb, 1.3, 0.9, 0.04, mat.oak(), 0, 0, 0);
@@ -2149,7 +2413,7 @@ function buildTech() {
   lathe(R.g, [[0.001, 0], [0.14, 0], [0.17, 0.38], [0.165, 0.38], [0.135, 0.02], [0.001, 0.02]], M(0x3a3e42, 0.6, 0.3, { side: THREE.DoubleSide }), 1.6, 0, -2.8, 20);
   for (let i = 0; i < 6; i++) box(R.g, 0.14, 0.012, 0.125, M([0x2a4a8a, 0xd8d8d8, 0x8a2a2a][i % 3], 0.3), -1.5 + i * 0.01, 0.775 + i * 0.012, -3.3).rotation.y = i * 0.2;
   ixTechDress(R);
-  door(R, 0, 3.95, 'Lobby', 'exit_tech', [0, 0]);
+  door(R, 0, 3.95, 'Lobby', 'exit_tech', [0, 0], { style: 'tech' });
   lamps(R, [0, 2.3, -0.5, 0xf4f4ec, 12, 12], [0, 1.4, -3, 0x8ab0d0, 1.2, 3]);
   return R;
 }
@@ -2464,7 +2728,7 @@ function buildArchive() {
   hit(R.g, -4.05, 1.3, 0.9, 0.7, 'books', 'Bookcase');
   palm(R.g, 3.8, -3.3, 1);
   ixArchiveDress(R);
-  door(R, 1.2, 3.95, 'Lobby', 'exit_archive', [1.2, 0]);
+  door(R, 1.2, 3.95, 'Lobby', 'exit_archive', [1.2, 0], { style: 'archive' });
   lamps(R, [0, 2.6, -0.5, 0xffd8a8, 11, 12], [1.2, 1.4, -2.3, 0xffe0b0, 3, 4]);
   return R;
 }
@@ -2500,7 +2764,7 @@ function buildSuite() {
   box(ac, 0.8, 0.4, 0.75, up, 0, 0.25, 0); box(ac, 0.8, 0.6, 0.18, up, 0, 0.65, -0.3);
   for (const s of [-1, 1]) box(ac, 0.14, 0.3, 0.75, up, s * 0.4, 0.55, 0);
   ixSuiteDress(R);
-  door(R, 0, 2.95, 'Lobby', 'exit_suite', [0, 0]);
+  door(R, 0, 2.95, 'Lobby', 'exit_suite', [0, 0], { style: 'suite', sign: 'GUEST WING' });
   lamps(R, [0, 2.4, 0, 0xffdcb0, 8, 10], [0.05, 1.0, -2.55, 0xffc070, 3, 4]);
   return R;
 }
@@ -2680,7 +2944,7 @@ function buildTunnel() {
   star3(vd, 0.15, BRASS, 0, 0, 0.32, 0.04);
   tag(vd, 'stardoor', 'Round vault door');
   { const dp = add(R.g, new THREE.PlaneGeometry(3.6, 3.6), new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffb070, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 1.3, -14.7); dp.userData.nocast = 1; dp.renderOrder = 2; }
-  door(R, 0, 1.95, null, 'exit_tunnel', [0, -5], { metal: 1 });
+  door(R, 0, 1.95, null, 'exit_tunnel', [0, -5], { metal: 1, style: 'service', sign: ['PLANETARIUM', 'STAFF ACCESS'] });
   lamps(R, [0, 2.2, -2, 0xffc890, 9, 10], [0, 2.2, -12, 0xffc890, 9, 10]);
   return R;
 }
@@ -2895,7 +3159,7 @@ function buildStarRoom() {
   // warm light pools (candles, desk lamp, the crown), all in one additive mesh
   poolPts.push(dkG(new THREE.PlaneGeometry(3, 3), 0, 0.011, -0.8, -PI / 2, 0, 0));
   { const o = dkMerge(R.g, poolPts, new THREE.MeshBasicMaterial({ map: dkGlowTex(), color: 0xffa860, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false })); o.renderOrder = 2; }
-  door(R, 0, 3.9, null, 'exit_star', [0, 0], { metal: 1 });
+  door(R, 0, 3.9, null, 'exit_star', [0, 0], { metal: 1, style: 'service', sign: ['TUNNEL', 'STAFF ACCESS'] });
   lamps(R, [0, 2.4, 0.5, 0xffc890, 14, 9], [0, 1.6, -0.8, 0xffd8a0, 5, 4]);
   return R;
 }
@@ -2991,11 +3255,11 @@ function buildWing() {
   struct(add(R.g, new THREE.PlaneGeometry(1.3, 14.6), M(0xffffff, 0.95, 0, { t: TX.carpetRed(), rep: [1, 8], bump: 0.01 }), 0, 0.006, -5.5)).rotation.x = -Math.PI / 2;
   for (const z of [0, -5.8, -10.8]) for (const s of [-1, 1]) sconce(R.g, s * 1.58, 2.0, z, s < 0 ? Math.PI / 2 : -Math.PI / 2);
   for (const z of [-1.5, -7.5]) { cyl(R.g, 0.006, 0.006, 0.5, BRASS, 0, 2.85, z, 6); lathe(R.g, [[0.001, 0], [0.16, 0.02], [0.2, 0.12], [0.001, 0.14]], M(0xfff0d0, 0.5, 0, { emissive: 0xffc680, emissiveIntensity: 1 }), 0, 2.45, z, 20).userData.nocast = 1; }
-  door(R, -1.5, -2.6, 'Spa Suite', 'door_vsuite', [0, -2.6]);
-  door(R, 1.5, -4.2, 'Suite 2', 'door_suite', [0, -4.2]);
-  door(R, -1.5, -8.2, 'Linen', 'door_linen', [0, -8.2]);
-  door(R, 1.5, -9.2, 'Suite 4', 'door_csuite', [0, -9.2]);
-  door(R, 0, 1.95, 'Grand Staircase', 'exit_wing', [0, -5]);
+  door(R, -1.5, -2.6, 'Spa Suite', 'door_vsuite', [0, -2.6], { style: 'suite' });
+  door(R, 1.5, -4.2, 'Suite 2', 'door_suite', [0, -4.2], { style: 'suite' });
+  door(R, -1.5, -8.2, 'Linen', 'door_linen', [0, -8.2], { style: 'suite' });
+  door(R, 1.5, -9.2, 'Suite 4', 'door_csuite', [0, -9.2], { style: 'suite', dnd: 1 });
+  door(R, 0, 1.95, 'Grand Staircase', 'exit_wing', [0, -5], { style: 'stairs' });
   // a card hanging on Vesper's door
   const card = add(R.g, new THREE.PlaneGeometry(0.2, 0.28), new THREE.MeshStandardMaterial({ roughness: 0.9, map: T.textCanvas(160, 220, g => { g.fillStyle = '#f2ead6'; g.fillRect(0, 0, 160, 220); g.fillStyle = '#6a1a2a'; g.font = 'bold 22px Georgia'; g.textAlign = 'center'; ['VOCAL', 'REST'].forEach((l, i) => g.fillText(l, 80, 70 + i * 28)); g.font = 'italic 17px Georgia'; ['Do not knock.', 'This means you.'].forEach((l, i) => g.fillText(l, 80, 150 + i * 24)); }) }), -1.42, 1.45, -2.6);
   card.rotation.y = Math.PI / 2;
@@ -3484,7 +3748,7 @@ function buildTerrace() {
   b.box(2.5, 0.22, 0.16, mStone, 0, 3.6, 8.19, 0, 1.5); b.box(2.0, 0.34, 0.12, mStone, 0, 3.8, 8.16, 0, 1.5);
   for (const s of [-1, 1]) { b.box(0.1, 0.3, 0.03, IRON, s * 1.75, 2.8, 8.18); b.box(0.04, 0.04, 0.2, IRON, s * 1.75, 2.9, 8.08); b.box(0.14, 0.2, 0.14, lampM, s * 1.75, 2.82, 8.0); b.add(new THREE.ConeGeometry(0.12, 0.1, 4), IRON, s * 1.75, 3.0, 8.0, Math.PI / 4); }
   plaqueMesh(R.g, 'THE AQUADOME', 3.2, 0.36, 0, 5.27, 6.37, Math.PI, { size: 0.5, bg: '#8a7a5a', fg: '#2a2014' });
-  door(R, 0, 8.17, 'Lobby', 'exit_terrace', [0, 0]).position.y = 0.36;
+  door(R, 0, 8.17, 'Lobby', 'exit_terrace', [0, 0], { style: 'terrace' }).position.y = 0.36;
   // ----- the wings round the rotunda, where the lobby's doors lead (lobby door angle a: from the terrace that direction
   // is (-sin a, cos a) about the drum's centre). Sizes follow the rooms inside. Planetarium 0, Spa 55, Tech Office and the
   // Guest Wing above it 110, Grand Staircase 150, Terrace 180 (the portico), Kitchen 250, Archive 305.
