@@ -29,6 +29,14 @@ Vale**; Beau is not in the game, and nods to his tastes stay as nods (Vesper Vox
   it's B", "Honestly? ...", "Also? ...", "There's a difference", stacked one-word fragments, and pithy aphorisms ("Ovens
   don't lie. People do."). Plain, character-specific lines.
 - Never draw four-point sparkle stars (reads as an AI logo); five-point stars are fine.
+- Usage: Garrett is on a usage-limited plan and watches it. Do the work yourself by default; spawn subagents only when he
+  asks (he prefers Sonnet for grunt work), and keep them few. If a limit runs out mid-task, pick up where it stopped when
+  he says "Continue".
+- Verification: after a change, syntax-check and take targeted screenshots of what changed (`tools/test/shot.js`,
+  `closeup.js`, `doorshots.js`). Do **not** run the full playthrough (`play.js`) after every change; only when story flow,
+  flags or dialogue gating changed broadly, or when he asks. Send him the screenshots as proof.
+- He often says "claude rc" (switch on Remote Control so he can follow from his phone) and "Continue" (carry on).
+- Answers: when he asks "what next?", give a recommendation and a short ranked list, not an essay.
 - Art: Garrett generates images in ChatGPT from prompts you write (he has a daily image limit). Character turnaround
   prompt is in `tools/figures/README.md`; other wishes in `tools/art/WISHLIST.md`.
 
@@ -114,6 +122,23 @@ was in the building, which unlocks the spa, tech office, kitchen, archive and te
 a line); the planetarium is shut for the projector removal until Night 1. People arrive over time: `LATER` (Jojo, Priya,
 Regent, Silas, Nate) are absent on Day 1 (Silas turns up filming on Night 1). The optional "other guests" task counts only
 people who are around (`othersTask`). Interaction: tapping a door walks Nova up to it and shows its name; tap again to go in.
+Doors everywhere (lobby, hallway, exits) use two taps (`isDoor`, `V.doorReady` in main.js `activate`): first tap walks to
+1.6 m if farther than 1.9 m, turns smoothly to face it (`faceTo` eases yaw and `V.pitchT`) and captions "<name> · tap the
+door again to go in"; second tap enters. Moving or dragging resets it.
+**Nova's inner voice** (Beau and Garrett, Oct 2026: "more internal dialog, especially at roadblocks, but don't overdo it"):
+one `think()` line on the first visit to each room (`FIRST_VISIT`, may be a function of phase, e.g. the planetarium by night)
+and a line at each roadblock (locked doors via `LOCKED`, the map's tunnel entry, etc.), so the player knows why and what
+to do. Keep it to that: no running commentary.
+
+**Doors** (`world.js`, ~lines 160-460): each destination has its own look, `D_STYLE[style](body, batch, DM(), ctx)` with
+styles planetarium (midnight blue, gilt stars, fanlight), spa (frosted glass, brass), tech (grey steel, card reader, wired
+glass), stairs (mahogany, glazed, fanlight), terrace (white French doors showing the lake), kitchen (cream swing doors,
+portholes), archive (narrow oak plank door, iron straps), suite (panelled mahogany, brass numbers, DND hanger), service
+(steel). Shared: `dFrame` (moulded surround: back band, bead, plinth blocks, frieze and cap; `cap` raised above fanlights),
+`dSill`, `dHinges` ('pair' on double doors), `dPulls`, `dLever`, signs `dSign` with `D_SIGN` kinds, `D_TEXT` default
+wording. `D_SIZE` scales each style's body (planetarium 1.1x1.12, kitchen 1.14 wide, archive 0.84 ...); the sign is built
+outside the scaled body at true size, height capped at 2.05 m. Everything is merged per material through `dBatch`.
+`door(R,x,z,label,hot,face,{style,sign,dnd,metal})` keeps one signature for all rooms; lobby doors via `D(deg,...)` at r 8.9.
 Tapping a thing walks over if it's out of reach and moves the camera in on it (`inspect`) until nothing is being said or
 shown (`inspectStep`). Dex's ghost is a Pepper's ghost (projector + glass), his test show a CD-R (flags still `holo_*`).
 
@@ -206,7 +231,9 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   W1-W3 wing, E1-E3 terrace, U* tunnel, X1 Star Room.
 - In the desktop app's browser pane, frames only advance while screenshots are taken, so animations, glides and walking
   need several screenshots in a row; reload with a fresh `?v` (run bump.py) to avoid cached modules.
-- Full playthrough script (Oct 2026, scratchpad `play.js`, worth recreating if lost): drives `story.onHot`/`onTalk` through every
+- Test scripts live in `tools/test/` (see its README; Playwright installed outside the repo). Write screenshots outside
+  the repo or into a git-ignored folder. `doorshots.js` renders every door at 1.5 m; `closeup.js` any point in a room.
+- Full playthrough script (`tools/test/play.js`): drives `story.onHot`/`onTalk` through every
   phase, talks to everyone about every topic, sets the outcomes of unchanged puzzles, solves the evidence board for real,
   takes the Locked In and Wrong Call endings and Second Chance, and reaches Case Closed, in Junior and Senior, with no page
   errors. A world check raycasts every hotspot from its room's camera spots and the glides between spots (postcard 8 was
@@ -216,12 +243,30 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
 Long-term goal (Garrett, Oct 2026): once the game is finished, publish it on Google Play (likely bundled with Capacitor so it
 works offline; needs a developer account, a closed test with testers, a privacy policy, no "Nancy Drew" in the listing,
 fonts bundled, and a phone performance pass first). Not now.
-Non-art ideas offered next: phone controls and feel, opening/ending cutscenes, save slots and quality of life, a phone
-performance pass (smaller model textures), the boathouse mini-case.
-Recently done (newest first): environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
+**Recommended next (Oct 2026, offered to Garrett, not yet picked):**
+1. Phone performance pass: smaller figure textures on phones, adaptive render scale on weak GPUs, frame-rate check of the
+   heaviest views (terrace, lobby, planetarium; `__dbg.renderer.info`), and test the thumb stick on a real phone. Needed
+   before the Play Store anyway.
+2. Celeste in the world after Day 1 (she is in the lobby on Day 1 only), a few lines as the case moves.
+3. The boathouse mini-case (sequel hook already planted).
+4. Art when Garrett has image credits: crew photo, four ending illustrations (bases in `tools/art/bases/BASES.md`).
+5. Blinking/lip-sync (needs eyes-closed and mouth-open face crops from Garrett).
+Recently done (newest first): door fidelity (moulded surrounds, sills, hinges, sizes per room); two-tap doors everywhere
+with smooth turning and Nova's first-visit and roadblock lines; directed start (wake in Suite 2, knock, Celeste in the
+lobby, rooms unlocked by her introduction, people arriving over time, walk-up close-ups on things); per-destination door
+designs with signs; cutscenes, save slots and quality of life; touch controls; painted art (title, postcards, paintings,
+clipping); environment pass on every room (lobby dome/medallion/seating, bathhouse spa, working kitchen, lit planetarium with instanced seats, A/V office, archive shelves, dressed suite and wing, tunnel and Star Room detail, terrace with real lake, garden, boathouse and Aquadome exterior, new painted sky; room helpers are prefixed per room above each `build*`, static pieces merged per material; `aoRun` contact shadows in `rectRoom`); coy undercover-intern dialogue; story cleanup and cover story; click-to-walk and lazy
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
 - Not yet checked: the thumb stick on a real phone.
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
   hand in Act 3, placing Celeste in the world on Day 2, lip-sync/blinking for figures (needs eyes-closed and mouth-open
   face crops from Garrett).
+
+## A note from the last session
+You're picking up a game made as a gift, by someone who playtests every change on his phone and notices everything. What
+worked best: make the change, look at it yourself in a screenshot before he does, fix what's off, then show him. Small
+careful passes beat big rewrites here; when something already works (the figures, the doors, the opening), refine it.
+Before writing any line for Nova, ask what she knows at that moment and gate it on a flag. Read a few existing
+conversations in `story.js` first to get her voice; she's sharp and funny and never mean. Keep his usage in mind, keep
+the writing plain, and have fun with it. Beau is going to love the planetarium doors.
