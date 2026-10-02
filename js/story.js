@@ -147,7 +147,7 @@ export function openMap() {
     </svg><p class="small">${junior() ? 'Tap a place you have visited to go straight there.' : 'Tap a visited place to go there.'}</p></div>`, { cls: 'map-p', title: 'The Aquadome' });
   b.querySelectorAll('.mp.seen').forEach(g => g.onclick = () => {
     const r = g.dataset.r; if (r === here) return closePanel();
-    if ((r === 'tunnel' || r === 'star') && S.phase !== 'n2') return toast('Not with everyone awake.');
+    if ((r === 'tunnel' || r === 'star') && S.phase !== 'n2') { closePanel(true); return think('Not with half the building awake. That tunnel can wait for the dark.'); }
     sfx('click'); closePanel(true); goRoom(PLACES[r][0]);
   });
 }
@@ -789,6 +789,11 @@ export function examineItem(id) {
 
 // ---------- Entering a room: remember it for the map, set the sound ----------
 const FIRST_VISIT = {
+  spa: ['Steam, chlorine and very good acoustics. If anyone here were practising singing in secret, this is where I\'d do it.'],
+  kitchen: ['Something lemony in the oven. Kitchens keep records whether anyone means them to: timers, tickets, washing up.'],
+  tech: ['Beige computers, cables everywhere and a lava lamp. If that keypad keeps a log, it lives in here somewhere.'],
+  archive: ['Twenty years of drawings in labelled boxes. Opal Finch labels everything.'],
+  plan: () => night() ? ['The singing is loudest in here. A dome full of stars, rows of empty seats, and that great iron projector in the middle.'] : ['Row after row of empty seats under a dome full of stars. Somebody loved this room very much.'],
   wing: ['The Guest Wing. Runner carpet, dim sconces, and every door shut.', 'Hotels always feel like they\'re keeping secrets. This one\'s probably keeping five.'],
   terrace: ['Fresh air. The lake, the dock, a boathouse, and the whole dome glowing behind me like a snow globe somebody forgot to shake.'],
   tunnel: ['Concrete, pipes, and one flickering bulb every ten feet. Opal, you absolute dramatist.'],
@@ -800,7 +805,8 @@ export function onRoom(room) {
   roomSound(room, night(), S.phase);
   if (ghostOn()) ghostVoice(true, room === 'plan' ? 1 : 0.5, room === 'plan');
   else ghostVoice(false);
-  if (first && FIRST_VISIT[room]) setTimeout(() => think(FIRST_VISIT[room]), 700);
+  const fv = typeof FIRST_VISIT[room] === 'function' ? FIRST_VISIT[room]() : FIRST_VISIT[room];
+  if (first && fv) setTimeout(() => think(fv), 700);
 }
 
 // ---------- Previously, on continuing a saved game ----------

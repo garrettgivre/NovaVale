@@ -104,7 +104,7 @@ const basePitch = () => innerWidth < innerHeight ? -0.14 : PITCH0;
 function place(nodeId, look) {
   const n = NODES[nodeId];
   V.node = nodeId; S.node = nodeId; V.walk = null; mark.material.opacity = 0;
-  if (V.focus) { V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); } V.inspect = null; ui.speech.focus = null;
+  if (V.focus) { V.focus = null; camera.fov = FOV0; camera.updateProjectionMatrix(); } V.inspect = null; ui.speech.focus = null; V.doorReady = null; V.pitchT = null;
   camera.position.set(n.p[0], EYE, n.p[1]);
   const l = look || n.look;
   V.yaw = yawTo(n.p, l[0], l[1]); V.pitch = basePitch(); V.yawT = null;
@@ -204,6 +204,7 @@ function floorAt(x, y) {
 const mark = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.22, 32), new THREE.MeshBasicMaterial({ color: 0xffe2a0, transparent: true, opacity: 0, depthWrite: false }));
 mark.rotation.x = -Math.PI / 2; mark.userData.nocast = 1; mark.renderOrder = 5;
 function walkTo(p) {
+  V.doorReady = null;
   V.walk = { x: p.x, z: p.z, stuck: 0 };
   scene.add(mark); mark.position.set(p.x, p.y + 0.02, p.z); mark.material.opacity = 0.9; mark.scale.setScalar(1);
 }
@@ -220,7 +221,7 @@ function walkNear(x, z, stop) {
     const t0 = performance.now(), iv = setInterval(() => { if (!V.walk || performance.now() - t0 > 7000) { clearInterval(iv); V.walk = null; res(); } }, 50);
   });
 }
-function faceTo(x, z, pitch = basePitch()) { V.yawT = yawTo([camera.position.x, camera.position.z], x, z); V.pitch = pitch; }
+function faceTo(x, z, pitch = basePitch()) { V.yawT = V.yaw + angDiff(V.yaw, yawTo([camera.position.x, camera.position.z], x, z)); V.pitchT = pitch; }
 async function activate(u, obj = pickObj) {
   if (!u) return;
   sfx('click');
@@ -231,12 +232,15 @@ async function activate(u, obj = pickObj) {
   _bx.setFromObject(obj); _bx.getCenter(_c);
   const c = _c.clone(), size = _bx.getSize(new THREE.Vector3()), far = Math.hypot(c.x - camera.position.x, c.z - camera.position.z);
   if (isDoor(u.hot)) {
-    if (far > 2.4) {   // walk up to the door and read it
-      V.approach = true; await walkNear(c.x, c.z, 1.7); V.approach = false;
+    // first tap: step up to the door (if needed) and face its sign; a second tap on the same door goes through
+    if (V.doorReady !== u.hot) {
+      if (far > 1.9) { V.approach = true; await walkNear(c.x, c.z, 1.6); V.approach = false; }
       faceTo(c.x, c.z, -0.02);
-      ui.caption(u.name ? `${u.name} · tap the door to go in` : 'Tap the door to go in', 2600);
+      V.doorReady = u.hot;
+      ui.caption(u.name ? `${u.name} · tap the door again to go in` : 'Tap the door again to go in', 2600);
       return;
     }
+    V.doorReady = null;
     return story.onHot(u.hot);
   }
   // a thing: walk over if it's out of reach, then look closely
@@ -277,7 +281,7 @@ canvas.addEventListener('pointermove', e => {
     const dx = e.clientX - down.x, dy = e.clientY - down.y;
     if (Math.hypot(dx, dy) > 6) down.moved = true;
     if (down.moved && !V.busy && !V.focus && !ui.talking() && !V.title) {
-      V.yawT = null;
+      V.yawT = null; V.pitchT = null;
       V.yaw = down.yaw + dx * 0.005;
       V.pitch = Math.max(-0.7, Math.min(0.5, down.pitch + dy * 0.004));
     }
@@ -512,6 +516,7 @@ function loop() {
     V.yaw += d * Math.min(1, dt * 7);
     if (Math.abs(d) < 0.002) { V.yaw = V.yawT; V.yawT = null; S.yaw = V.yaw; }
   }
+  if (V.pitchT != null) { const d = V.pitchT - V.pitch; V.pitch += d * Math.min(1, dt * 6); if (Math.abs(d) < 0.002) { V.pitch = V.pitchT; V.pitchT = null; } }
   let yaw = V.yaw, pitch = V.pitch;
   if (V.focus) {
     const F = V.focus; F.t = Math.max(0, Math.min(1, F.t + F.dir * dt / 0.7));
@@ -689,4 +694,4 @@ const firstCast = () => { try { const n = latestSlot() || 1, d = JSON.parse(loca
   document.getElementById('boot').remove();
   title();
 }, 30));
-window.__dbg = { S, renderer, camera, rooms, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };
+window.__dbg = { S, renderer, camera, rooms, pick: (x, y) => { const u = pick(x, y); return u && { hot: u.hot, go: u.go, who: u.who, name: u.name, obj: pickObj && pickObj.type }; }, go, place, setRetro, view: (id, look) => { showRoom(NODES[id].room); sync(); place(id, look); }, story, NODES, V, focus, unfocus };
