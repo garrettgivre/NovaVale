@@ -14,8 +14,9 @@ V = np.stack([P[:, 0], -P[:, 2], P[:, 1]], 1)
 me.vertices.add(len(V)); me.vertices.foreach_set('co', V.ravel())
 me.loops.add(F.size); me.loops.foreach_set('vertex_index', F.ravel())
 me.polygons.add(len(F)); me.polygons.foreach_set('loop_start', np.arange(0, F.size, 3)); me.polygons.foreach_set('loop_total', np.full(len(F), 3))
-if 'vF' in Z.files:   # blended texturing: four UV maps (front, side, back, weights) per vertex
-    for nm, arr in (('UVMap', Z['vF']), ('UVSide', Z['vS']), ('UVBack', Z['vB']), ('UVW', Z['WTS'])):
+VD = 'vS1' in Z.files   # view-dependent texturing: front, +x side, back, -x side; the game's shader mixes them
+if 'vF' in Z.files:   # four UV maps per vertex
+    for nm, arr in ((('UVMap', Z['vF']), ('UVSide', Z['vS1']), ('UVBack', Z['vB']), ('UVSide2', Z['vS2'])) if VD else (('UVMap', Z['vF']), ('UVSide', Z['vS']), ('UVBack', Z['vB']), ('UVW', Z['WTS']))):
         me.uv_layers.new(name=nm).data.foreach_set('uv', arr[F.ravel()].ravel())
 else:
     me.uv_layers.new(name='UVMap').data.foreach_set('uv', UV.ravel())
@@ -26,7 +27,7 @@ m = bpy.data.materials.new(name); m.use_nodes = True
 nt = m.node_tree; bs = nt.nodes['Principled BSDF']
 tx = nt.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(os.path.join(D, name + '_tex.png')); tx.interpolation = 'Cubic'
 nt.links.new(tx.outputs['Color'], bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.7
-if 'vF' in Z.files:
+if 'vF' in Z.files and not VD:
     def samp(uvname):
         t = nt.nodes.new('ShaderNodeTexImage'); t.image = tx.image; t.interpolation = 'Cubic'
         u = nt.nodes.new('ShaderNodeUVMap'); u.uv_map = uvname; nt.links.new(u.outputs['UV'], t.inputs['Vector']); return t

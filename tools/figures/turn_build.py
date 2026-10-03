@@ -191,6 +191,9 @@ win = max(3, int(0.13 / (px['front'] * STEP)))
 zFo = ndimage.maximum_filter1d(ndimage.minimum_filter1d(zFr, win), win)
 zBo = -ndimage.maximum_filter1d(ndimage.minimum_filter1d(-zBr, win), win)
 body = yr < chinY - 0.02
+# (not below the shins: a shoe's toe is itself a low forward bump, and the filter cut feet down to the ankle's depth)
+shin = yr < 0.16 * HEIGHT
+zFo, zBo = np.where(shin, zFr, zFo), np.where(shin, zBr, zBo)
 zFr = np.where(body, ndimage.gaussian_filter1d(zFo, 2), zFr); zBr = np.where(body, ndimage.gaussian_filter1d(zBo, 2), zBr)
 rng = {k: (a_, b_) for k, a_, b_ in zip(ks, zFr, zBr)}
 # the face profile: raw side outline minus a smooth head curve = nose, lips, chin
@@ -241,6 +244,16 @@ bad = zf - zb < 0.004; zf[bad] = zm[bad] + 0.002; zb[bad] = zm[bad] - 0.002
 Mfr = M['front']; cu2 = int(round(cxf)); segRow = {}
 for r in np.unique(V.astype(int)):
     rr = min(max(int(r), 0), SH - 1); segRow[r] = segs(Mfr[rr]) if Mfr[rr].any() else []
+# legs (the piece nearest the middle on each side, below the crotch) take their depth from the side outline like the
+# torso: as round limbs, feet were only as deep as they are wide and the side painting's shoes were cropped to a stub
+crotchRow = None
+for r in range(int(bot['front']) - 5, int(top['front']), -1):
+    if Mfr[r, cu2 - 2:cu2 + 3].any(): crotchRow = r; break
+if crotchRow is not None and crotchRow >= bot['front'] - 0.12 * (bot['front'] - top['front']): crotchRow = None
+def isLeg(sg, ss, r):
+    if crotchRow is None or r <= crotchRow + 2: return False
+    lf = [q for q in ss if q[1] < cu2]; rt = [q for q in ss if q[0] > cu2]
+    return (bool(lf) and sg == max(lf, key=lambda q: q[1])) or (bool(rt) and sg == min(rt, key=lambda q: q[0]))
 hullF = np.empty(n); hullB = np.empty(n)
 NEXP = cfg.get('boxy', 2.6)
 for i in range(n):
@@ -252,6 +265,8 @@ for i in range(n):
     if a_ <= cu2 <= b_:                      # the torso / head piece: depth from the side outline
         zf_i = headSm.get(r, zF[i]) if y[i] > chinY - 0.03 else zF[i]
         c_, h_ = (zf_i + zB[i]) / 2, (zf_i - zB[i]) / 2
+    elif isLeg(sg, ss, r):
+        c_, h_ = (zF[i] + zB[i]) / 2, (zF[i] - zB[i]) / 2
     else:                                    # a limb: round, centred in the body's depth
         c_ = (zF[i] + zB[i]) / 2; h_ = min(hw * px['front'], (zF[i] - zB[i]) / 2)
     hullF[i] = c_ + h_ * sh; hullB[i] = c_ - h_ * sh
@@ -272,7 +287,9 @@ pb = np.array([profBump.get(int(v), 0.0) for v in V])
 headV = y > Yf(cfg['joints']['chin'][1]) - 0.03
 lim = np.where(headV, 0.006, 0.007)                  # a little relief on the face, very little on clothes
 detF, detB = np.clip(gsm(hp(zf), 1.0), -lim, lim), np.clip(gsm(hp(zb), 1.0), -lim, lim)
-zf = np.minimum(hullF + detF, zF); zb = np.maximum(hullB + detB, zB)
+# (not on the head: the raw outline there dips under the fringe and at the bridge of the nose, and clipping every row to
+# it cut that dip right round the head as a groove; the head's hull already follows a smoothed outline)
+zf = np.where(headV, hullF + detF, np.minimum(hullF + detF, zF)); zb = np.maximum(hullB + detB, zB)
 bad = zf - zb < 0.003; zm = (hullF + hullB) / 2; zf[bad] = zm[bad] + 0.0015; zb[bad] = zm[bad] - 0.0015
 # smooth along the grid (depth noise)
 def smooth(z):
@@ -355,6 +372,80 @@ if HEAD and 'front' in HEAD and cfg.get('headCarve', 1):
         kv = np.where(hv_, kg, 1.0); kv = 1 + (gsm(kv, 3.0) - 1) * wC
         zf = np.maximum(zmid + (zf - zmid) * kv, zb + 0.003)
         print('face fitted to the profile: row scale', round(float(np.min(list(rowK.values()))), 2), '-', round(float(np.max(list(rowK.values()))), 2))
+# nothing on the head may stand out past the side painting's outline: seen side-on, the nose and mouth stuck out a few
+# centimetres beyond the painted profile as a snout, textured with nothing
+# (the outline is taken over a few rows and smoothed: row by row it jumps with every strand of hair, and the front and
+# side views never line up to the row, which cut the face into horizontal shelves and grooves)
+ksR = sorted(rngRaw); zCapR = ndimage.gaussian_filter1d(ndimage.maximum_filter1d(np.array([rngRaw[k][0] for k in ksR]), 3), 0.8)
+capOf = dict(zip(ksR, zCapR))
+zRawV = np.array([capOf[r] for r in V])
+# the outline is the face's middle line only (nose, lips, chin, the dip at the bridge): away from the middle the limit
+# eases to the smoothed head curve, so the nose stands out from the cheeks and the dip stays between the eyes
+zSmV = np.array([headSm[r] for r in V]); zRawV = zSmV + np.exp(-(x / cfg.get('noseW', 0.022)) ** 2) * (zRawV - zSmV)
+over = np.where(headV, np.maximum(0, zf - zRawV), 0)
+print('head clamped to the profile: max', round(float(over.max()), 4), 'm over', int((over > 0.002).sum()), 'vertices')
+zf = np.maximum(zf - over, zb + 0.003)
+# and the face falls away from its middle line: the hull's face was a flat plate as wide as the head, so from a
+# three-quarter view the far cheek and mouth corner stood out as a beak. Cap the front surface under a rounded envelope
+# hung from the profile (about 2 cm back at the mouth corners, 4 cm at the cheeks), over the face rows only.
+kF = cfg.get('faceRound', 12.0)
+rowW = ss_cap = np.clip((y - (chinY - 0.03)) / 0.025, 0, 1) * np.clip((faceTop + 0.03 - y) / 0.03, 0, 1)
+# a wedge below the eyes (cheeks and mouth corners fall back about as fast as they go sideways, so the nose and lips
+# still lead the outline at a three-quarter view), flatter across the brow and forehead
+faceY = Yf(cfg['joints'].get('face', cfg['joints']['chin'])[1])
+kL = cfg.get('faceWedge', 0.35) * (0.35 + 0.65 * np.clip((faceY + 0.02 - y) / 0.03, 0, 1))
+env = zRawV - np.minimum(kL * np.abs(x) + 0.5 * kF * x * x, 0.07)
+cap = np.where(headV, np.maximum(0, zf - env) * rowW, 0) * (0 if (HEAD and 'front' in HEAD and cfg.get('faceMesh', 1)) else 1)   # the face mesh below does this properly
+zf = np.maximum(zf - cap, np.maximum(zb + 0.003, (hullF + hullB) / 2))
+# one smooth skin over the head's front (the depth passes above each work row by row and leave ridges)
+hS = np.clip((y - (chinY - 0.03)) / 0.02, 0, 1) * cfg.get('headSmooth', 1.0)
+zf = np.maximum(zf + hS * (gsm(zf, 1.1) - zf), zb + 0.003)
+print('face rounded: max', round(float(cap.max()), 4), 'm, mean', round(float(cap[cap > 0].mean()) if (cap > 0).any() else 0, 4))
+# ---- model the face itself. A face-landmark model (MediaPipe Face Mesh: 478 points with depth, fitted to a real head
+# shape) reads the head sheet's front painting; its surface, nose, eye sockets, lips, cheeks and jaw, replaces the
+# front of the head inside the face, set so the tip of the nose sits on the side painting's profile. Everything above
+# only guesses at a face from a depth estimate and the outline; this is the painted face as a solid.
+fOut = [float(cxf), float(fcy), float(rx), float(ry)]; wFace = np.zeros(n, np.float32)
+if HEAD and 'front' in HEAD and cfg.get('faceMesh', 1):
+    import mediapipe as mp
+    from mediapipe.tasks import python as mpp
+    from mediapipe.tasks.python import vision
+    from scipy.interpolate import LinearNDInterpolator
+    h_ = HEAD['front']; x0h, x1h = HV['front']
+    vr = hs[:, x0h:x1h + 1].astype(np.float32); va_ = ha[:, x0h:x1h + 1, None].astype(np.float32) / 255
+    vr = np.ascontiguousarray(cv2.cvtColor((vr * va_ + 180 * (1 - va_)).astype(np.uint8), cv2.COLOR_BGR2RGB)); ww_ = vr.shape[1]; hh_ = vr.shape[0]
+    fl = vision.FaceLandmarker.create_from_options(vision.FaceLandmarkerOptions(
+        base_options=mpp.BaseOptions(model_asset_path=os.path.join(D, 'mp', 'face_landmarker.task')), num_faces=1,
+        min_face_detection_confidence=0.2, min_face_presence_confidence=0.2))
+    res = fl.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=vr))
+    if res.face_landmarks:
+        L = np.array([[q.x, q.y, q.z] for q in res.face_landmarks[0]])
+        bx = (L[:, 0] * ww_ + x0h - h_['ox']) / h_['sx']; by = (L[:, 1] * hh_ - h_['oy']) / h_['sy']     # body-sheet pixels
+        lx, ly = X(bx), Yf(by); lz = -L[:, 2] * ww_ / h_['sx'] * px['front'] * cfg.get('faceZ', 1.0)   # the model's depth is in units of x
+        zi = LinearNDInterpolator(np.stack([lx, ly], 1), lz)(x, y); fin = np.isfinite(zi)
+        # the nose tip sits on the profile (the furthest-forward point of the outline around the nose's height)
+        yN = ly[np.argmax(lz)]; nb = [capOf[r] for r in ksR if abs(Yf(r) - yN) < 0.012]
+        zi = zi - np.nanmax(zi) + (max(nb) if nb else float(zf[headV].max()))
+        # inside the face the surface is the face mesh; around it the head eases from the face's edge out to the hull over
+        # a few centimetres (a hard edge left the face standing proud of the head like a mask, with a cliff at the jaw)
+        g_ = np.zeros(inside.shape, bool); g_[inside] = fin
+        zg = np.zeros(inside.shape, np.float32); zg[inside] = np.where(fin, zi, 0)
+        dO, (iy_, ix_) = ndimage.distance_transform_edt(~g_, return_indices=True)
+        zExt = zg[iy_, ix_][inside]; dO = dO[inside] * STEP * px['front']
+        wM = 1 - np.clip(dO / cfg.get('faceFeather', 0.03), 0, 1); wM = wM * wM * (3 - 2 * wM)
+        zf = np.maximum(zf + wM * (np.where(fin, zi, zExt) - zf), zb + 0.003)
+        # hair beside the face lies on the head, a little proud of the face's edge: the hull (an oval as deep as the fringe)
+        # stood forward of the cheeks like blinkers and hid the face from the side
+        zf = np.where(headV & ~fin, np.minimum(zf, zExt + cfg.get('hairProud', 0.008) + 0.4 * dO), zf)
+        zf = np.maximum(zf, zb + 0.003)
+        sm_ = np.clip(wM * 3, 0, 1); wFace = wM.astype(np.float32)
+        zf = np.maximum(zf + sm_ * (gsm(zf, 0.8) - zf), zb + 0.003)       # soften the mesh's facets and the join
+        col_ = np.clip(4 * wM * (1 - wM), 0, 1) * ~fin                    # and the ring round the face more (lumpy locks)
+        zf = np.maximum(zf + col_ * (gsm(zf, 2.0) - zf), zb + 0.003)
+        # the face for the shader: the oval through the cheeks, forehead top and chin
+        fOut = [float((bx[234] + bx[454]) / 2), float((by[10] + by[152]) / 2), float(abs(bx[454] - bx[234]) / 2), float(abs(by[152] - by[10]) / 2)]
+        print('face modelled from', len(L), 'landmarks over', int((wM > 0.5).sum()), 'vertices; nose to cheek edge', round(float(lz.max() - lz.min()), 3), 'm')
+    else: print('face modelled: NO FACE FOUND, kept the estimate')
 print('scale', sF, sB, 'depth', zf.max(), zb.min())
 
 # ---- triangles
@@ -601,7 +692,7 @@ WTS = np.stack([wS, wB], 1).astype(np.float32)
 # ---- a narrower stance: the sheets are drawn with feet wide apart. Only the legs move, from the crotch down (the
 # pelvis and waist stay exactly as painted), each leg shifted as a whole so it keeps its width, growing linearly to the
 # full amount at the feet. Gowns with no gap between the legs are left alone.
-cu = int(round(cxf)); crotch = None
+cu = int(round(cxf)); crotch = None; P0 = P.copy(); stanceInfo = None   # (kept for gen_build.py)
 for r in range(int(bot['front']) - 5, int(top['front']), -1):
     if M['front'][r, cu - 2:cu + 3].any(): crotch = r; break
 fx = (np.array([footL_u, footR_u]) - cxf) * px['front']; F_ = float(np.abs(fx).mean())
@@ -611,15 +702,39 @@ if crotch is not None and crotch < bot['front'] - 0.12 * (bot['front'] - top['fr
     k_ = np.clip((yc - P[:, 1]) / yc, 0, 1)
     side = np.tanh(P[:, 0] / 0.02)                      # which leg (a hard switch, smoothed over 2 cm at the middle)
     armW = (Wt * np.isin(top4, [6, 7, 8, 10, 11, 12])).sum(1)     # hands hanging by the legs stay with their arms
-    P[:, 0] -= (F_ - T_) * k_ * side * (1 - armW)
+    P[:, 0] -= (F_ - T_) * k_ * side * (1 - armW); stanceInfo = [float(yc), float(F_), float(T_)]
     print('stance', round(F_, 3), '->', round(T_, 3), 'from crotch at', round(yc, 2))
 else:
     print('stance kept (gown or already narrow)')
+# ---- side paintings, both flanks, for every vertex: the game's shader picks between front, back and the two sides by
+# the surface's facing and the direction it is seen from. The side views are painted with the arms hanging, so the arms
+# are swung down about the shoulders (in the picture plane) before they are projected; in the A-pose an arm's side would
+# land on the wrong part of the painting.
+Q = P[:, :2].astype(np.float64).copy()
+for s_, js in (('R', (6, 7, 8)), ('L', (10, 11, 12))):
+    wA = (Wt * np.isin(top4, js)).sum(1)
+    sh_, wr_ = J['sh' + s_][:2], J['wr' + s_][:2]; v_ = wr_ - sh_; th = -np.arctan2(v_[0], -v_[1])
+    R_ = np.array([[np.cos(th), -np.sin(th)], [np.sin(th), np.cos(th)]])
+    Q += wA[:, None] * (((P[:, :2] - sh_) @ R_.T + sh_) - P[:, :2])
+s_side = np.stack([czs - sgn * P[:, 2] / px['side'], rowOf('side', Q[:, 1])], 1)
+if 'side2' in M:
+    s_side2 = np.stack([czs2 - sgn2 * P[:, 2] / px['side2'], rowOf('side2', Q[:, 1])], 1)
+    sA, sB = (s_side, s_side2) if sgn > 0 else (s_side2, s_side)      # +x flank, -x flank
+else: sA = sB = s_side
+# texture u per metre of depth for each flank's painting (the shader slides the profile with the view, see figures.js)
+kS = [-sgn / px['side'], (-sgn2 / px['side2']) if 'side2' in M else -sgn / px['side']]
+if sgn <= 0 and 'side2' in M: kS = kS[::-1]
+vS1, vS2 = tc(sA[:, 0], sA[:, 1]), tc(sB[:, 0], sB[:, 1])
 if HEAD:   # body sheet coordinates -> the atlas (body sheet at its top-left)
     AW_, AH_ = max(SW, HW), SH + HH
     re = lambda t: np.stack([t[:, 0] * (SW - 1) / (AW_ - 1), 1 - (1 - t[:, 1]) * (SH - 1) / (AH_ - 1)], 1).astype(np.float32)
-    vF, vS, vB, UV = re(vF), re(vS), re(vB), re(UV)
-np.savez(os.path.join(D, name + '_turn.npz'), P=P, F=F.astype(np.int32), UV=UV, kind=kind, vF=vF, vS=vS, vB=vB, WTS=WTS,
+    vF, vS, vB, UV, vS1, vS2 = re(vF), re(vS), re(vB), re(UV), re(vS1), re(vS2)
+# what gen_build.py needs to put a generated 3D shape under the same paintings and rig
+meta = dict(px={k_: float(v_) for k_, v_ in px.items()}, top={k_: float(v_) for k_, v_ in top.items()}, bot={k_: float(v_) for k_, v_ in bot.items()},
+            height=HEIGHT, SW=SW, SH=SH, cxf=float(cxf), cxb=float(cxb), czs=float(czs), sgn=int(sgn), czs2=float(czs2) if 'side2' in M else None,
+            atlas=[int(max(SW, HW)), int(SH + HH)] if HEAD else None, stance=stanceInfo, n=int(n), chinY=float(chinY),
+            J={k_: [float(q) for q in v_] for k_, v_ in J.items()})
+np.savez(os.path.join(D, name + '_turn.npz'), P0=P0, wFace=wFace, meta=json.dumps(meta), P=P, F=F.astype(np.int32), UV=UV, kind=kind, vF=vF, vS=vS, vB=vB, WTS=WTS, vS1=vS1, vS2=vS2,
          bones=json.dumps([[b, p, J[h].tolist(), J[t].tolist()] for b, p, h, t in BONES]), wi=top4.astype(np.int32), wv=Wt.astype(np.float32))
 # texture: the sheet with each figure's colours bled outward (no grey halo at the edges)
 # only trust confident pixels: nearly opaque, and not background-coloured near the outline (gaps between curls,
@@ -671,7 +786,7 @@ if HEAD:
     atlas = np.zeros((AH, AW, 3), np.uint8); atlas[:SH, :SW] = tex; atlas[SH:, :HW] = htex
     _, (iy_, ix_) = ndimage.distance_transform_edt(atlas.sum(2) == 0, return_indices=True); atlas = atlas[iy_, ix_]
     cv2.imwrite(os.path.join(D, name + '_tex.png'), atlas)
-    json.dump({'A': [AW, AH], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
+    json.dump({'A': [AW, AH], 'f': fOut, 's': [float(k_ / (AW - 1)) for k_ in kS], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
               open(os.path.join(D, name + '_head.json'), 'w'))
 else:
     cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)

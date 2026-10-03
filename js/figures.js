@@ -29,7 +29,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610030816';
+export const ASSET_V = '202610030909';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -83,14 +83,14 @@ export function buildFigure(who, HIT) {
       // the exporter flips V, so back = 1 - y); colour = mix(mix(front, back, wB), side, wS)
       // head sheet: the texture holds a much larger painting of the head below the body sheet. Wherever a lookup lands on
       // a body view's head (above the neck), it reads the head sheet instead, fading in from the neck to the chin.
-      const HM = HEADMAP[who];
+      const HM = HEADMAP[who], f = n => n.toFixed(4), f5 = n => n.toFixed(5);
       // each figure's head lookup is compiled into its shader: give it its own program (three.js would otherwise reuse the
       // first figure's, since every figure's onBeforeCompile looks the same to it)
       o.material.customProgramCacheKey = () => 'fig:' + who;
       if (o.geometry.attributes.uv3) o.material.onBeforeCompile = sh => {
         let hd = 'vec4 hd(vec2 uv) { return texture2D(map, uv); }';
         if (HM) {
-          const v = HM.v, f = n => n.toFixed(4);
+          const v = HM.v;
           sh.uniforms.hV = { value: v.map(r => new THREE.Vector4(r[0], r[1], r[2], r[3])) };
           sh.uniforms.hT = { value: v.map(r => new THREE.Vector4(r[4], r[5], r[6], r[7])) };
           hd = `uniform vec4 hV[${v.length}]; uniform vec4 hT[${v.length}];
@@ -107,17 +107,16 @@ vec4 hd(vec2 uv) {
   }
   return base;
 }
+// The face oval of the front painting (1 inside, fading out over the hairline and ears)
+float faceZ(vec2 uv) {
+  vec2 p = uv * vec2(${f(HM.A[0] - 1)}, ${f(HM.A[1] - 1)});
+  vec2 q = (p - vec2(${f(HM.f[0])}, ${f(HM.f[1])})) / vec2(${f(HM.f[2])}, ${f(HM.f[3])});
+  return 1.0 - smoothstep(1.3, 2.2, dot(q, q));
+}
 // how much of the head a front-view lookup is (1 above the chin, fading out at the neck)
 float headW(vec2 uv) {
-  vec2 p = uv * vec2(${f(HM.A[0] - 1)}, ${f(HM.A[1] - 1)}); vec4 r = hV[0];
-  return step(p.y, r.w) * (1.0 - smoothstep(r.z, r.w, p.y)) * smoothstep(r.x, r.x + 5.0, p.x) * (1.0 - smoothstep(r.y - 5.0, r.y, p.x));
-}
-// The head is modelled from flat paintings, so each painting is only right from its own direction. Seen from the side
-// (or from behind), the sides of the face take the profile painting; seen from the front they keep the front one (the
-// profile there put a second eye on the cheek, and the front painting, stretched, smeared the side of the jaw).
-float viewSide(vec3 d, vec3 n) {
-  float side = max(smoothstep(0.7, 0.92, abs(d.x)), smoothstep(0.05, -0.35, d.z));
-  return side * smoothstep(0.12, 0.45, abs(n.x));
+  float y = uv.y * ${f(HM.A[1] - 1)}; vec4 r = hV[0];
+  return 1.0 - smoothstep(r.z, r.w, y);
 }`;
         }
         sh.vertexShader = sh.vertexShader
@@ -127,25 +126,47 @@ attribute vec2 uv2;
 attribute vec2 uv3;
 varying vec2 vUvS;
 varying vec2 vUvB;
-varying vec2 vW;
+varying vec2 vUvS2;
+varying float vPX;
 varying vec3 vON;
 varying vec3 vOV;`)
           .replace('#include <uv_vertex>', `#include <uv_vertex>
-vUvS = uv1; vUvB = uv2; vW = uv3;`)
+vUvS = uv1; vUvB = uv2; vUvS2 = uv3; vPX = position.x;`)
+          // the rest-pose normal, and the direction to the camera brought back into the rest pose (so a turned head is
+          // still judged by which of its own sides you see)
           .replace('#include <project_vertex>', `#include <project_vertex>
-vON = objectNormal; vOV = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz - transformed;`);
+vON = objectNormal; vOV = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz - transformed;
+#ifdef USE_SKINNING
+vOV = vOV * mat3(skinMatrix);
+#endif`);
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
 varying vec2 vUvS;
 varying vec2 vUvB;
-varying vec2 vW;
+varying vec2 vUvS2;
+varying float vPX;
 varying vec3 vON;
 varying vec3 vOV;`)
           .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
 ${hd}`)
-          .replace('#include <map_fragment>', `float wSv = clamp(vW.x, 0.0, 1.0);
-${HM ? 'wSv = mix(wSv, max(wSv, viewSide(normalize(vOV), normalize(vON))), headW(vMapUv));' : ''}
-vec4 fcol = mix(mix(hd(vMapUv), hd(vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), hd(vUvS), wSv);
+          // Four paintings (front, back, the two flanks), each only right from its own direction. Each is scored by how
+          // squarely the surface faces it and how nearly you look from its side, and the best one wins with a soft edge:
+          // from the front you see the front painting, from the side the side painting, and in between surfaces take
+          // the painting they face. The face switches as a whole (two paintings side by side on one face gave it a
+          // second eye on the temple).
+          // Seen from near the side, the head's profile painting is laid on as you would see it from where you stand
+          // (slid across the head by the view angle) rather than strictly from the side: a head is rarely seen in exact
+          // profile (it turns towards you), and projected strictly sideways the painting smeared across every surface
+          // that faces forward, the lips most of all.
+          .replace('#include <map_fragment>', `vec3 fN = normalize(vON), fD = normalize(vOV);
+vec4 fa = vec4(fN.z, -fN.z, fN.x, -fN.x), fv = vec4(fD.z, -fD.z, fD.x, -fD.x);
+vec4 fw = exp(7.0 * fa + 7.0 * fv - 14.0) * smoothstep(-0.25, 0.1, fa);
+fw /= fw.x + fw.y + fw.z + fw.w + 1e-6;
+float fsl = 0.0;
+${HM ? `float fz = faceZ(vMapUv) * smoothstep(-0.1, 0.1, fN.z), lat = smoothstep(0.84, 0.93, abs(fD.x));
+fw = mix(fw, vec4(1.0 - lat, 0.0, lat * step(0.0, fD.x), lat * step(fD.x, 0.0)), fz);
+fsl = -vPX * clamp(fD.z / (fD.x + sign(fD.x) * 1e-3), -0.6, 0.6) * lat * headW(vMapUv);` : ''}
+vec4 fcol = fw.x * hd(vMapUv) + fw.y * hd(vUvB) + fw.z * hd(vUvS + vec2(${HM ? f5(HM.s[0]) : '0.0'} * fsl, 0.0)) + fw.w * hd(vUvS2 + vec2(${HM ? f5(HM.s[1]) : '0.0'} * fsl, 0.0));
 diffuseColor *= fcol;`)
           .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= fcol.rgb;');
       };
