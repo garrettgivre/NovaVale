@@ -32,7 +32,7 @@ export function hasVoice(who, text) { return !!(vIdx && vIdx[who] && vIdx[who].h
 const vBuf = new Map();
 function vLoad(k) {
   if (!vBuf.has(k)) {
-    vBuf.set(k, fetch(`assets/voice/${k}.mp3`).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    vBuf.set(k, fetch(`assets/voice/${k}.mp3`, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
       .then(d => new Promise((ok, no) => ctx.decodeAudioData(d, ok, no))).catch(e => { vBuf.delete(k); throw e; }));
     if (vBuf.size > 40) vBuf.delete(vBuf.keys().next().value);
   }

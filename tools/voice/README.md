@@ -30,3 +30,11 @@ the `N:` prefix), so an edited line is silent until it's made again, never wrong
 and plays each as it appears; the speaker's figure keeps talking until the recording ends. Cutscene narration in `cine()`
 (main.js) plays in Nova's voice line after line, the camera holding until she's done. Menu: Voices On/Off; sound settings
 are per device, and the title screen says when sound or voices are off.
+
+## Chatterbox (expressive, being trialled Oct 2026)
+`cbox.py` remakes lines with Chatterbox (Resemble AI, MIT), which acts: each line can carry an intensity (exaggeration).
+Voices are cloned from `refs/<who>.wav`, built from that person's own Kokoro lines, so nobody real is cloned. It makes up
+to N takes per line and keeps the one Whisper transcribes closest to the text. Trial so far: Nova's opening
+(`opening.json`, the flyover and Suite 2). Install (on D:, C: is nearly full): venv `D:\NovaVoice\chatterbox` with
+`chatterbox-tts`, torch 2.6.0+cu124, set `HF_HOME=D:\NovaVoice\hf`; RTX 3060 laptop (6 GB) runs it at ~25 it/s.
+faster-whisper segfaults beside torch here, so the checker uses transformers' Whisper.

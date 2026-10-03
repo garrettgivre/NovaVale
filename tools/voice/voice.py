@@ -5,7 +5,7 @@
 import json, os, re, sys
 import numpy as np
 import soundfile as sf
-from kokoro_onnx import Kokoro
+
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MODELS = os.environ.get('KOKORO_DIR', r'C:\Users\Garrett\dev\kokoro')
 # who: (Kokoro voice, or a blend 'a*0.6+b*0.4'; speed; pitch). Pitch above 1 resamples higher (Jojo is a kid), below 1
@@ -52,6 +52,7 @@ def spoken(t):
 
 FORCE = set(sys.argv[2].split(',')) if len(sys.argv) > 2 else set()
 def main():
+    from kokoro_onnx import Kokoro
     lines = json.load(open(sys.argv[1], encoding='utf-8'))
     k = Kokoro(os.path.join(MODELS, 'kokoro-v1.0.onnx'), os.path.join(MODELS, 'voices-v1.0.bin'))
     idx_p = os.path.join(REPO, 'assets', 'voice', 'index.json')
@@ -73,4 +74,4 @@ def main():
         done += 1; print(who, kk, text[:60], flush=True)
         if done % 20 == 0: json.dump(idx, open(idx_p, 'w'), separators=(',', ':'))
     json.dump(idx, open(idx_p, 'w'), separators=(',', ':'))
-main()
+if __name__ == "__main__": main()
