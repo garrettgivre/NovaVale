@@ -1,4 +1,4 @@
-// All sound is synthesised with WebAudio, so there are no audio files.
+// All sound is synthesised with WebAudio, except recorded voices for dialogue (assets/voice, see voice() below).
 let ctx, master, music, amb, ambGain, ghost, verb, muted = false, musicOn = true, lastAmb = null;
 
 export function initAudio() {
@@ -17,7 +17,25 @@ function impulse(sec) {
   return b;
 }
 
-export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; }
+export function setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.8; if (m) stopVoice(); }
+
+// Recorded voices: assets/voice/<who>/<key>.mp3, made by tools/voice (Kokoro). key = FNV-1a of the line as shown, so an
+// edited line simply has no recording until it is made again. index.json lists what exists (no requests for missing lines).
+let vIdx = null, vNow = null, voicesOn = true;
+try { voicesOn = localStorage.getItem('novavale.voices') !== '0'; } catch (e) { }
+fetch('assets/voice/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { vIdx = {}; for (const w in j) vIdx[w] = new Set(j[w]); }).catch(() => { });
+export function voiceKey(t) { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+export function hasVoice(who, text) { return !!(vIdx && vIdx[who] && vIdx[who].has(voiceKey(text))); }
+// plays the line's recording if there is one; returns the Audio element (or null)
+export function voice(who, text) {
+  stopVoice();
+  if (!who || muted || !voicesOn || !hasVoice(who, text)) return null;
+  const a = new Audio(`assets/voice/${who}/${voiceKey(text)}.mp3`); a.volume = 0.95;
+  a.play().catch(() => { }); vNow = a; return a;
+}
+export function stopVoice() { if (vNow) { vNow.pause(); vNow.onended = null; vNow = null; } }
+export function setVoices(on) { voicesOn = on; if (!on) stopVoice(); try { localStorage.setItem('novavale.voices', on ? '1' : '0'); } catch (e) { } }
+export const isVoices = () => voicesOn;
 export const isMuted = () => muted;
 // Music (the ambient score) can be switched off on its own; sound effects and the "ghost" stay.
 export function setMusic(on) { musicOn = on; if (music) music.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.3); }

@@ -1,5 +1,5 @@
 // DOM user interface: dialogue box, panels, captions, inventory bar.
-import { sfx } from './audio.js';
+import { sfx, voice, stopVoice } from './audio.js';
 
 const $ = s => document.querySelector(s);
 export const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -112,7 +112,7 @@ export function openTalk(who, { pt = false } = {}) {
   document.body.classList.add('talking');
 }
 export function closeTalk() {
-  busy = false; speech.who = null; speech.typing = false;
+  busy = false; speech.who = null; speech.typing = false; stopVoice();
   $('#talk').className = '';
   document.body.classList.remove('talking');
 }
@@ -124,6 +124,7 @@ export function say(who, lines) {
     let i = -1, typing = 0, full = '';
     const next = () => {
       if (typing) { clearInterval(typing); typing = 0; box.querySelector('.tx').innerHTML = full; speech.typing = false; return; }
+      stopVoice();
       i++;
       if (i >= lines.length) { box.onclick = null; box.classList.remove('more'); res(); return; }
       let l = lines[i], sp = who;
@@ -132,12 +133,13 @@ export function say(who, lines) {
       full = l; speech.who = sp; speech.typing = true; speech.line = l; speech.n = (speech.n || 0) + 1;
       box.className = 'more' + (sp === 'nova' ? ' nova' : sp ? '' : ' narr');
       box.innerHTML = `<b style="--c:${sp ? PEOPLE[sp].c : '#6a7a90'}">${sp ? PEOPLE[sp].n : ''}</b><span class="tx"></span><i class="nx">▼</i>`;
-      const tx = box.querySelector('.tx');
+      const tx = box.querySelector('.tx'), vo = voice(sp, l), done = () => { if (full === l && !(vo && !vo.ended && !vo.paused)) speech.typing = false; };
+      if (vo) vo.onended = () => { if (full === l) speech.typing = false; };
       let k = 0;
-      if (speech.instant || !speech.speed) { tx.innerHTML = l; speech.typing = true; typing = 0; setTimeout(() => { if (full === l) speech.typing = false; }, 600); return; }
+      if (speech.instant || !speech.speed) { tx.innerHTML = l; speech.typing = true; typing = 0; setTimeout(done, 600); return; }
       typing = setInterval(() => {
         k += speech.speed; tx.textContent = l.slice(0, k);
-        if (k >= l.length) { clearInterval(typing); typing = 0; tx.innerHTML = l; speech.typing = false; }
+        if (k >= l.length) { clearInterval(typing); typing = 0; tx.innerHTML = l; done(); }
       }, 16);
     };
     box.onclick = () => { sfx('click'); next(); };

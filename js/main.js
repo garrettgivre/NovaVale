@@ -8,7 +8,7 @@ import { prepareCast } from './people.js';
 import { FIG } from './figures.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
-import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step } from './audio.js';
+import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step, setVoices, isVoices } from './audio.js';
 import { ITEMS, icon } from './items.js';
 
 const EYE = 1.62, PITCH0 = -0.07;
@@ -443,6 +443,7 @@ function openMenu() {
   const b = ui.panel(`<div class="menu">
     <button class="mbtn" data-a="resume">Return to Game</button>
     <button class="mbtn" data-a="music">Music: ${isMusic() ? 'On' : 'Off'}</button>
+    <button class="mbtn" data-a="voices">Voices: ${isVoices() ? 'On' : 'Off'}</button>
     <button class="mbtn" data-a="sound">All sound: ${isMuted() ? 'Off' : 'On'}</button>
     <button class="mbtn" data-a="retro">Retro picture: ${RETRO ? 'On' : 'Off'}</button>
     <button class="mbtn" data-a="text">Text: ${TEXTS[textSpeed][0]}</button>
@@ -453,6 +454,7 @@ function openMenu() {
     if (a === 'resume') ui.closePanel();
     if (a === 'sound') { setMuted(!isMuted()); x.textContent = 'All sound: ' + (isMuted() ? 'Off' : 'On'); try { localStorage.setItem('novavale.mute', isMuted() ? '1' : ''); } catch (e) { } }
     if (a === 'music') { setMusic(!isMusic()); setPref('music', isMusic()); musicUI(); x.textContent = 'Music: ' + (isMusic() ? 'On' : 'Off'); }
+    if (a === 'voices') { setVoices(!isVoices()); x.textContent = 'Voices: ' + (isVoices() ? 'On' : 'Off'); }
     if (a === 'retro') { setRetro(!RETRO); x.textContent = 'Retro picture: ' + (RETRO ? 'On' : 'Off'); }
     if (a === 'text') { textSpeed = (textSpeed + 1) % TEXTS.length; try { localStorage.setItem('novavale.text', textSpeed); } catch (e) { } ui.speech.speed = TEXTS[textSpeed][1]; x.textContent = 'Text: ' + TEXTS[textSpeed][0]; }
     if (a === 'title') { save(); location.reload(); }
