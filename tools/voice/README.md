@@ -13,7 +13,7 @@ from the kokoro-onnx GitHub release `model-files-v1.0`. Set `KOKORO_DIR` if they
 - `voice.py lines.json`: makes `assets/voice/<who>/<key>.mp3` for each line and updates `assets/voice/index.json`.
   `CAST` maps each person to a Kokoro voice and speed; `spoken()` rewrites text for speech (clock times, caps, acronyms).
 
-In the game, `voice(who, text)` in `js/audio.js` plays a line if `index.json` lists its key (`voiceKey`, FNV-1a of the
+In the game, `voice(who, text)` in `js/audio.js` plays a line through Web Audio (decoded buffers; phone browsers block <audio> elements started outside a tap) if `index.json` lists its key (`voiceKey`, FNV-1a of the
 line exactly as shown, without the `N:` prefix). Changing a line's text needs a new recording.
 Cutscene narration in `cine()` (main.js) plays in Nova's voice line after line when recorded, the camera holding until
 she's done; recordings are preloaded (`preloadVoice`). Narration (`*...*`)

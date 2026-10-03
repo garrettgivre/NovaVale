@@ -26,22 +26,36 @@ try { voicesOn = localStorage.getItem('novavale.voices') !== '0'; } catch (e) { 
 fetch('assets/voice/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { vIdx = {}; for (const w in j) vIdx[w] = new Set(j[w]); }).catch(() => { });
 export function voiceKey(t) { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
 export function hasVoice(who, text) { return !!(vIdx && vIdx[who] && vIdx[who].has(voiceKey(text))); }
-// fetch recordings ahead (a conversation's lines, a cutscene's narration) so each starts the moment its line shows
-const vPre = new Map();
-export function preloadVoice(who, text) {
-  if (!who || !voicesOn || !hasVoice(who, text)) return;
-  const k = who + '/' + voiceKey(text); if (vPre.has(k)) return;
-  const a = new Audio(`assets/voice/${k}.mp3`); a.preload = 'auto'; a.load(); vPre.set(k, a);
-  if (vPre.size > 40) vPre.delete(vPre.keys().next().value);
+// Voices play through Web Audio (the context the first tap unlocked): phone browsers refuse <audio> elements started
+// later, outside a tap, which left the voices silent on phones.
+// fetch and decode recordings ahead (a conversation's lines, a cutscene's narration) so each starts the moment its line shows
+const vBuf = new Map();
+function vLoad(k) {
+  if (!vBuf.has(k)) {
+    vBuf.set(k, fetch(`assets/voice/${k}.mp3`).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(d => new Promise((ok, no) => ctx.decodeAudioData(d, ok, no))).catch(e => { vBuf.delete(k); throw e; }));
+    if (vBuf.size > 40) vBuf.delete(vBuf.keys().next().value);
+  }
+  return vBuf.get(k);
 }
-// plays the line's recording if there is one; returns the Audio element (or null)
+export function preloadVoice(who, text) { if (ctx && who && voicesOn && hasVoice(who, text)) vLoad(who + '/' + voiceKey(text)).catch(() => { }); }
+// plays the line's recording if there is one; returns a handle { ended, paused, onended, onerror } (or null)
 export function voice(who, text) {
   stopVoice();
-  if (!who || muted || !voicesOn || !hasVoice(who, text)) return null;
-  const k = who + '/' + voiceKey(text), a = vPre.get(k) || new Audio(`assets/voice/${k}.mp3`); vPre.delete(k); a.volume = 0.95;
-  a.play().catch(() => { if (a.onerror) a.onerror(); }); vNow = a; return a;
+  if (!ctx || !who || muted || !voicesOn || !hasVoice(who, text)) return null;
+  if (ctx.state === 'suspended') ctx.resume();
+  const h = { ended: false, paused: false, onended: null, onerror: null, src: null };
+  const fail = () => { if (h.paused) return; h.ended = true; if (h.onerror) h.onerror(); };
+  vLoad(who + '/' + voiceKey(text)).then(buf => {
+    if (h.paused) return;
+    const src = ctx.createBufferSource(), g = ctx.createGain(); g.gain.value = 1.15;
+    src.buffer = buf; src.connect(g); g.connect(master); h.src = src;
+    src.onended = () => { if (h.paused) return; h.ended = true; if (h.onended) h.onended(); };
+    src.start();
+  }, fail);
+  vNow = h; return h;
 }
-export function stopVoice() { if (vNow) { vNow.pause(); vNow.onended = null; vNow = null; } }
+export function stopVoice() { const h = vNow; vNow = null; if (h) { h.paused = true; h.onended = null; if (h.src) try { h.src.stop(); } catch (e) { } } }
 export function setVoices(on) { voicesOn = on; if (!on) stopVoice(); try { localStorage.setItem('novavale.voices', on ? '1' : '0'); } catch (e) { } }
 export const isVoices = () => voicesOn;
 export const isMuted = () => muted;
