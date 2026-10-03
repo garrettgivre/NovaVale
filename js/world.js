@@ -934,12 +934,26 @@ function buildLobby() {
   box(cs, 0.8, 1.02, 0.8, mh, 0, 0.51, 0);
   box(cs, 0.88, 0.06, 0.88, mh, 0, 1.05, 0); box(cs, 0.9, 0.1, 0.9, mh, 0, 0.05, 0);
   for (const s of [-1, 1]) for (const t of [-1, 1]) box(cs, 0.03, 0.95, 0.03, BRASS, s * 0.4, 0.52, t * 0.4);
-  box(cs, 0.5, 0.07, 0.5, M(0x4a0f18, 0.95, 0, { t: TX.velvet(), rep: [2, 2] }), 0, 1.11, 0);
-  const lid = box(cs, 0.74, 0.6, 0.74, GLASS, 0, 1.39, 0); lid.rotation.z = 0.04;
-  for (const s of [-1, 1]) for (const t of [-1, 1]) box(cs, 0.02, 0.6, 0.02, BRASS, s * 0.37, 1.39, t * 0.37);
+  // what Nova's first look describes: crimson velvet with the crown's dent still in it, the glass hood sitting a hair
+  // crooked on its rail, the brass lock untouched, and the keypad that remembers every code
+  const velM = M(0x9a1828, 0.95, 0, { t: TX.velvet(), rep: [2, 2], emissive: 0x2a0406 });
+  box(cs, 0.56, 0.05, 0.56, BRASS, 0, 1.095, 0);                                   // the brass tray under the cushion
+  box(cs, 0.5, 0.07, 0.5, velM, 0, 1.12, 0);
+  const dentM = M(0x3e070e, 1, 0);
+  const dent = add(cs, new THREE.TorusGeometry(0.115, 0.016, 8, 32), dentM, 0, 1.152, 0); dent.rotation.x = Math.PI / 2;   // the ring the band pressed in
+  const dent2 = add(cs, new THREE.CircleGeometry(0.035, 16), dentM, 0, 1.157, 0.115); dent2.rotation.x = -Math.PI / 2;        // and the star's mark in front
+  const hood = new THREE.Group(); hood.position.set(0.025, 0, -0.012); hood.rotation.y = 0.05; hood.rotation.z = 0.012; cs.add(hood);
+  box(hood, 0.74, 0.6, 0.74, GLASS, 0, 1.43, 0);
+  for (const s of [-1, 1]) for (const t of [-1, 1]) box(hood, 0.025, 0.62, 0.025, BRASS, s * 0.37, 1.43, t * 0.37);
+  for (const y of [1.13, 1.735]) for (const [w, d, x, z] of [[0.76, 0.025, 0, 0.37], [0.76, 0.025, 0, -0.37], [0.025, 0.76, 0.37, 0], [0.025, 0.76, -0.37, 0]]) box(hood, w, 0.03, d, BRASS, x, y, z);
+  box(cs, 0.82, 0.025, 0.82, BRASS, 0, 1.1, 0);                                    // the rail the hood should sit square on
+  box(cs, 0.09, 0.07, 0.015, BRASS, 0, 1.06, 0.405); cyl(cs, 0.012, 0.012, 0.01, M(0x1a1408, 0.6), 0, 1.06, 0.413, 10).rotation.x = Math.PI / 2;   // lock plate
+  // the keypad on the front of the plinth: brass bezel, black face, nine keys and a green light
+  box(cs, 0.22, 0.28, 0.015, BRASS, 0.18, 0.72, 0.402);
   box(cs, 0.18, 0.24, 0.02, M(0x1c1c1e, 0.4), 0.18, 0.72, 0.405);
   const keyM = M(0xc8c0b0, 0.4);
-  for (let i = 0; i < 9; i++) box(cs, 0.035, 0.035, 0.012, keyM, 0.13 + (i % 3) * 0.05, 0.78 - Math.floor(i / 3) * 0.05, 0.415);
+  for (let i = 0; i < 9; i++) box(cs, 0.035, 0.035, 0.012, keyM, 0.13 + (i % 3) * 0.05, 0.75 - Math.floor(i / 3) * 0.05, 0.415);
+  box(cs, 0.05, 0.016, 0.006, new THREE.MeshBasicMaterial({ color: 0x40ff70 }), 0.18, 0.825, 0.416);
   for (const s of [-1, 1]) { cyl(cs, 0.03, 0.06, 0.95, BRASS, s * 0.85, 0.475, 0.62, 12); sph(cs, 0.055, BRASS, s * 0.85, 0.97, 0.62, 12); }
   add(cs, new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(new THREE.Vector3(-0.85, 0.9, 0.62), new THREE.Vector3(0, 0.62, 0.66), new THREE.Vector3(0.85, 0.9, 0.62)), 20, 0.022, 8), M(0x5a0f18, 0.8));
   tag(cs, 'case', 'Display case');
@@ -4145,7 +4159,7 @@ const DAY = {
   dex: ['tech', 2, -1.6], juniper: ['kitchen', -1.8, -1.4], jojo: ['kitchen', 2.9, 0.4], opal: ['archive', -0.9, -1.6],
   priya: ['plan', -2.4, 1.3], regent: ['plan', 1.3, -6.0, 0.5], rashad: ['wing', 0.95, -8.0],
   gus: ['terrace', -3.4, -2.6], silas: ['terrace', 6.0, 0.6], nate: ['terrace', 4.4, -13.5],
-  celeste: ['lobby', -3.3, 2.0],   // beside the empty case (not in front of it)
+  celeste: ['lobby', -3.3, 2.0, 0, 0.67],   // beside the empty case (not in front of it), facing the way you come in
 };
 // arriving for the gala over the next day: not in the building on Day 1
 const LATER = ['jojo', 'priya', 'regent', 'silas', 'nate'];

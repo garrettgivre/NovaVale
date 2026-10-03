@@ -369,11 +369,14 @@ const hiLine = {
 };
 
 const INTRO = {
-  celeste: ['*Celeste Arden stands by the empty display case, turning a ring of keys over in her hands.*', 'Nova. Thank you for coming. I\'d hug you, but you\'re the intern, and I don\'t hug interns.',
-    'N: Ms. Arden. So this is where it was.', 'Right there on the velvet until Tuesday night. Locked, with Dex\'s keypad on it, and gone by morning.',
-    'Everyone who was in the building that night is still here. Vesper Vox is in the spa. Dex Halloway set up that keypad; he\'s in the tech office. Juniper runs the kitchen. Opal Finch, who designed all this, works in the archive. And Cherry is somewhere near the fountain. You can\'t miss her.',
-    'N: And everyone else?', 'Staff, a conservator restoring our old automaton, and a podcaster I\'d like you to keep away from. More guests arrive tomorrow for the gala. The planetarium is shut while the projector comes out.',
-    'I\'ve unlocked the other doors for you. Please, Nova. Before Saturday.', 'N: Then I\'ll start with the case.'],
+  celeste: ['*A woman in a plum suit is standing beside the empty display case. Celeste Arden. She looks like she hasn\'t slept since Tuesday.*',
+    'Nova. Mae warned me you\'d be early, and that you\'d correct my grammar inside an hour.', 'N: Only if it needs correcting. So far you\'re doing fine.', '*Celeste almost smiles.*',
+    'That case held the Prism Crown until Tuesday night. Locked, with a code. Nobody heard a thing, and on Wednesday morning there was nothing on the velvet but a dent.',
+    'N: Who was in the building?',
+    'Five guests, besides staff. Vesper Vox, our headliner, has taken over the spa. Dex Halloway set up that keypad, and he practically lives in the tech office. Juniper runs the kitchen. Opal Finch, who designed this building, works in the archive.',
+    'And Miss Cherry Pop, who hosts the Revue. She\'s by the fountain. You\'ll hear her before you see her.',
+    'N: And everyone else?', 'A conservator restoring our old automaton, and a podcaster I would very much like you to avoid. More guests arrive tomorrow for the gala, and the planetarium is shut while the projector comes out.',
+    'Every door you need is unlocked. Nobody here knows who you are, and I need it to stay that way until Saturday.', 'N: Then I\'d better look like an intern. I\'ll start with the case.'],
   vesper: ['*A tall woman in a silver gown lounges by the pool, sunglasses on indoors.*', 'If you\'re bringing towels, darling, put them on the lounger and go.', 'N: I\'m Nova Vale. Ms. Arden\'s intern.', 'Celeste has an intern now. How lovely for her.', 'N: She asked me to check everyone has what they need before Saturday.', 'What I need is quiet, darling. You may chat until my steam cycle ends, and then you may go away.'],
   cherry: ['*A drag queen in hot pink stands by the fountain, beehive first.*', 'Well, hello. You\'re new. Miss Cherry Pop: host of the Starfall Revue, and the reason anyone bought a ticket.', 'N: Nova Vale. I\'m Ms. Arden\'s intern for the relaunch.', 'Celeste said she was getting an intern. She didn\'t say you\'d stare at my wig like it owes you money.', 'N: It\'s about three inches over the fire code.', '*Cherry blinks. Then she laughs, loud enough to echo off the dome.*', 'Oh, I\'m going to keep my eye on you.'],
   dex: ['*A young man in a teal hoodie jumps and nearly knocks over a lava lamp.*', 'Oh! Hi! Sorry, nobody comes in here. Are you lost? The spa\'s the other way.', 'N: Nova Vale. Ms. Arden\'s intern. The insurers want to know how the display case works, and she said you\'d know.', 'Oh. Yeah. Sure. The insurers. Right.', '*He laughs, a bit too high.*', 'I\'m Dex. I do the tech. All of it. I can explain the case. It\'s a very normal case. Nothing weird about it.', 'N: I didn\'t say it was weird.', '...No. You didn\'t.'],
