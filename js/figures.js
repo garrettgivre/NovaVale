@@ -29,7 +29,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610031147';
+export const ASSET_V = '202610031814';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -169,14 +169,18 @@ vec4 fw = exp(7.0 * fa + 7.0 * fv - 14.0) * smoothstep(-0.25, 0.1, fa);
 ${hasVis ? `// a painting only colours what it could see (full 3D figures carry this per vertex); where none saw it, any may
 vec4 fvis = vVis * vVis; fw *= mix(vec4(1.0), fvis, step(0.02, fvis.x + fvis.y + fvis.z + fvis.w)) + 1e-4;` : ''}
 float fsl = 0.0;
-${HM ? `float lat = smoothstep(0.84, 0.93, abs(fD.x)), fhw = headW(vMapUv);
+${HM ? `float lat = smoothstep(0.86, 0.90, abs(fD.x)), fhw = headW(vMapUv);   // a quick switch: a slow cross-fade showed both faces at once
 // on the head, the side paintings keep behind the eyes (cheek sides, ears, hair) unless you look from the side or from behind: further
 // forward they show the profile's eye and cheek, which landed on the temple and on locks beside the face as a second eye
-fw.zw *= mix(1.0, mix(1.0 - smoothstep(${f(HM.z || 0)} - 0.01, ${f(HM.z || 0)} + 0.03, vPXZ.y), 1.0, max(lat, smoothstep(0.0, -0.3, fD.z))), fhw);` : ''}
+fw.zw *= mix(1.0, mix(1.0 - smoothstep(${f(HM.z || 0)} - 0.035, ${f(HM.z || 0)} + 0.03, vPXZ.y), 1.0, max(lat, smoothstep(0.0, -0.3, fD.z))), fhw);` : ''}
+${HM && HM.ban ? `// this figure's sheet has no true painting of one side of the head (Harper: both profiles show her shaved side, and her
+// other side is all curls): there the hair takes the front and back paintings instead
+float fban = fhw * (1.0 - faceZ(vMapUv)); fw.${HM.ban === 'A' ? 'z' : 'w'} *= 1.0 - fban; fw.xy += 0.004 * fban * vec2(smoothstep(-0.3, 0.3, fN.z), smoothstep(0.3, -0.3, fN.z));` : ''}
 fw /= fw.x + fw.y + fw.z + fw.w + 1e-6;
 ${HM ? `float fz = faceZ(vMapUv) * mix(smoothstep(0.15, 0.5, fN.z), smoothstep(-0.1, 0.1, fN.z), lat);
 vec4 ft = vec4(1.0 - lat, 0.0, lat * step(0.0, fD.x), lat * step(fD.x, 0.0));
-${hasVis ? `// (full 3D head: the profile only goes where the side painting could see)
+${hasVis ? `// (full 3D head: the profile only goes where the side painting could see. Without this switch, each surface taking
+// the painting it faces, a head seen from the side showed the front face and the profile side by side.)
 ft *= fvis + 1e-3; ft /= ft.x + ft.y + ft.z + ft.w;` : ''}
 fw = mix(fw, ft, fz);
 fsl = -vPXZ.x * clamp(fD.z / (fD.x + sign(fD.x) * 1e-3), -0.6, 0.6) * lat * fhw;` : ''}

@@ -37,6 +37,8 @@ V0 = np.asarray(m.vertices, np.float64); F = np.asarray(m.faces, np.int64)
 
 def sil(P, view):   # silhouette of the mesh in a view's sheet pixels
     if view == 'front': u, v = P[:, 0] / px['front'] + cxf, bot['front'] - P[:, 1] / px['front']
+    elif view == 'side2': u, v = meta['czs2'] + sgn * P[:, 2] / px['side2'], rowOf('side2', P[:, 1])
+    elif view == 'back': u, v = cxb - P[:, 0] / px['back'], rowOf('back', P[:, 1])
     else: u, v = czs - sgn * P[:, 2] / px['side'], rowOf('side', P[:, 1])
     pts = np.stack([u, v], 1)[F].round().astype(np.int32)
     img = np.zeros((SH, SW), np.uint8)
@@ -79,7 +81,7 @@ cv2.imwrite(os.path.join(D, name + '_genfit.png'), np.concatenate([np.stack([Mf 
 from scipy import ndimage
 J = {k: np.array(v) for k, v in meta['J'].items()}
 def rowfit(P, view):
-    S, Mk = sil(P, view), (Mf if view == 'front' else Ms)
+    S, Mk = sil(P, view), (Mf if view == 'front' else Ms if view == 'side' else mask(view))
     a = np.full(SH, np.nan); cm = np.full(SH, np.nan); cp = np.full(SH, np.nan)
     for r in range(SH):
         xm, xp = np.nonzero(S[r])[0], np.nonzero(Mk[r])[0]
@@ -105,6 +107,16 @@ for it in range(1):
         P[:, 2] += w_ * (sgn * (czs - (cm_ + d_ + a_ * (u - cm_))) * px['side'] - P[:, 2])
 print('after fitting to the outlines: front', round(iou(sil(P, 'front'), Mf), 3), 'side', round(iou(sil(P, 'side'), Ms), 3))
 cv2.imwrite(os.path.join(D, name + '_genfit.png'), np.concatenate([np.stack([Mf * 255, sil(P, 'front') * 255, Mf * 0], 2), np.stack([Ms * 255, sil(P, 'side') * 255, Ms * 0], 2)], 1))
+
+# the other two paintings (back, and the second side) are lined up the other way round: the shape stays, and their
+# lookups are stretched and shifted row by row so each painting's outline lands on the shape's. The second side view is
+# drawn separately and sits a centimetre or two differently on its own centre; unregistered, its profile face showed
+# beside the real one from that side.
+fitB = rowfit(P, 'back'); fit2 = rowfit(P, 'side2') if 'side2' in px else None
+def uvfit(u, v, fa, w=1.0):
+    if not fa: return u
+    a_, cm_, d_ = (np.interp(np.clip(v, 0, SH - 1), np.arange(SH), q) for q in fa)
+    return u + w * ((cm_ + d_ + a_ * (u - cm_)) - u)
 
 # ---- the rig: weights from the flat build's nearest vertices (it worked them out inside the front painting)
 P0 = Z['P0']; wi0, wv0 = Z['wi'], Z['wv']; NB = len(json.loads(str(Z['bones'])))
@@ -139,6 +151,27 @@ if zone.any() and len(seeds):
     print('hand zone:', int(zone.sum()), 'vertices; to an arm', int((W[okz][:, [6, 7, 8, 10, 11, 12]].sum(1) > 0.5).sum()))
 top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.sum(1, keepdims=True)
 
+# split chosen triangles in four, and their neighbours in two or three so every new edge point is shared: splitting only
+# the chosen ones leaves points on the border that the neighbours don't have, and when the face moved, cracks opened along
+# it (a dotted pale line down the cheek)
+def refine(P, F, W, sel):
+    N = len(P); key = lambda a, b: np.minimum(a, b) * N + np.maximum(a, b)
+    fe = np.stack([key(F[:, 0], F[:, 1]), key(F[:, 1], F[:, 2]), key(F[:, 2], F[:, 0])], 1)
+    uk = np.unique(fe[sel].ravel()); a_, b_ = uk // N, uk % N
+    P2 = np.concatenate([P, (P[a_] + P[b_]) / 2]); W2 = np.concatenate([W, (W[a_] + W[b_]) / 2])
+    pos = np.searchsorted(uk, fe); pos = np.clip(pos, 0, len(uk) - 1); has = uk[pos] == fe; mid = np.where(has, N + pos, -1)
+    cnt = has.sum(1); out = [F[cnt == 0]]
+    f3, m3 = F[cnt == 3], mid[cnt == 3]
+    out += [np.stack([f3[:, 0], m3[:, 0], m3[:, 2]], 1), np.stack([f3[:, 1], m3[:, 1], m3[:, 0]], 1), np.stack([f3[:, 2], m3[:, 2], m3[:, 1]], 1), m3]
+    for k in range(3):      # one split edge: (k, k+1)
+        q = (cnt == 1) & has[:, k]; f, m = F[q], mid[q][:, k]; v0, v1, v2 = f[:, k], f[:, (k + 1) % 3], f[:, (k + 2) % 3]
+        out += [np.stack([v0, m, v2], 1), np.stack([m, v1, v2], 1)]
+    for k in range(3):      # two split edges: all but (k+2, k)
+        q = (cnt == 2) & ~has[:, (k + 2) % 3]; f = F[q]; v0, v1, v2 = f[:, k], f[:, (k + 1) % 3], f[:, (k + 2) % 3]
+        m01, m12 = mid[q][:, k], mid[q][:, (k + 1) % 3]
+        out += [np.stack([m01, v1, m12], 1), np.stack([v0, m01, m12], 1), np.stack([v0, m12, v2], 1)]
+    return P2, np.concatenate(out).astype(np.int64), W2
+
 # ---- the face: the flat build modelled it from the head painting; lay that surface into the front of this head
 n0 = int(meta['n']); wM0 = Z['wFace']
 if wM0.max() > 0:
@@ -161,9 +194,7 @@ if wM0.max() > 0:
     # the face needs far more points than the rest (a whole-body shape leaves it a few hundred): split its triangles
     for _ in range(2):
         _, wgt = facew(P, F); sel = np.nonzero((wgt[F] > 0.02).any(1))[0]
-        nv = len(P); P, F = trimesh.remesh.subdivide(P, F, face_index=sel)
-        d_, ix = cKDTree(P[:nv]).query(P[nv:], k=2); wn = 1.0 / (d_ + 1e-6); wn /= wn.sum(1, keepdims=True)
-        W = np.concatenate([W, (W[ix] * wn[..., None]).sum(1)])
+        P, F, W = refine(P, F, W, sel)
     top4 = np.argsort(-W, 1)[:, :4]; Wt = np.take_along_axis(W, top4, 1); Wt /= Wt.sum(1, keepdims=True)
     fz, wgt = facew(P, F)
     P[:, 2] += wgt * (fz - P[:, 2])
@@ -185,7 +216,7 @@ def lim(view):
     xs = np.nonzero(mask(view).any(0))[0]; return xs.min() - 5, xs.max() + 5
 cl = lambda u, view: np.clip(u, *lim(view))
 vF = tc(cl(P[:, 0] / px['front'] + cxf, 'front'), bot['front'] - P[:, 1] / px['front'])
-vB = tc(cl(cxb - P[:, 0] / px['back'], 'back'), rowOf('back', P[:, 1]))
+vB = tc(cl(uvfit(cxb - P[:, 0] / px['back'], rowOf('back', P[:, 1]), fitB), 'back'), rowOf('back', P[:, 1]))
 # the arms swung down to hang, as the side views are painted, and then forward or back until the hand lies on the
 # painted hand (found by its colour: the side views carry the hand a little in front of the hip, and a hand hanging
 # straight down left the painted one stranded on the shorts as a second hand)
@@ -217,7 +248,7 @@ for s_, js in (('R', (6, 7, 8)), ('L', (10, 11, 12))):
 Q = Qh[:, :2]
 s_side = np.stack([cl(czs - sgn * Qh[:, 2] / px['side'], 'side'), rowOf('side', Q[:, 1])], 1)
 if side2:
-    s_side2 = np.stack([cl(meta['czs2'] + sgn * Qh[:, 2] / px['side2'], 'side2'), rowOf('side2', Q[:, 1])], 1)
+    s_side2 = np.stack([cl(uvfit(meta['czs2'] + sgn * Qh[:, 2] / px['side2'], rowOf('side2', Q[:, 1]), fit2, np.clip((P[:, 1] - J['hips'][1]) / 0.12, 0, 1)), 'side2'), rowOf('side2', Q[:, 1])], 1)
     sA, sB = (s_side, s_side2) if sgn > 0 else (s_side2, s_side)
 else: sA = sB = s_side
 if cfg.get('swapSides'): sA, sB = sB, sA   # the sheet's side views show the opposite flanks to what its front view implies

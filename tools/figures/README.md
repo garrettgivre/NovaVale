@@ -96,9 +96,13 @@ front view; its 478 points with depth become the front of the head, nose tip on 
 The shader (`js/figures.js`) mixes front, back and the two side paintings per pixel by the surface's facing and the
 direction you look from, gated by the stored visibility. On the head the side paintings keep behind the eyes
 (`z` in `figheads.js`) unless you look from the side or behind; the middle of the face holds its front painting; near
-profile the side painting is slid with the view angle. Known flaws: a faint seam on the cheek at three-quarter views;
-Harper doubles a little from her shaved side (her sheet's front and side views disagree about her hair); generated
-hands are mitten-like.
+profile the side painting is slid with the view angle. Known flaws: front, profile and back views are clean, but between
+them (about 35 to 75 degrees) most heads show the front face and part of the profile side by side. That is the limit of
+projecting four paintings; tried and rejected: no face switch at all (worse at 60 to 75), one fixed painting per surface
+point (doubles the cheeks from the front). A real fix needs one baked texture per figure (Hunyuan3D-Paint needs more
+than this 6 GB card, or an online service). Harper's sheet has no painting of her curly side (`banSide` keeps the wrong
+profile off it); generated hands are mitten-like. `gen_build.py` also registers the back and second side paintings to
+the shape row by row, and splits the face's triangles with a conforming split (the earlier one left cracks).
 
 Check with a normals-free render: swap a figure's material for plain white Lambert in the page to see the bare shape.
 

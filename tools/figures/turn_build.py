@@ -787,7 +787,7 @@ if HEAD:
     atlas = np.zeros((AH, AW, 3), np.uint8); atlas[:SH, :SW] = tex; atlas[SH:, :HW] = htex
     _, (iy_, ix_) = ndimage.distance_transform_edt(atlas.sum(2) == 0, return_indices=True); atlas = atlas[iy_, ix_]
     cv2.imwrite(os.path.join(D, name + '_tex.png'), atlas)
-    json.dump({'A': [AW, AH], 'f': fOut, 'z': float(zf[headV].max() - cfg.get('sideFrom', 0.06)), 's': [float(k_ / (AW - 1)) for k_ in kS], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
+    json.dump({'A': [AW, AH], 'f': fOut, 'ban': cfg.get('banSide', ''), 'z': float(zf[headV].max() - cfg.get('sideFrom', 0.06)), 's': [float(k_ / (AW - 1)) for k_ in kS], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
               open(os.path.join(D, name + '_head.json'), 'w'))
 else:
     cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)
