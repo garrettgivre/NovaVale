@@ -14,7 +14,9 @@ from the kokoro-onnx GitHub release `model-files-v1.0`. Set `KOKORO_DIR` if they
   `CAST` maps each person to a Kokoro voice and speed; `spoken()` rewrites text for speech (clock times, caps, acronyms).
 
 In the game, `voice(who, text)` in `js/audio.js` plays a line if `index.json` lists its key (`voiceKey`, FNV-1a of the
-line exactly as shown, without the `N:` prefix). Changing a line's text needs a new recording. Narration (`*...*`)
+line exactly as shown, without the `N:` prefix). Changing a line's text needs a new recording.
+Cutscene narration in `cine()` (main.js) plays in Nova's voice line after line when recorded, the camera holding until
+she's done; recordings are preloaded (`preloadVoice`). Narration (`*...*`)
 and topic questions are not voiced. Menu: Voices On/Off.
 Scaling up needs an extractor that collects every spoken line (INTRO, TOPICS, hiLine, CALLS, finales, think()), including
 lines built by functions in several flag states.
