@@ -36,6 +36,9 @@ Vale**; Beau is not in the game, and nods to his tastes stay as nods (Vesper Vox
   `closeup.js`, `doorshots.js`). Do **not** run the full playthrough (`play.js`) after every change; only when story flow,
   flags or dialogue gating changed broadly, or when he asks. Send him the screenshots as proof.
 - He often says "claude rc" (switch on Remote Control so he can follow from his phone) and "Continue" (carry on).
+- When he says "stop all testing", stop at once; don't restart test runs or kill his processes without asking.
+- His C: drive is nearly full (under 6 GB free); big installs and model files go on D: (`D:/NovaVoice` holds the
+  Chatterbox venv and Hugging Face cache).
 - Answers: when he asks "what next?", give a recommendation and a short ranked list, not an essay.
 - Art: Garrett generates images in ChatGPT from prompts you write (he has a daily image limit). Character turnaround
   prompt is in `tools/figures/README.md`; other wishes in `tools/art/WISHLIST.md`.
@@ -259,7 +262,9 @@ run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or
 3. A fresh-eyes playthrough by Garrett or Beau, then a round of fixes; then ElevenLabs voices (Garrett: only once the
    game is finished; Chatterbox was only marginally better than Kokoro, don't redo voices with it) and the Play Store.
 4. Blinking/lip-sync (needs eyes-closed and mouth-open face crops from Garrett).
-Recently done (newest first): Celeste's topics after Day 1 (the singing, Dex's ghost, the relaunch memo, the fake
+Recently done (newest first): Celeste's introduction rewritten and she faces the lobby entrance (`DAY.celeste` facing
+0.67); the display case rebuilt to match Nova's first look (velvet with the crown's ring dent, hood knocked a hair
+crooked on its brass rail, lock plate, lit keypad; velvet reads a little maroon, could go redder); Celeste's topics after Day 1 (the singing, Dex's ghost, the relaunch memo, the fake
 star pointing to the appraisal, Kenji, Opal; greetings by progress); phone performance pass (see Testing); voices; door fidelity (moulded surrounds, sills, hinges, sizes per room); two-tap doors everywhere
 with smooth turning and Nova's first-visit and roadblock lines; directed start (wake in Suite 2, knock, Celeste in the
 lobby, rooms unlocked by her introduction, people arriving over time, walk-up close-ups on things); per-destination door
@@ -277,5 +282,7 @@ You're picking up a game made as a gift, by someone who playtests every change o
 worked best: make the change, look at it yourself in a screenshot before he does, fix what's off, then show him. Small
 careful passes beat big rewrites here; when something already works (the figures, the doors, the opening), refine it.
 Before writing any line for Nova, ask what she knows at that moment and gate it on a flag. Read a few existing
-conversations in `story.js` first to get her voice; she's sharp and funny and never mean. Keep his usage in mind, keep
-the writing plain, and have fun with it. Beau is going to love the planetarium doors.
+conversations in `story.js` first to get her voice; she's sharp and funny and never mean. Every new line needs a voice
+(`tools/voice`), so run the two scripts before you commit dialogue. Garrett's open notes when we stopped: Celeste's idle
+stance may still look stiff to him (only her facing was changed), and the case velvet could be redder. Keep his usage in
+mind, keep the writing plain, and have fun with it.
