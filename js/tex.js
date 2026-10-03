@@ -40,8 +40,15 @@ export function fbm(w, h, { scale = 4, oct = 4, seed = 1, sx = 1, sy = 1 } = {})
 }
 
 export function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+// Phones and low-memory devices: the room patterns (and the figures' paintings, in figures.js) are kept at half size, a
+// quarter of the GPU memory. At the game's low render resolution the difference is hard to see; text and skies stay sharp.
+export const LOWMEM = (() => { try { return matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory || 8) <= 4; } catch (e) { return false; } })();
+export function halfCanvas(im) {
+  const c = canvas(Math.round(im.width / 2), Math.round(im.height / 2)), x = c.getContext('2d');
+  x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, c.width, c.height); return c;
+}
 export function toTex(c, rep, srgb = true) {
-  const t = new THREE.CanvasTexture(c);
+  const t = new THREE.CanvasTexture(LOWMEM && c.width >= 512 ? halfCanvas(c) : c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;

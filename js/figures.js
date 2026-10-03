@@ -6,7 +6,9 @@
 // following the camera, and talking gestures.
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
+import { MeshoptDecoder } from '../vendor/meshopt_decoder.module.js';
 import { HEADMAP } from './figheads.js';
+import { LOWMEM, halfCanvas } from './tex.js';
 
 // who -> { head: model-space height of the head centre, talk: which arm gestures ('R' | 'L') }
 export const FIG = {
@@ -27,7 +29,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610030023';
+export const ASSET_V = '202610030737';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -42,9 +44,19 @@ export function loadFigure(who, onReady, now = true) {
   if (!now) { if (!queue.some(q => q[0] === who)) queue.push([who, onReady]); return pump(); }
   startLoad(who, onReady);
 }
+// The GLBs are meshopt-compressed (tools/figures/build_all.sh runs gltfpack): about a fifth of the download.
+const gltf = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+// Phones and low-memory devices get each figure's painting at half size: a quarter of the GPU memory (about 20 MB to 5 MB
+// per person), which keeps a crowded lobby from running a phone out of memory and losing the WebGL context.
+export { LOWMEM };
+function halve(tex) {
+  const im = tex && tex.image; if (!LOWMEM || !im || !(im.width > 1100)) return;
+  const c = halfCanvas(im); if (im.close) im.close();
+  tex.image = c; tex.needsUpdate = true;
+}
 function startLoad(who, onReady) {
   if (loading[who]) return loading[who];
-  loading[who] = new GLTFLoader().loadAsync(`assets/figures/${who}.glb?v=${ASSET_V}`).then(gl => { loaded[who] = gl.scene; onReady && onReady(who); })
+  loading[who] = gltf.loadAsync(`assets/figures/${who}.glb?v=${ASSET_V}`).then(gl => { loaded[who] = gl.scene; onReady && onReady(who); })
     .catch(e => console.warn('figure', who, e));
   return loading[who];
 }
@@ -61,7 +73,7 @@ export function buildFigure(who, HIT) {
   root.traverse(o => {
     if (o.isBone) bones[o.name] = o;
     if (o.isMesh) {
-      const old = o.material;
+      const old = o.material; halve(old.map);
       // matte: the painting already has its lighting; a standard material adds a Fresnel sheen at grazing angles,
       // which lit up the jagged hair outlines as grey-white specks
       // the paintings carry their own lighting: mostly self-lit, with a gentle share of the room's light (rooms lit very

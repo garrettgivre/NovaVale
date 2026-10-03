@@ -4108,7 +4108,14 @@ export function buildWorld(sc, renderer) {
 
 let curRoom = null;
 export function showRoom(id) {
-  for (const k in rooms) rooms[k].g.visible = k === id;
+  // only the shown room stays in the scene: three.js recomposes every object's matrix each frame, visible or not, and
+  // with all eleven rooms attached that was ~15% of a phone's frame. Rooms sit at the origin, so a detached room's
+  // world positions are unchanged for anything that asks.
+  for (const k in rooms) {
+    const g = rooms[k].g, on = k === id; g.visible = on;
+    if (on && g.parent !== scene) scene.add(g); else if (!on && g.parent === scene) scene.remove(g);
+  }
+  if (rooms[id]) rooms[id].g.updateMatrixWorld(true);
   curRoom = id; applyTime();
 }
 export const roomOf = () => rooms[curRoom];

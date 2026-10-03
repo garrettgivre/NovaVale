@@ -221,6 +221,13 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   1.4 s, faint glints mark tappable things within 4.2 m (`nearHints`, `#near`); a light vibration on a hotspot tap; captions
   sit above the stick; Reveal labels stay on screen. All puzzles and panels checked at 412 px wide.
 - Lost WebGL context (switching apps on a phone): index.html makes every 2D canvas `willReadFrequently` (memory-backed, survives backgrounding); main.js rebuilds the env maps on restore (`rebuildEnv`) and reloads into the save if a probe canvas was wiped. Test with `WEBGL_lose_context`.
+- Performance (Oct 2026 pass): figure GLBs are meshopt-compressed by gltfpack in `tools/figures/build_all.sh` (71 MB to
+  16 MB; `-kv` keeps TEXCOORD_1-3, `-vpf` keeps float positions; decoded by `vendor/meshopt_decoder.module.js`). On phones
+  and low-memory devices (`LOWMEM` in tex.js: coarse pointer or deviceMemory <= 4) figure paintings and room pattern
+  textures load at half size (text, signs and skies stay full), and the retro picture's 1x canvas skips devicePixelRatio.
+  Only the shown room is attached to the scene (`showRoom` adds/removes room groups): three.js recomposed every hidden
+  room's matrices each frame (14% of a throttled frame, now under 1%). Profile with Playwright CPU throttling
+  (`Emulation.setCPUThrottlingRate`) and a CDP profile; frame times on this laptop are noisy, the profile isn't.
 - Draw-call budget: views run ~150-430 calls/frame (`__dbg.renderer.info`); merge static meshes per material (`mergeGeometries`) and instance repeats when adding detail. `__dbg.view(node)` jumps to a camera spot instantly.
 - Serve locally: `python -m http.server 8777` from the repo root. In the Claude desktop app, `.claude/launch.json`
   (git-ignored) holds `{"version":"0.0.1","configurations":[{"name":"aquadome","runtimeExecutable":"python","runtimeArgs":["-m","http.server","8777"],"port":8777}]}`.
@@ -246,15 +253,14 @@ fonts bundled, and a phone performance pass first). Not now.
 **Voices (Oct 2026)**: every spoken line is voiced with Kokoro TTS, each person with their own voice (`CAST` in
 `tools/voice/voice.py`), played by `voice()` in audio.js from `ui.say` and `cine()`. **After adding or editing dialogue,
 run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or the new lines stay silent. Menu: Voices On/Off.
-**Recommended next (Oct 2026, offered to Garrett, not yet picked):**
-1. Phone performance pass: smaller figure textures on phones, adaptive render scale on weak GPUs, frame-rate check of the
-   heaviest views (terrace, lobby, planetarium; `__dbg.renderer.info`), and test the thumb stick on a real phone. Needed
-   before the Play Store anyway.
-2. Celeste in the world after Day 1 (she is in the lobby on Day 1 only), a few lines as the case moves.
-3. The boathouse mini-case (sequel hook already planted).
-4. Art when Garrett has image credits: crew photo, four ending illustrations (bases in `tools/art/bases/BASES.md`).
-5. Blinking/lip-sync (needs eyes-closed and mouth-open face crops from Garrett).
-Recently done (newest first): door fidelity (moulded surrounds, sills, hinges, sizes per room); two-tap doors everywhere
+**Recommended next (Oct 2026):**
+1. The last art when Garrett has image credits: crew photo, four ending illustrations (bases in `tools/art/bases/BASES.md`).
+2. The boathouse mini-case (sequel hook already planted), only if Garrett wants the game bigger before release.
+3. A fresh-eyes playthrough by Garrett or Beau, then a round of fixes; then ElevenLabs voices (Garrett: only once the
+   game is finished; Chatterbox was only marginally better than Kokoro, don't redo voices with it) and the Play Store.
+4. Blinking/lip-sync (needs eyes-closed and mouth-open face crops from Garrett).
+Recently done (newest first): Celeste's topics after Day 1 (the singing, Dex's ghost, the relaunch memo, the fake
+star pointing to the appraisal, Kenji, Opal; greetings by progress); phone performance pass (see Testing); voices; door fidelity (moulded surrounds, sills, hinges, sizes per room); two-tap doors everywhere
 with smooth turning and Nova's first-visit and roadblock lines; directed start (wake in Suite 2, knock, Celeste in the
 lobby, rooms unlocked by her introduction, people arriving over time, walk-up close-ups on things); per-destination door
 designs with signs; cutscenes, save slots and quality of life; touch controls; painted art (title, postcards, paintings,

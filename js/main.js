@@ -5,7 +5,7 @@ import { S, load, newGame, hasSave, save, PHASE_NAME, SLOTS, slotInfo, setSlot, 
 import { computeBoundsTree, acceleratedRaycast } from '../vendor/three-mesh-bvh.js';
 import { buildWorld, rebuildEnv, showRoom, NODES, rooms, chars, sync, update, showArrows, roomOf, headOf, hotspotsOnScreen } from './world.js';
 import { prepareCast } from './people.js';
-import { FIG } from './figures.js';
+import { FIG, LOWMEM } from './figures.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
 import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step, setVoices, isVoices, voice, stopVoice, preloadVoice } from './audio.js';
@@ -74,7 +74,8 @@ postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post));
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h;
   if (RETRO) {
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    // the 640 px picture is upscaled to the screen: on a phone, a 1x canvas looks the same and fills far fewer pixels
+    renderer.setPixelRatio(LOWMEM ? 1 : Math.min(devicePixelRatio || 1, 2));
     renderer.setSize(w, h, false);
     const k = 640 / Math.max(w, h), lw = Math.round(w * k), lh = Math.round(h * k);
     rt.setSize(lw, lh); post.uniforms.uRes.value.set(lw, lh);
