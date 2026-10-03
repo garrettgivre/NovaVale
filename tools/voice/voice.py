@@ -5,7 +5,7 @@ import json, os, re, sys
 import soundfile as sf
 from kokoro_onnx import Kokoro
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-MODELS = os.environ.get('KOKORO_DIR', r'C:SERSGARRETTDEVKOKORO')
+MODELS = os.environ.get('KOKORO_DIR', r'C:\Users\Garrett\dev\kokoro')
 CAST = {   # voice, speed
     'nova': ('af_heart', 1.06),
     'dex': ('am_puck', 1.12),
