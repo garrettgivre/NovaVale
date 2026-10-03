@@ -243,8 +243,9 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
 Long-term goal (Garrett, Oct 2026): once the game is finished, publish it on Google Play (likely bundled with Capacitor so it
 works offline; needs a developer account, a closed test with testers, a privacy policy, no "Nancy Drew" in the listing,
 fonts bundled, and a phone performance pass first). Not now.
-**Voices (pilot, Oct 2026)**: Kokoro TTS recordings for Dex's first conversation, played by `voice()` in audio.js from
-`ui.say`; Menu has Voices On/Off. See `tools/voice/README.md`. Waiting on Garrett to pick voices before voicing the rest.
+**Voices (Oct 2026)**: every spoken line is voiced with Kokoro TTS, each person with their own voice (`CAST` in
+`tools/voice/voice.py`), played by `voice()` in audio.js from `ui.say` and `cine()`. **After adding or editing dialogue,
+run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or the new lines stay silent. Menu: Voices On/Off.
 **Recommended next (Oct 2026, offered to Garrett, not yet picked):**
 1. Phone performance pass: smaller figure textures on phones, adaptive render scale on weak GPUs, frame-rate check of the
    heaviest views (terrace, lobby, planetarium; `__dbg.renderer.info`), and test the thumb stick on a real phone. Needed

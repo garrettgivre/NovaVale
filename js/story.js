@@ -97,7 +97,7 @@ function taskList() {
 export function tasks() { return taskList(); }
 function nextHint() {
   const t = taskList().find(x => !x.d && !x.t.startsWith('Optional'));
-  return t ? t.hint[junior() ? 0 : 1] : 'Honestly? I think you\'ve already solved it and you\'re calling so I\'ll tell you how smart you are.';
+  return t ? t.hint[junior() ? 0 : 1] : 'I think you\'ve already solved it, and you only called so I\'d tell you how smart you are.';
 }
 
 // ---------- Days ----------

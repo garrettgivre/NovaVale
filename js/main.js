@@ -652,7 +652,11 @@ function title() {
       ${anySave ? '<button class="tbtn" id="tLoad">Load Game</button>' : ''}
       <button class="tbtn" id="tNew">New Game</button>
     </div>
+    ${isMuted() || !isVoices() ? `<button class="tlink" id="tSound">${isMuted() ? 'Sound is off' : 'Voices are off'} · turn on</button>` : ''}
     <p class="small">Click to look and talk · drag to look around · click the screen's edge to turn</p></div>`, 'title-s');
+  // sound settings belong to the device, not the save, so say so here when they're off
+  const ts = s.querySelector('#tSound');
+  if (ts) ts.onclick = () => { setMuted(false); setVoices(true); try { localStorage.setItem('novavale.mute', ''); } catch (e) { } initAudio(); sfx('click'); ts.remove(); };
   const start = (diff, slot) => { initAudio(); setSlot(slot); ui.closeScreen(); newGame(diff); resume(); story.intro(); };
   // each save slot as a card: its day, level, time played and when it was last played
   const slotCard = (n, id) => {
