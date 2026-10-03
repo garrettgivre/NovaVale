@@ -9,7 +9,7 @@ Setup on Garrett's PC (already done): `C:\Users\Garrett\dev\kokoro` has a venv (
 from the kokoro-onnx GitHub release `model-files-v1.0`. Set `KOKORO_DIR` if they live elsewhere.
 
 - `sample.py`: auditions, one Nova line and one Dex line in six voices each.
-- `pilot_dex.py`: writes `pilot_dex.json`, a list of `[who, text]`.
+- `pilot_dex.py`, `opening.py`: write the line lists (`[who, text]`) for Dex's first conversation and Nova's opening (flyover narration, her first thoughts in Suite 2).
 - `voice.py lines.json`: makes `assets/voice/<who>/<key>.mp3` for each line and updates `assets/voice/index.json`.
   `CAST` maps each person to a Kokoro voice and speed; `spoken()` rewrites text for speech (clock times, caps, acronyms).
 

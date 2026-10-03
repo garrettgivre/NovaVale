@@ -26,12 +26,20 @@ try { voicesOn = localStorage.getItem('novavale.voices') !== '0'; } catch (e) { 
 fetch('assets/voice/index.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { vIdx = {}; for (const w in j) vIdx[w] = new Set(j[w]); }).catch(() => { });
 export function voiceKey(t) { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
 export function hasVoice(who, text) { return !!(vIdx && vIdx[who] && vIdx[who].has(voiceKey(text))); }
+// fetch recordings ahead (a conversation's lines, a cutscene's narration) so each starts the moment its line shows
+const vPre = new Map();
+export function preloadVoice(who, text) {
+  if (!who || !voicesOn || !hasVoice(who, text)) return;
+  const k = who + '/' + voiceKey(text); if (vPre.has(k)) return;
+  const a = new Audio(`assets/voice/${k}.mp3`); a.preload = 'auto'; a.load(); vPre.set(k, a);
+  if (vPre.size > 40) vPre.delete(vPre.keys().next().value);
+}
 // plays the line's recording if there is one; returns the Audio element (or null)
 export function voice(who, text) {
   stopVoice();
   if (!who || muted || !voicesOn || !hasVoice(who, text)) return null;
-  const a = new Audio(`assets/voice/${who}/${voiceKey(text)}.mp3`); a.volume = 0.95;
-  a.play().catch(() => { }); vNow = a; return a;
+  const k = who + '/' + voiceKey(text), a = vPre.get(k) || new Audio(`assets/voice/${k}.mp3`); vPre.delete(k); a.volume = 0.95;
+  a.play().catch(() => { if (a.onerror) a.onerror(); }); vNow = a; return a;
 }
 export function stopVoice() { if (vNow) { vNow.pause(); vNow.onended = null; vNow = null; } }
 export function setVoices(on) { voicesOn = on; if (!on) stopVoice(); try { localStorage.setItem('novavale.voices', on ? '1' : '0'); } catch (e) { } }

@@ -8,7 +8,7 @@ import { prepareCast } from './people.js';
 import { FIG } from './figures.js';
 import * as story from './story.js';
 import * as ui from './ui.js';
-import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step, setVoices, isVoices } from './audio.js';
+import { initAudio, sfx, setMuted, isMuted, setMusic, isMusic, step, setVoices, isVoices, voice, stopVoice, preloadVoice } from './audio.js';
 import { ITEMS, icon } from './items.js';
 
 const EYE = 1.62, PITCH0 = -0.07;
@@ -567,22 +567,33 @@ canvas.addEventListener('webglcontextrestored', () => {
 addEventListener('visibilitychange', () => { if (document.hidden) { try { save(); } catch (e) { } } });
 
 // ---------- Cutscenes: a camera move with letterbox bars and narration; tap to skip ----------
-// keys: [{ p: [x, y, z], l: [look x, y, z], t: seconds }, ...] (t cumulative); lines: narration shown as captions in turn
+// keys: [{ p: [x, y, z], l: [look x, y, z], t: seconds }, ...] (t cumulative); lines: narration shown as captions in turn.
+// Narration that has Nova's recorded voice plays line after line, each caption staying up while it's spoken; the camera
+// holds on its last spot until she's finished.
 function cine(node, keys, lines = []) {
   return new Promise(res => {
     const n = NODES[node]; showRoom(n.room); sync(); place(node);
     document.body.classList.add('cine'); V.busy = true;
     const T = keys[keys.length - 1].t, ov = $('#cine'); ov.className = 'on';
     const each = T / Math.max(1, lines.length);
-    lines.forEach((l, i) => setTimeout(() => V.cine && ui.caption(l, each * 1000 - 300), (i * each + 0.4) * 1000));
-    const end = () => { if (!V.cine) return; V.cine = null; ov.className = ''; ui.hideCaption(); document.body.classList.remove('cine'); V.busy = false; res(); };
+    const end = () => { if (!V.cine) return; V.cine = null; stopVoice(); ov.className = ''; ui.hideCaption(); document.body.classList.remove('cine'); V.busy = false; res(); };
     ov.onclick = end; V.cine = { keys, t: 0, end };
+    const C = V.cine, spoken = i => {
+      if (V.cine !== C) return;
+      if (i >= lines.length) { C.talk = false; return; }
+      const a = voice('nova', lines[i]);
+      if (!a) { ui.caption(lines[i], each * 1000 - 300); return setTimeout(() => spoken(i + 1), each * 1000); }
+      C.talk = true; ui.caption(lines[i], 60000);
+      let next = false; const go = () => { if (next) return; next = true; setTimeout(() => spoken(i + 1), 450); };
+      a.onended = go; a.onerror = go;
+    };
+    lines.forEach(l => preloadVoice('nova', l)); setTimeout(() => spoken(0), 400);
   });
 }
 function cineStep(dt) {
   const C = V.cine; if (!C) return false;
   C.t += dt; const K = C.keys, T = K[K.length - 1].t;
-  if (C.t >= T + 0.6) { C.end(); return false; }
+  if (C.t >= T + 0.6 && !C.talk) { C.end(); return false; }
   let i = 0; while (i < K.length - 2 && C.t > K[i + 1].t) i++;
   const a = K[i], b = K[i + 1], u = Math.min(1, Math.max(0, (C.t - a.t) / (b.t - a.t))), k = u * u * (3 - 2 * u);
   const L = (x, y) => x + (y - x) * k, p = a.p.map((v, j) => L(v, b.p[j])), l = a.l.map((v, j) => L(v, b.l[j]));

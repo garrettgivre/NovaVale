@@ -1,5 +1,5 @@
 // DOM user interface: dialogue box, panels, captions, inventory bar.
-import { sfx, voice, stopVoice } from './audio.js';
+import { sfx, voice, stopVoice, preloadVoice } from './audio.js';
 
 const $ = s => document.querySelector(s);
 export const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -122,6 +122,7 @@ export function say(who, lines) {
     const box = $('#talkLine'), opts = $('#talkOpts');
     opts.innerHTML = '';
     let i = -1, typing = 0, full = '';
+    for (const l of lines) if (!l.startsWith('*')) l.startsWith('N:') ? preloadVoice('nova', l.slice(2).trim()) : preloadVoice(who, l);
     const next = () => {
       if (typing) { clearInterval(typing); typing = 0; box.querySelector('.tx').innerHTML = full; speech.typing = false; return; }
       stopVoice();
