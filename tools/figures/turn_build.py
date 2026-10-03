@@ -724,6 +724,7 @@ else: sA = sB = s_side
 # texture u per metre of depth for each flank's painting (the shader slides the profile with the view, see figures.js)
 kS = [-sgn / px['side'], (-sgn2 / px['side2']) if 'side2' in M else -sgn / px['side']]
 if sgn <= 0 and 'side2' in M: kS = kS[::-1]
+if cfg.get('swapSides'): sA, sB, kS = sB, sA, kS[::-1]   # a sheet whose side views show the opposite flanks to its front view (Harper's curls)
 vS1, vS2 = tc(sA[:, 0], sA[:, 1]), tc(sB[:, 0], sB[:, 1])
 if HEAD:   # body sheet coordinates -> the atlas (body sheet at its top-left)
     AW_, AH_ = max(SW, HW), SH + HH
@@ -786,7 +787,7 @@ if HEAD:
     atlas = np.zeros((AH, AW, 3), np.uint8); atlas[:SH, :SW] = tex; atlas[SH:, :HW] = htex
     _, (iy_, ix_) = ndimage.distance_transform_edt(atlas.sum(2) == 0, return_indices=True); atlas = atlas[iy_, ix_]
     cv2.imwrite(os.path.join(D, name + '_tex.png'), atlas)
-    json.dump({'A': [AW, AH], 'f': fOut, 's': [float(k_ / (AW - 1)) for k_ in kS], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
+    json.dump({'A': [AW, AH], 'f': fOut, 'z': float(zf[headV].max() - cfg.get('sideFrom', 0.06)), 's': [float(k_ / (AW - 1)) for k_ in kS], 'v': [[h['x0'], h['x1'], h['chin'], h['neck'], h['sx'], h['sy'], h['ox'], h['oy'] + SH] for k_, h in HEAD.items() if k_ != '_k']},
               open(os.path.join(D, name + '_head.json'), 'w'))
 else:
     cv2.imwrite(os.path.join(D, name + '_tex.png'), tex)

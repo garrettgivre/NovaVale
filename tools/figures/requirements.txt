@@ -5,3 +5,6 @@ scipy
 scikit-image
 huggingface_hub
 numpy
+mediapipe
+trimesh
+fast-simplification

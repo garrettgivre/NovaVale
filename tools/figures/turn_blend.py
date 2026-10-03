@@ -20,6 +20,9 @@ if 'vF' in Z.files:   # four UV maps per vertex
         me.uv_layers.new(name=nm).data.foreach_set('uv', arr[F.ravel()].ravel())
 else:
     me.uv_layers.new(name='UVMap').data.foreach_set('uv', UV.ravel())
+if 'vis' in Z.files:   # which paintings see each vertex (front, back, +x side, -x side), as a vertex colour
+    ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); ca.data.foreach_set('color', Z['vis'].astype(np.float32).ravel())
+    me.color_attributes.active_color = ca; me.color_attributes.render_color_index = 0
 me.update(); me.validate()
 me.polygons.foreach_set('use_smooth', np.ones(len(F), bool))
 ob = bpy.data.objects.new(name, me); sc.collection.objects.link(ob)
@@ -85,6 +88,6 @@ if not posed:
     bpy.context.view_layer.objects.active = arm
     out = os.path.join(D, '..', '..', 'assets', 'figures', name + '.glb')   # the repo's assets/figures
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_image_format='WEBP', export_image_quality=90, export_yup=True, export_skins=True, export_animations=False)
+    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_image_format='WEBP', export_image_quality=90, export_yup=True, export_skins=True, export_animations=False, **({'export_vertex_color': 'ACTIVE'} if 'vis' in Z.files else {}))
     print('EXPORT OK', os.path.getsize(out))
 print('DONE')

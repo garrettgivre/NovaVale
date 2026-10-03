@@ -184,6 +184,14 @@ Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin
 `build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.
 
 ## Characters in 3D (painted figures)
+**Since Oct 2026 the figures are full 3D** (Garrett: "model the 2D image", "the whole body/head"): each shape is generated
+from the turnaround views by Hunyuan3D-2mv (set up on D:/NovaFig, see `tools/figures/README.md`), fitted to the paintings
+and the old flat build's rig by `tools/figures/gen_build.py`, with a face modelled by MediaPipe Face Mesh, and textured in
+the shader from the four paintings by view and visibility. Rebuild: `./gen_all.sh <names>` (or `./gen_refit.sh`), then
+`heads_js.py` and `bump.py`. The notes below about the flat build still describe the rig, weights and head sheets.
+Garrett's remaining complaints to watch: lumpy shapes, hands and arms. Known flaws: cheek seam at three-quarter views,
+Harper from her shaved side, mitten hands. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
+local server holds a file; run them again.
 All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
 README: setup, sheet prompt, commands, how it works, what to check). All 15 are built (Oct 2026) from
 new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celeste is built but only a phone contact).

@@ -66,6 +66,42 @@ Check renders (all Blender, `-b -P <script> -- <who> ...`):
 Always look at these before shipping. Problems found this way so far: hands bound to thighs, legs following arms,
 grey backdrop specks in hair, lumpy torsos, ghost faces on the side of the head, a cape sliver from a neighbouring view.
 
+## Full 3D figures (Oct 2026: what the game ships)
+The flat build above makes a relief over the front painting. Since Oct 2026 every figure's shape is instead generated
+as a real solid from the same turnaround views (Hunyuan3D-2mv, shape only), and the flat build supplies everything else:
+the rig and skin weights, the modelled face, and where the paintings sit.
+
+1. **Shape** (GPU, about 3.5 min each on the RTX 3060 6 GB): `D:/NovaFig/venv/Scripts/python D:/NovaFig/gen.py <who>`
+   with `HF_HOME=D:/NovaVoice/hf`, writes `D:/NovaFig/out/<who>.glb`. `gen3d.py` here is a copy of that script. It reads
+   the cut views (`<who>_front.png` ...), so `batch.py` must have run. The setup lives on D: (C: is full): the
+   Hunyuan3D-2 repo, a venv that borrows the Chatterbox venv's PyTorch through a `.pth` file, and the 5 GB model in the
+   Hugging Face cache. The script loads one network at a time straight onto the GPU; the stock loader needs more memory
+   than the laptop can commit. **Run nothing heavy alongside it** (Blender, Chrome): four runs crashed that way.
+   `pymeshlab` crashes on import there and is stubbed.
+2. **Fit and export**: `./gen_all.sh <names>` (flat build, then `gen_build.py`, Blender, gltfpack), or `./gen_refit.sh
+   <names>` to refit only (reuses `<who>_flat.npz`). Then `python heads_js.py` and `python tools/bump.py`.
+
+`gen_build.py`: keeps the largest piece, decimates to 70k faces, smooths (Taubin), finds the facing by matching outlines,
+stretches the shape gently onto the front and side outlines (smoothed over height; row by row it ridged the head), copies
+skin weights from the flat build's nearest vertices, reassigns the hands along the surface (fingers stayed behind on the
+thigh otherwise), subdivides and lays in the modelled face over the middle of the face only, projects the four paintings
+(arms swung down and onto the painted hand for the side views, each lookup clamped to its own view), stores which
+paintings can see each vertex (vertex colour: front, back, +x side, -x side) and cuts triangles that bridge an arm and
+the body. Per-character keys in `<who>.json`: `genFaces`, `genSmooth`, `fitSmooth`, `handZone`, `handTol`, `faceInset`,
+`faceRelax`, `armCut` (Regent: 9 = off, the cape hangs from the arms), `sideFrom` (Harper: 0.105).
+
+The face (both builds): MediaPipe Face Mesh (`mp/face_landmarker.task`, `pip install mediapipe`) reads the head sheet's
+front view; its 478 points with depth become the front of the head, nose tip on the side painting's profile.
+
+The shader (`js/figures.js`) mixes front, back and the two side paintings per pixel by the surface's facing and the
+direction you look from, gated by the stored visibility. On the head the side paintings keep behind the eyes
+(`z` in `figheads.js`) unless you look from the side or behind; the middle of the face holds its front painting; near
+profile the side painting is slid with the view angle. Known flaws: a faint seam on the cheek at three-quarter views;
+Harper doubles a little from her shaved side (her sheet's front and side views disagree about her hair); generated
+hands are mitten-like.
+
+Check with a normals-free render: swap a figure's material for plain white Lambert in the page to see the bare shape.
+
 ## How turn_build.py works
 1. **Masks**: each view's cutout, trimmed inward 3 px (`trim`; the paintings fade into the backdrop at the outline), small
    enclosed gaps filled, only the main connected body kept. Touching views (capes) are split by `turn_cut.py`.
