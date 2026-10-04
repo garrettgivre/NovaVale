@@ -126,6 +126,17 @@ texture: `./tex_all.sh <names>` (or `./bake_all.sh <names>` to re-bake only).
 Still wrong: at three-quarter views several heads show a second cheek or ear from the profile painting (Celeste, Harper,
 Regent, Rashad, Juniper), and the far cheek is stretched front painting. Front, profile and back are clean.
 
+## A second head sheet (more angles)
+Six more views of a head (three-quarter front, profiles, three-quarter back; prompt in the chat log of Oct 2026 and
+below) fix the angles between front and profile. Save as `refs/<who>_head2.png`, add
+`"head2": {"sheet": "refs/<who>_head2.png", "yaw": [six angles, top row then bottom row]}` to `<who>.json` (degrees; + = seen
+from the character's left, nose pointing to the image's left; ChatGPT picks its own angles, so look at the sheet), then
+`python head2.py <who>` and `./bake_all.sh <who>`. head2.py finds the six cells, places views up to 60 degrees by face
+landmarks (which also corrects the angle) and the rest by outline, and writes `<who>_head2_check.jpg` to look at.
+bake.py then gives every point of the head the view nearest its direction round the head (not its surface normal: the
+bumpy hair made a patchwork), mirrors a view for a side the sheet lacks, and blends narrowly. Done: Kenji, Celeste,
+Rashad, Cherry. Harper's sheet contradicts her model (`noHead2`). Sheets must show both sides of the head.
+
 ## How turn_build.py works
 1. **Masks**: each view's cutout, trimmed inward 3 px (`trim`; the paintings fade into the backdrop at the outline), small
    enclosed gaps filled, only the main connected body kept. Touching views (capes) are split by `turn_cut.py`.

@@ -90,5 +90,16 @@
    509.0
   ]
  },
- "head": "refs/celeste_head.png"
+ "head": "refs/celeste_head.png",
+ "head2": {
+  "sheet": "refs/celeste_head2.png",
+  "yaw": [
+   -45,
+   35,
+   90,
+   -90,
+   150,
+   -150
+  ]
+ }
 }

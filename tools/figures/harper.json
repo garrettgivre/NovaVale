@@ -91,5 +91,17 @@
   ]
  },
  "head": "refs/harper_head.png",
- "banSide": "A"
+ "banSide": "A",
+ "head2": {
+  "sheet": "refs/harper_head2.png",
+  "yaw": [
+   -45,
+   -30,
+   90,
+   -90,
+   160,
+   -135
+  ]
+ },
+ "noHead2": true
 }

@@ -91,6 +91,51 @@ ref = (cF * wF[:, None] + cB * wB[:, None])[sure] / (wF + wB)[sure][:, None]
 gs = g[sure]
 gain = (ref.std(0) / np.maximum(gs.std(0), 1)).clip(0.7, 1.5); g = (g - gs.mean(0)) * gain + ref.mean(0)
 col = cF * wF[:, None] + cB * wB[:, None] + cA * wA[:, None] + cS * wS[:, None] + g * wG[:, None]
+# ---- a second head sheet (head2.py): more views of the head from other angles, each placed on the model. Every point of
+# the head takes the view that faces it most squarely (and could see it), with a narrow blend between neighbours, from
+# all the views there are: the new ones and the first sheet's front, back and sides. With a view every 45 degrees or
+# so, no painting has to be stretched round a corner, which is what smeared and doubled the cheeks.
+h2p = os.path.join(D, name + '_head2.json')
+if HM and os.path.exists(h2p) and not cfg.get('noHead2'):
+    H2 = json.load(open(h2p)); sh2 = cv2.imread(os.path.join(D, H2['sheet']))[..., :3].astype(np.float32)
+    m2 = cv2.imread(os.path.join(D, name + '_head2_mask.png'), 0) > 127
+    core = cv2.erode(m2.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    _, (iy_, ix_) = ndimage.distance_transform_edt(~core, return_indices=True); sh2 = sh2[iy_, ix_]      # colours bled past the outlines
+    def smp2(im, x_, y_, interp=cv2.INTER_LINEAR):
+        m = len(x_); W_ = 4096; pad = (-m) % W_
+        xx = np.pad(x_.astype(np.float32), (0, pad)).reshape(-1, W_); yy = np.pad(y_.astype(np.float32), (0, pad)).reshape(-1, W_)
+        return cv2.remap(im, xx, yy, interp, borderMode=cv2.BORDER_CONSTANT, borderValue=0).reshape(-1, im.shape[2] if im.ndim == 3 else 1)[:m]
+    hsel = head > 0.01; ph = pos[hsel]
+    # which way each point lies round the head (as seen from above, from the head's middle), not which way its surface
+    # tilts: the generated hair is bumpy, and choosing views by the surface's own direction cut the face into a patchwork
+    # of views. By direction round the head, the views divide it into clean sectors.
+    hc = np.array([np.median(ph[:, 0]), 0, (ph[:, 2].max() + ph[:, 2].min()) / 2 - 0.01])
+    rad = ph - hc; rad[:, 1] = 0; rad /= np.linalg.norm(rad, axis=1, keepdims=True) + 1e-9
+    nh0 = n[hsel]; nh = rad * 0.85 + nh0 * 0.15; nh /= np.linalg.norm(nh, axis=1, keepdims=True) + 1e-9
+    cands = [(nh[:, 2], cF[hsel]), (-nh[:, 2], cB[hsel]), (nh[:, 0], cA[hsel]), (-nh[:, 0], cS[hsel])]
+    if HM.get('ban') == 'A': cands[2] = (cands[2][0] * 0, cands[2][1])
+    if HM.get('ban') == 'B': cands[3] = (cands[3][0] * 0, cands[3][1])
+    # a side the sheet has no view of borrows the other side's view, mirrored (faces are near enough symmetric; without
+    # it that side fell back to the stretched front painting)
+    yaws = [v['yaw'] for v in H2['views']]; views = [dict(v, mir=1) for v in H2['views']]
+    for v in H2['views']:
+        if 20 < abs(v['yaw']) < 125 and not any(abs(y + v['yaw']) < 30 for y in yaws) and not cfg.get('noMirror'): views.append(dict(v, mir=-1))
+    for v in views:
+        mir = v['mir']; ph = pos[hsel] * [mir, 1, 1]; nhm = nh * [mir, 1, 1]
+        th = np.radians(v['yaw']); d = np.array([np.sin(th), 0, np.cos(th)])
+        u_ = (ph[:, 0] * np.cos(th) - ph[:, 2] * np.sin(th)) * v['s'] + v['t'][0]; v_ = -ph[:, 1] * v['s'] + v['t'][1]
+        x0, y0, x1, y1 = v['cell']; ins = (u_ > x0) & (u_ < x1 - 1) & (v_ > y0) & (v_ < y1 - 1)
+        ins &= smp2(core.astype(np.float32), u_, v_)[:, 0] > 0.6
+        dep = ph @ d; bu, bv = np.clip((u_ / 2).astype(int), 0, sh2.shape[1] // 2), np.clip((v_ / 2).astype(int), 0, sh2.shape[0] // 2)
+        buf = np.full((sh2.shape[0] // 2 + 1, sh2.shape[1] // 2 + 1), -1e9, np.float32); np.maximum.at(buf, (bv, bu), dep.astype(np.float32))
+        buf = ndimage.maximum_filter(buf, 3); seen_ = 1 - np.clip((buf[bv, bu] - dep - 0.012) / 0.012, 0, 1)
+        cands.append(((nhm @ d) * (0.5 + 0.5 * seen_) * ins + cfg.get('head2Bonus', 0.06) * ins * (1 if mir > 0 else -1), smp2(sh2, u_, v_)))
+    S_ = np.stack([c[0] for c in cands], 1); best_ = S_.max(1)
+    Wt_ = np.exp(cfg.get('head2Sharp', 22) * (S_ - best_[:, None])) * (S_ > 0.12); Wt_ /= np.maximum(Wt_.sum(1, keepdims=True), 1e-6)
+    colH = sum(Wt_[:, i:i + 1] * cands[i][1] for i in range(len(cands)))
+    cov = ss(0.12, 0.3, best_) * head[hsel]
+    col[hsel] = col[hsel] + cov[:, None] * (colH - col[hsel])
+    print('second head sheet:', len(H2['views']), 'views; share of the head from them', round(float((Wt_[:, 4:].sum(1) * cov).mean() / max(head[hsel].mean(), 1e-6)), 2))
 if os.environ.get('BAKEDBG'): col = np.stack([wG, wA + wS, wF], 1) * 255     # debug: blue = ground, green = sides, red = front
 out = np.zeros((T, T, 3), np.float32); out[ys, xs] = np.clip(col, 0, 255)
 # spread colours past each island's edge (no dark seams when the texture is filtered or halved)

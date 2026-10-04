@@ -90,5 +90,16 @@
    506.6
   ]
  },
- "head": "refs/rashad_head.png"
+ "head": "refs/rashad_head.png",
+ "head2": {
+  "sheet": "refs/rashad_head2.png",
+  "yaw": [
+   -40,
+   0,
+   75,
+   90,
+   160,
+   -160
+  ]
+ }
 }

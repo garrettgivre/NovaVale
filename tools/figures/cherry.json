@@ -90,5 +90,16 @@
    493.6
   ]
  },
- "head": "refs/cherry_head.png"
+ "head": "refs/cherry_head.png",
+ "head2": {
+  "sheet": "refs/cherry_head2.png",
+  "yaw": [
+   -40,
+   55,
+   -90,
+   -90,
+   150,
+   -150
+  ]
+ }
 }
