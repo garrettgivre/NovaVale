@@ -10,3 +10,5 @@
 !build_all.sh
 !gen_all.sh
 !gen_refit.sh
+!bake_all.sh
+!tex_all.sh

@@ -90,5 +90,6 @@
    501.0
   ]
  },
- "head": "refs/jojo_head.png"
+ "head": "refs/jojo_head.png",
+ "noBake": true
 }

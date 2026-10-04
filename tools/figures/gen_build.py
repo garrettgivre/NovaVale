@@ -288,6 +288,8 @@ keep = (armn[F].max(1) - armn[F].min(1)) < cfg.get('armCut', 0.5)
 print('arm/body bridge triangles cut', int((~keep).sum()))
 F = F[keep]
 F = F[:, [0, 1, 2]].astype(np.int32)
+# the fitted shape, for the texture generator (D:/NovaFig/tex.py)
+trimesh.Trimesh(P, F, process=False).export(os.path.join(D, name + '_fit.obj'))
 np.savez(os.path.join(D, name + '_turn.npz'), P=P.astype(np.float32), F=F, UV=vF[F.ravel()], kind=np.zeros(len(F), np.int32), vF=vF, vS=vS1, vB=vB,
          WTS=np.zeros((len(P), 2), np.float32), vS1=vS1, vS2=vS2, vis=VIS, bones=str(Z['bones']), wi=top4.astype(np.int32), wv=Wt.astype(np.float32), gen=1)
 print('verts', len(P), 'faces', len(F))

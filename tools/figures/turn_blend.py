@@ -14,13 +14,19 @@ V = np.stack([P[:, 0], -P[:, 2], P[:, 1]], 1)
 me.vertices.add(len(V)); me.vertices.foreach_set('co', V.ravel())
 me.loops.add(F.size); me.loops.foreach_set('vertex_index', F.ravel())
 me.polygons.add(len(F)); me.polygons.foreach_set('loop_start', np.arange(0, F.size, 3)); me.polygons.foreach_set('loop_total', np.full(len(F), 3))
+# one baked texture (D:/NovaFig/tex.py) with its own UVs (uv_blend.py): a plain textured model, no mixing of paintings
+BAKED = not json.load(open(os.path.join(D, name + '.json'))).get('noBake') and os.path.exists(os.path.join(D, name + '_baked.png')) and os.path.exists(os.path.join(D, name + '_uv.npz')) and 'gen' in Z.files
+if BAKED:
+    U_ = np.load(os.path.join(D, name + '_uv.npz')); assert (U_['F'] == F).all(), 'the UVs are of another fit: run uv_blend.py and tex.py again'
+    me.uv_layers.new(name='UVMap').data.foreach_set('uv', U_['cuv'].ravel())
 VD = 'vS1' in Z.files   # view-dependent texturing: front, +x side, back, -x side; the game's shader mixes them
-if 'vF' in Z.files:   # four UV maps per vertex
+if BAKED: pass
+elif 'vF' in Z.files:   # four UV maps per vertex
     for nm, arr in ((('UVMap', Z['vF']), ('UVSide', Z['vS1']), ('UVBack', Z['vB']), ('UVSide2', Z['vS2'])) if VD else (('UVMap', Z['vF']), ('UVSide', Z['vS']), ('UVBack', Z['vB']), ('UVW', Z['WTS']))):
         me.uv_layers.new(name=nm).data.foreach_set('uv', arr[F.ravel()].ravel())
 else:
     me.uv_layers.new(name='UVMap').data.foreach_set('uv', UV.ravel())
-if 'vis' in Z.files:   # which paintings see each vertex (front, back, +x side, -x side), as a vertex colour
+if 'vis' in Z.files and not BAKED:   # which paintings see each vertex (front, back, +x side, -x side), as a vertex colour
     ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT'); ca.data.foreach_set('color', Z['vis'].astype(np.float32).ravel())
     me.color_attributes.active_color = ca; me.color_attributes.render_color_index = 0
 me.update(); me.validate()
@@ -28,9 +34,9 @@ me.polygons.foreach_set('use_smooth', np.ones(len(F), bool))
 ob = bpy.data.objects.new(name, me); sc.collection.objects.link(ob)
 m = bpy.data.materials.new(name); m.use_nodes = True
 nt = m.node_tree; bs = nt.nodes['Principled BSDF']
-tx = nt.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(os.path.join(D, name + '_tex.png')); tx.interpolation = 'Cubic'
+tx = nt.nodes.new('ShaderNodeTexImage'); tx.image = bpy.data.images.load(os.path.join(D, name + ('_baked.png' if BAKED else '_tex.png'))); tx.interpolation = 'Cubic'
 nt.links.new(tx.outputs['Color'], bs.inputs['Base Color']); bs.inputs['Roughness'].default_value = 0.7
-if 'vF' in Z.files and not VD:
+if 'vF' in Z.files and not VD and not BAKED:
     def samp(uvname):
         t = nt.nodes.new('ShaderNodeTexImage'); t.image = tx.image; t.interpolation = 'Cubic'
         u = nt.nodes.new('ShaderNodeUVMap'); u.uv_map = uvname; nt.links.new(u.outputs['UV'], t.inputs['Vector']); return t
@@ -88,6 +94,6 @@ if not posed:
     bpy.context.view_layer.objects.active = arm
     out = os.path.join(D, '..', '..', 'assets', 'figures', name + '.glb')   # the repo's assets/figures
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_image_format='WEBP', export_image_quality=90, export_yup=True, export_skins=True, export_animations=False, **({'export_vertex_color': 'ACTIVE'} if 'vis' in Z.files else {}))
+    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_image_format='WEBP', export_image_quality=90, export_yup=True, export_skins=True, export_animations=False, **({'export_vertex_color': 'ACTIVE'} if ('vis' in Z.files and not BAKED) else {}))
     print('EXPORT OK', os.path.getsize(out))
 print('DONE')

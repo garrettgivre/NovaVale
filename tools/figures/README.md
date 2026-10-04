@@ -106,6 +106,26 @@ the shape row by row, and splits the face's triangles with a conforming split (t
 
 Check with a normals-free render: swap a figure's material for plain white Lambert in the page to see the bare shape.
 
+## One baked texture per figure (Oct 2026, what ships for everyone but Jojo)
+Mixing four paintings in the shader doubled faces between the front and profile views. Now each figure carries one
+texture: `./tex_all.sh <names>` (or `./bake_all.sh <names>` to re-bake only).
+1. `uv_blend.py` (Blender) unwraps the fitted shape (`<who>_fit.obj` from gen_build.py), the head at three times its
+   size so the face gets texture space. xatlas crashes on this machine.
+2. `D:/NovaFig/tex.py` (copy here: `textex.py`) runs Hunyuan3D-Paint on the shape with the front view as reference and
+   writes `<who>_gentex.png`: soft and low in detail, but consistent all round. Run it twice (the first run only prepares
+   the reference picture). To fit 16 GB RAM / 6 GB VRAM it loads one network at a time, reads the UNet's weights with
+   plain file reads (patched `hunyuanpaint/unet/modules.py`, copied over the model's own each run), keeps the UNet on the
+   GPU, uses a CPU-only build of the rasterizer (`setup_cpu.py`) and its own diffusers 0.31 / transformers 4.46 in
+   `D:/NovaFig/libs`. The model (18 GB) is in `D:/NovaFig/models`. Run nothing heavy alongside.
+3. `bake.py` lays the paintings over that texture per texel: front painting where the surface faces forward, back
+   behind, profiles on the flanks (on the head only behind the eyes), the middle of the face always from the head
+   sheet's front view, and on the head any unclaimed surface from the front or back painting (the generated texture is
+   too coarse for faces). `BAKEDBG=1` paints the sources as colours (red front, green sides, blue generated).
+4. `turn_blend.py` exports a plain textured model when `<who>_baked.png` exists (`"noBake": true` in the json keeps the
+   four-painting shader version: Jojo, whose bake smeared his cheek).
+Still wrong: at three-quarter views several heads show a second cheek or ear from the profile painting (Celeste, Harper,
+Regent, Rashad, Juniper), and the far cheek is stretched front painting. Front, profile and back are clean.
+
 ## How turn_build.py works
 1. **Masks**: each view's cutout, trimmed inward 3 px (`trim`; the paintings fade into the backdrop at the outline), small
    enclosed gaps filled, only the main connected body kept. Touching views (capes) are split by `turn_cut.py`.

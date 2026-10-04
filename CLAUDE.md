@@ -189,7 +189,9 @@ from the turnaround views by Hunyuan3D-2mv (set up on D:/NovaFig, see `tools/fig
 and the old flat build's rig by `tools/figures/gen_build.py`, with a face modelled by MediaPipe Face Mesh, and textured in
 the shader from the four paintings by view and visibility. Rebuild: `./gen_all.sh <names>` (or `./gen_refit.sh`), then
 `heads_js.py` and `bump.py`. The notes below about the flat build still describe the rig, weights and head sheets.
-Garrett's remaining complaints to watch: lumpy shapes, hands and arms. Known flaws: heads are clean from the front, side and back but double
+Each figure (except Jojo) now has **one baked texture** (`tex_all.sh` / `bake_all.sh`: Hunyuan3D-Paint as the ground, the
+paintings laid over it by `bake.py`; see the README), so the shader no longer mixes paintings for them. Garrett does not
+want people always facing the player as a workaround. Garrett's remaining complaints to watch: lumpy shapes, hands and arms. Known flaws: heads are clean from the front, side and back but double
 between them (35 to 75 degrees; see the README for what was tried), mitten hands. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
 local server holds a file; run them again.
 All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
