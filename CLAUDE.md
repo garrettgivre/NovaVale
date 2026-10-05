@@ -184,17 +184,14 @@ Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin
 `build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.
 
 ## Characters in 3D (painted figures)
-**Since Oct 2026 the figures are full 3D** (Garrett: "model the 2D image", "the whole body/head"): each shape is generated
-from the turnaround views by Hunyuan3D-2mv (set up on D:/NovaFig, see `tools/figures/README.md`), fitted to the paintings
-and the old flat build's rig by `tools/figures/gen_build.py`, with a face modelled by MediaPipe Face Mesh, and textured in
-the shader from the four paintings by view and visibility. Rebuild: `./gen_all.sh <names>` (or `./gen_refit.sh`), then
-`heads_js.py` and `bump.py`. The notes below about the flat build still describe the rig, weights and head sheets.
-Each figure (except Jojo) now has **one baked texture** (`tex_all.sh` / `bake_all.sh`: Hunyuan3D-Paint as the ground, the
-paintings laid over it by `bake.py`; see the README), so the shader no longer mixes paintings for them. Garrett does not
-want people always facing the player as a workaround. Every character also has a second head sheet (`refs/<who>_head2.png`, six views; `head2.py` registers them, `bake.py`
-gives each part of the head the nearest view), which is what finally removed the doubled faces at three-quarter views.
-Remaining flaws: Regent (generated head far wider than his art), Harper's shaved side at an angle, Jojo's front-view
-hair strands painted on his cheeks, mitten hands. Judge in the game at its own settings, not in long-lens proof sheets. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
+**The shipped figures are the original painted-relief build (commit ca0a862).** On 3-5 Oct 2026 two days went into
+replacing them with generated full-3D shapes (Hunyuan3D-2mv on D:/NovaFig), baked textures and extra head sheets
+(`tools/figures/README.md` describes all of it: gen3d.py, gen_build.py, uv_blend.py, textex.py, bake.py, head2.py,
+hull.py; `refs/<who>_head2.png` are the extra six-view head sheets). Garrett's verdict: "they all look worse than when we
+started", so `assets/figures/*.glb`, `js/figures.js` and `js/figheads.js` were put back to ca0a862. Don't rebuild the
+figures with the new pipeline unless he asks; `heads_js.py` would overwrite figheads.js with the new-pipeline head
+maps, so don't run it either. The 3D pipeline's one real finding: the art is the limit; a clean result needs a paid
+image-to-3D service or hand-made models. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
 local server holds a file; run them again.
 All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
 README: setup, sheet prompt, commands, how it works, what to check). All 15 are built (Oct 2026) from
