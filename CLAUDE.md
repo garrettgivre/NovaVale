@@ -191,8 +191,10 @@ the shader from the four paintings by view and visibility. Rebuild: `./gen_all.s
 `heads_js.py` and `bump.py`. The notes below about the flat build still describe the rig, weights and head sheets.
 Each figure (except Jojo) now has **one baked texture** (`tex_all.sh` / `bake_all.sh`: Hunyuan3D-Paint as the ground, the
 paintings laid over it by `bake.py`; see the README), so the shader no longer mixes paintings for them. Garrett does not
-want people always facing the player as a workaround. Garrett's remaining complaints to watch: lumpy shapes, hands and arms. Known flaws: heads are clean from the front, side and back but double
-between them (35 to 75 degrees; see the README for what was tried), mitten hands. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
+want people always facing the player as a workaround. Every character also has a second head sheet (`refs/<who>_head2.png`, six views; `head2.py` registers them, `bake.py`
+gives each part of the head the nearest view), which is what finally removed the doubled faces at three-quarter views.
+Remaining flaws: Regent (generated head far wider than his art), Harper's shaved side at an angle, Jojo's front-view
+hair strands painted on his cheeks, mitten hands. Judge in the game at its own settings, not in long-lens proof sheets. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
 local server holds a file; run them again.
 All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
 README: setup, sheet prompt, commands, how it works, what to check). All 15 are built (Oct 2026) from

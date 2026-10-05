@@ -134,8 +134,13 @@ from the character's left, nose pointing to the image's left; ChatGPT picks its 
 `python head2.py <who>` and `./bake_all.sh <who>`. head2.py finds the six cells, places views up to 60 degrees by face
 landmarks (which also corrects the angle) and the rest by outline, and writes `<who>_head2_check.jpg` to look at.
 bake.py then gives every point of the head the view nearest its direction round the head (not its surface normal: the
-bumpy hair made a patchwork), mirrors a view for a side the sheet lacks, and blends narrowly. Done: Kenji, Celeste,
-Rashad, Cherry. Harper's sheet contradicts her model (`noHead2`). Sheets must show both sides of the head.
+bumpy hair made a patchwork), mirrors a view for a side the sheet lacks, and blends narrowly. Done for all fifteen
+(Oct 2026). Per-character keys: `head2FacePen` (how firmly the exactly placed first-sheet front view keeps the face
+against the turned views; Priya, Harper 0.6, Regent 2), `neckTol` (Opal, Priya 130: the band of flat skin tone under
+the chin also covers darker marks there), `noHead2`, `noMirror`, `rows` (cells per row if not 3+3 / 4+3).
+`hull.py <who>` carves the head to the sheet's outlines (positions only; keeps `P_gen`); used on Regent, whose generated
+head is far wider than his art and still looks wrong. Judge results in the game (`tools/test/face.js` with `RETRO=1`,
+`shot.js`): the long-lens proof sheets exaggerate what a player sees.
 
 ## How turn_build.py works
 1. **Masks**: each view's cutout, trimmed inward 3 px (`trim`; the paintings fade into the backdrop at the outline), small
