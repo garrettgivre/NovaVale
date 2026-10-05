@@ -209,7 +209,7 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   they look about, weighted idle habits) and habits `ACTS` (hand on hip, chin up, sigh, shrug, neck roll, look around/up/down,
   fidget, bounce), springy head look, head and chest lead body turns, talking reacts to the line (`speech.line`: questions
   tilt and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
-  while Nova talks. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
+  while Nova talks.  is a resting pose kept all the time (hip: weight on one side, tilt: head); Celeste has one. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
   body, arms raised far look like a scarecrow, forearms brought forward show their edge.
 - Arms in the build: triangles bridging an arm and the body across background in the painting (a hand hanging a
   pixel from the hip; never where the arm overlaps the body, which left holes and bands) are cut and closed (`armCut`), and each hand is found from the painting (pieces outside the legs below the wrist) and bound wholly to the
@@ -292,6 +292,6 @@ worked best: make the change, look at it yourself in a screenshot before he does
 careful passes beat big rewrites here; when something already works (the figures, the doors, the opening), refine it.
 Before writing any line for Nova, ask what she knows at that moment and gate it on a flag. Read a few existing
 conversations in `story.js` first to get her voice; she's sharp and funny and never mean. Every new line needs a voice
-(`tools/voice`), so run the two scripts before you commit dialogue. Garrett's open notes when we stopped: Celeste's idle
-stance may still look stiff to him (only her facing was changed), and the case velvet could be redder. Keep his usage in
+(`tools/voice`), so run the two scripts before you commit dialogue. Garrett's open note when we stopped: the case velvet could be redder. (Celeste now has a
+resting pose, PERS.stand in figures.js: weight on one hip and a head tilt kept all the time; any person can have one.) Keep his usage in
 mind, keep the writing plain, and have fun with it.

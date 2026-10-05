@@ -18,7 +18,7 @@ export const FIG = {
   juniper: { head: 1.531, talk: 'R', relax: 0.36 },
   dex: { head: 1.663, talk: 'R', relax: 0.3 },
   harper: { head: 1.544, talk: 'R', relax: 0.3 },
-  celeste: { head: 1.58, talk: 'R', relax: 0.32 },
+  celeste: { head: 1.58, talk: 'R', relax: 0.36 },
   regent: { head: 1.721, talk: 'L', relax: 0.2 },
   gus: { head: 1.619, talk: 'R', relax: 0.24 },
   nate: { head: 1.674, talk: 'R', relax: 0.3 },
@@ -29,7 +29,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610051811';
+export const ASSET_V = '202610051828';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -84,6 +84,12 @@ export function buildFigure(who, HIT) {
       // head sheet: the texture holds a much larger painting of the head below the body sheet. Wherever a lookup lands on
       // a body view's head (above the neck), it reads the head sheet instead, fading in from the neck to the chin.
       const HM = HEADMAP[who];
+      let headZ = 0;
+      if (HM) {
+        const pa = o.geometry.attributes.position, zs = [];
+        for (let i = 0; i < pa.count; i += 3) if (pa.getY(i) > f.head - 0.1) zs.push(pa.getZ(i));
+        zs.sort((a, b) => a - b); headZ = zs.length ? (zs[Math.floor(zs.length * 0.1)] + zs[Math.floor(zs.length * 0.9)]) / 2 : 0;
+      }
       // each figure's head lookup is compiled into its shader: give it its own program (three.js would otherwise reuse the
       // first figure's, since every figure's onBeforeCompile looks the same to it)
       o.material.customProgramCacheKey = () => 'fig:' + who;
@@ -120,6 +126,7 @@ float viewSide(vec3 d, vec3 n) {
   return side * smoothstep(0.12, 0.45, abs(n.x));
 }`;
         }
+        sh.uniforms.headZ = { value: headZ };
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', `#include <common>
 attribute vec2 uv1;
@@ -129,22 +136,25 @@ varying vec2 vUvS;
 varying vec2 vUvB;
 varying vec2 vW;
 varying vec3 vON;
-varying vec3 vOV;`)
+varying vec3 vOV;
+varying float vPZ;`)
           .replace('#include <uv_vertex>', `#include <uv_vertex>
 vUvS = uv1; vUvB = uv2; vW = uv3;`)
           .replace('#include <project_vertex>', `#include <project_vertex>
-vON = objectNormal; vOV = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz - transformed;`);
+vON = objectNormal; vOV = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz - transformed; vPZ = position.z;`);
         sh.fragmentShader = sh.fragmentShader
           .replace('#include <common>', `#include <common>
 varying vec2 vUvS;
 varying vec2 vUvB;
 varying vec2 vW;
 varying vec3 vON;
-varying vec3 vOV;`)
+varying vec3 vOV;
+varying float vPZ;
+uniform float headZ;`)
           .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>
 ${hd}`)
           .replace('#include <map_fragment>', `float wSv = clamp(vW.x, 0.0, 1.0);
-${HM ? 'wSv = mix(wSv, max(wSv, viewSide(normalize(vOV), normalize(vON))), headW(vMapUv));' : ''}
+${HM ? 'wSv = mix(wSv, max(wSv, viewSide(normalize(vOV), normalize(vON)) * smoothstep(headZ - 0.015, headZ + 0.015, vPZ)), headW(vMapUv));' : ''}
 vec4 fcol = mix(mix(hd(vMapUv), hd(vUvB), clamp(1.0 - vW.y, 0.0, 1.0)), hd(vUvS), wSv);
 diffuseColor *= fcol;`)
           .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= fcol.rgb;');
@@ -242,9 +252,9 @@ const PERS = {
   gus: { tempo: .7, sway: .7, gest: .7, chin: .03, every: 8, look: .7, acts: { sigh: 3, roll: 3, look: 1 } },
   silas: { tempo: 1.3, sway: 1.2, gest: 1.3, chin: 0, every: 3.5, look: 2, acts: { look: 4, fidget: 2, bounce: 1, shrug: 1 } },
   nate: { tempo: .8, sway: .7, gest: .8, chin: 0, every: 7, look: 1, acts: { look: 3, roll: 1, sigh: 1 } },
-  celeste: { tempo: 1, sway: .8, gest: 1, chin: -.02, every: 6, look: 1, acts: { hip: 1, look: 2, sigh: 1 } },
+  celeste: { tempo: .95, sway: 1.05, gest: 1.05, chin: -.03, every: 4.5, look: 1.1, acts: { hip: 4, look: 2, chinUp: 1, roll: 1, sigh: 1 }, stand: { hip: 2.2, tilt: -.045 } },   // the hostess: weight on one hip, chin up a touch (her stance read as stiff)
 };
-const DEF = { tempo: 1, sway: 1, gest: 1, chin: 0, every: 6, look: 1, acts: { look: 2, roll: 1, sigh: 1 } };
+const DEF = { tempo: 1, sway: 1, gest: 1, chin: 0, every: 6, look: 1, acts: { look: 2, roll: 1, sigh: 1 }, stand: { hip: 0, tilt: 0 } };
 // Idle habits: a duration and an envelope-driven pose. e = 0..1..0 over the action (eased in and out); the pose is an
 // offset added on top of the standing pose: yaw/pitch/tilt of the head, chest lean, shoulders up, arm (R/L) out/bend.
 const ACTS = {
@@ -314,7 +324,9 @@ export function animateFigure(g, dt, cam, speech) {
   if ((u.wNext -= dt) < 0) { u.wT = u.wT > 0 ? -1 : 1; u.wNext = (5 + Math.random() * 6) / P.tempo; }
   u.w = ease(u.w, u.wT, 0.9 * P.tempo, dt);
   const br = Math.sin(T * 1.35), br2 = Math.sin(T * 1.35 - .6);
-  const sw = (drift(T, .37, .23, .61) * .3 + u.w) * P.sway + (O.sway || 0);
+  // stand: a resting pose kept all the time (hip: weight settled on one side, as a share of the sway; tilt: head)
+  const ST = P.stand || DEF.stand;
+  const sw = (drift(T, .37, .23, .61) * .3 + u.w) * P.sway + (O.sway || 0) + ST.hip;
   // talking: nods on the beat, bigger on exclamations; a tilt on questions; a listening nod now and then
   if (listening && (u.lnNext = (u.lnNext ?? 1.5) - dt) < 0) { u.ln = 0.7; u.lnNext = 1.8 + Math.random() * 2.5; }
   u.ln = Math.max(0, (u.ln || 0) - dt);
@@ -329,7 +341,7 @@ export function animateFigure(g, dt, cam, speech) {
   pose(u, 'chest', [[Zax, -sw * 0.012], [X, -0.012 * br + (O.chest || 0) - laugh * .03], [Y, u.look.x * 0.12 + (O.chestYaw || 0) + lead * .4]]);
   pose(u, 'neck', [[Y, u.look.x * 0.35], [X, u.look.y * 0.35]]);
   pose(u, 'head', [[Y, u.look.x * 0.5], [X, u.look.y * 0.55 + nod + lShake * .5],
-    [Zax, sw * 0.02 + 0.025 * drift(T, .31, .17, .53) + u.talk * 0.025 * Math.sin(t * 1.9) + qTilt + (O.tilt || 0)]]);
+    [Zax, sw * 0.02 + 0.025 * drift(T, .31, .17, .53) + u.talk * 0.025 * Math.sin(t * 1.9) + qTilt + (O.tilt || 0) + ST.tilt]]);
   // talking: pick a gesture now and then and ease into it (questions open the hands, exclamations go bigger)
   if (talking && (u.gNext -= dt) < 0) { u.gNow = GESTS[Math.floor(Math.random() * GESTS.length)]; u.gNext = u.gNow[3] * (0.8 + Math.random() * .5) / Math.sqrt(P.tempo); }
   if (!talking) u.gNow = null;
