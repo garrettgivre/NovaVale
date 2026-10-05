@@ -96,11 +96,19 @@ col = cF * wF[:, None] + cB * wB[:, None] + cA * wA[:, None] + cS * wS[:, None] 
 # all the views there are: the new ones and the first sheet's front, back and sides. With a view every 45 degrees or
 # so, no painting has to be stretched round a corner, which is what smeared and doubled the cheeks.
 h2p = os.path.join(D, name + '_head2.json')
-if HM and os.path.exists(h2p) and not cfg.get('noHead2'):
-    H2 = json.load(open(h2p)); sh2 = cv2.imread(os.path.join(D, H2['sheet']))[..., :3].astype(np.float32)
-    m2 = cv2.imread(os.path.join(D, name + '_head2_mask.png'), 0) > 127
-    core = cv2.erode(m2.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
-    _, (iy_, ix_) = ndimage.distance_transform_edt(~core, return_indices=True); sh2 = sh2[iy_, ix_]      # colours bled past the outlines
+# Characters without a second sheet get the same treatment from the views they have (front, back, the two sides): each
+# painting keeps to its own quarter of the head, so the front painting is no longer carried round to the ears (which
+# repeated ears, earrings and the hair's edge down the sides of the head).
+# (Tried for everyone in Oct 2026 and switched off again: with only four views 90 degrees apart, the profile painting's
+# own face still landed on the cheek at three-quarter views. It needs the extra views. "sectors": true forces it.)
+use2 = os.path.exists(h2p) and not cfg.get('noHead2')
+if HM and (use2 or cfg.get('sectors')):
+    H2 = json.load(open(h2p)) if use2 else {'views': []}
+    if use2:
+        sh2 = cv2.imread(os.path.join(D, H2['sheet']))[..., :3].astype(np.float32)
+        m2 = cv2.imread(os.path.join(D, name + '_head2_mask.png'), 0) > 127
+        core = cv2.erode(m2.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+        _, (iy_, ix_) = ndimage.distance_transform_edt(~core, return_indices=True); sh2 = sh2[iy_, ix_]      # colours bled past the outlines
     def smp2(im, x_, y_, interp=cv2.INTER_LINEAR):
         m = len(x_); W_ = 4096; pad = (-m) % W_
         xx = np.pad(x_.astype(np.float32), (0, pad)).reshape(-1, W_); yy = np.pad(y_.astype(np.float32), (0, pad)).reshape(-1, W_)
@@ -112,7 +120,10 @@ if HM and os.path.exists(h2p) and not cfg.get('noHead2'):
     hc = np.array([np.median(ph[:, 0]), 0, (ph[:, 2].max() + ph[:, 2].min()) / 2 - 0.01])
     rad = ph - hc; rad[:, 1] = 0; rad /= np.linalg.norm(rad, axis=1, keepdims=True) + 1e-9
     nh0 = n[hsel]; nh = rad * 0.85 + nh0 * 0.15; nh /= np.linalg.norm(nh, axis=1, keepdims=True) + 1e-9
-    cands = [(nh[:, 2], cF[hsel]), (-nh[:, 2], cB[hsel]), (nh[:, 0], cA[hsel]), (-nh[:, 0], cS[hsel])]
+    # with only the first sheet's four views, the front painting keeps the face out to about 58 degrees round (the profile
+    # painting, used further forward than that, put its own eye and nose on the cheek as a second face)
+    fb_ = 0.0 if H2['views'] else cfg.get('frontBias', 0.32)
+    cands = [(nh[:, 2] + fb_ * (nh[:, 2] > 0), cF[hsel]), (-nh[:, 2], cB[hsel]), (nh[:, 0], cA[hsel]), (-nh[:, 0], cS[hsel])]
     if HM.get('ban') == 'A': cands[2] = (cands[2][0] * 0, cands[2][1])
     if HM.get('ban') == 'B': cands[3] = (cands[3][0] * 0, cands[3][1])
     # a side the sheet has no view of borrows the other side's view, mirrored (faces are near enough symmetric; without
@@ -131,6 +142,21 @@ if HM and os.path.exists(h2p) and not cfg.get('noHead2'):
         buf = ndimage.maximum_filter(buf, 3); seen_ = 1 - np.clip((buf[bv, bu] - dep - 0.012) / 0.012, 0, 1)
         cands.append(((nhm @ d) * (0.5 + 0.5 * seen_) * ins + cfg.get('head2Bonus', 0.06) * ins * (1 if mir > 0 else -1), smp2(sh2, u_, v_)))
     S_ = np.stack([c[0] for c in cands], 1); best_ = S_.max(1)
+    # bring neighbouring views to the same tone where they overlap (each painting is lit a little differently, and the
+    # step in tone along the edge of the face read as a mask): starting from the front view, each view in turn is
+    # shifted to match those already done
+    cols = [c[1].astype(np.float32).copy() for c in cands]; done = [0]; todo = list(range(1, len(cands)))
+    while todo:
+        bestp = None
+        for i in todo:
+            for j in done:
+                ov = (S_[:, i] > 0.45) & (S_[:, j] > 0.45)
+                if ov.sum() > 400 and (bestp is None or ov.sum() > bestp[0]): bestp = (int(ov.sum()), i, j, ov)
+        if bestp is None: break
+        _, i, j, ov = bestp
+        off = np.clip(np.median(cols[j][ov] - cols[i][ov], 0), -cfg.get('toneMax', 28), cfg.get('toneMax', 28))
+        cols[i] = np.clip(cols[i] + off, 0, 255); done.append(i); todo.remove(i)
+    cands = [(c[0], cols[k]) for k, c in enumerate(cands)]
     Wt_ = np.exp(cfg.get('head2Sharp', 22) * (S_ - best_[:, None])) * (S_ > 0.12); Wt_ /= np.maximum(Wt_.sum(1, keepdims=True), 1e-6)
     colH = sum(Wt_[:, i:i + 1] * cands[i][1] for i in range(len(cands)))
     cov = ss(0.12, 0.3, best_) * head[hsel]
