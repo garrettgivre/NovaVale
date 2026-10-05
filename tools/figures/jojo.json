@@ -91,5 +91,15 @@
   ]
  },
  "head": "refs/jojo_head.png",
- "noBake": true
+ "head2": {
+  "sheet": "refs/jojo_head2.png",
+  "yaw": [
+   -40,
+   40,
+   90,
+   -90,
+   150,
+   -150
+  ]
+ }
 }

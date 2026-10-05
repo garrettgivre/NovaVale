@@ -90,5 +90,18 @@
    503.7
   ]
  },
- "head": "refs/priya_head.png"
+ "head": "refs/priya_head.png",
+ "head2": {
+  "sheet": "refs/priya_head2.png",
+  "yaw": [
+   -40,
+   35,
+   90,
+   -90,
+   150,
+   -150
+  ]
+ },
+ "head2FacePen": 0.6,
+ "neckTol": 130
 }

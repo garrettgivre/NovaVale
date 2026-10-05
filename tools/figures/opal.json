@@ -90,5 +90,17 @@
    510.6
   ]
  },
- "head": "refs/opal_head.png"
+ "head": "refs/opal_head.png",
+ "head2": {
+  "sheet": "refs/opal_head2.png",
+  "yaw": [
+   -40,
+   0,
+   75,
+   90,
+   150,
+   -150
+  ]
+ },
+ "neckTol": 130
 }

@@ -90,5 +90,16 @@
    509.0
   ]
  },
- "head": "refs/juniper_head.png"
+ "head": "refs/juniper_head.png",
+ "head2": {
+  "sheet": "refs/juniper_head2.png",
+  "yaw": [
+   -35,
+   0,
+   35,
+   -90,
+   150,
+   -150
+  ]
+ }
 }

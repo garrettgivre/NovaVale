@@ -91,5 +91,18 @@
   ]
  },
  "head": "refs/regent_head.png",
- "armCut": 9
+ "armCut": 9,
+ "head2": {
+  "sheet": "refs/regent_head2.png",
+  "yaw": [
+   -40,
+   0,
+   40,
+   90,
+   -90,
+   150,
+   -150
+  ]
+ },
+ "head2FacePen": 0.6
 }

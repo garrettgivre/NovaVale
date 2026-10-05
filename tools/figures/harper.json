@@ -95,13 +95,13 @@
  "head2": {
   "sheet": "refs/harper_head2.png",
   "yaw": [
-   -45,
+   -40,
    -30,
    90,
    -90,
-   160,
-   -135
+   150,
+   -140
   ]
  },
- "noHead2": true
+ "head2FacePen": 0.6
 }

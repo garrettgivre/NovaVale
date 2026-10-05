@@ -90,5 +90,16 @@
    498.5
   ]
  },
- "head": "refs/dex_head.png"
+ "head": "refs/dex_head.png",
+ "head2": {
+  "sheet": "refs/dex_head2.png",
+  "yaw": [
+   -35,
+   35,
+   90,
+   -90,
+   155,
+   -155
+  ]
+ }
 }

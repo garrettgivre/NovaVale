@@ -90,5 +90,16 @@
    494.1
   ]
  },
- "head": "refs/vesper_head.png"
+ "head": "refs/vesper_head.png",
+ "head2": {
+  "sheet": "refs/vesper_head2.png",
+  "yaw": [
+   -35,
+   0,
+   90,
+   -90,
+   150,
+   -150
+  ]
+ }
 }

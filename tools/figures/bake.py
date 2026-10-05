@@ -140,7 +140,10 @@ if HM and (use2 or cfg.get('sectors')):
         dep = ph @ d; bu, bv = np.clip((u_ / 2).astype(int), 0, sh2.shape[1] // 2), np.clip((v_ / 2).astype(int), 0, sh2.shape[0] // 2)
         buf = np.full((sh2.shape[0] // 2 + 1, sh2.shape[1] // 2 + 1), -1e9, np.float32); np.maximum.at(buf, (bv, bu), dep.astype(np.float32))
         buf = ndimage.maximum_filter(buf, 3); seen_ = 1 - np.clip((buf[bv, bu] - dep - 0.012) / 0.012, 0, 1)
-        cands.append(((nhm @ d) * (0.5 + 0.5 * seen_) * ins + cfg.get('head2Bonus', 0.06) * ins * (1 if mir > 0 else -1), smp2(sh2, u_, v_)))
+        # inside the face the first sheet's front view (placed by its landmarks to a millimetre) keeps priority: the
+        # turned views are placed a centimetre or so off, which painted strands of hair onto the cheeks
+        pen = cfg.get('head2FacePen', 0.3) * (1 - ss(0.8, 1.4, q[hsel])) * (abs(v['yaw']) < 70)
+        cands.append(((nhm @ d) * (0.5 + 0.5 * seen_) * ins + cfg.get('head2Bonus', 0.06) * ins * (1 if mir > 0 else -1) - pen, smp2(sh2, u_, v_)))
     S_ = np.stack([c[0] for c in cands], 1); best_ = S_.max(1)
     # bring neighbouring views to the same tone where they overlap (each painting is lit a little differently, and the
     # step in tone along the edge of the face read as a mask): starting from the front view, each view in turn is
@@ -162,6 +165,17 @@ if HM and (use2 or cfg.get('sectors')):
     cov = ss(0.12, 0.3, best_) * head[hsel]
     col[hsel] = col[hsel] + cov[:, None] * (colH - col[hsel])
     print('second head sheet:', len(H2['views']), 'views; share of the head from them', round(float((Wt_[:, 4:].sum(1) * cov).mean() / max(head[hsel].mean(), 1e-6)), 2))
+# the neck, just under the chin, takes the generated texture: every painting carries the chin's shadow and the collar's
+# edge there, and on a neck that sits a little differently from the painted one they became a dark smear under the jaw
+if HM:
+    chin_ = meta_chin = json.loads(str(np.load(os.path.join(D, name + '_flat.npz'))['meta']))['chinY']
+    nb = ss(chin_ - 0.005, chin_ - 0.025, pos[:, 1]) * (1 - ss(chin_ - 0.045, chin_ - 0.065, pos[:, 1])) * ss(-0.2, 0.3, n[:, 2]) * cfg.get('neckG', 0.8)
+    nb *= 1 - ss(0.035, 0.055, np.abs(pos[:, 0] - np.median(pos[head > 0.5, 0])))     # the neck's width only, not the shoulders
+    # (not the generated texture: it is dark and uneven there; a flat tone taken from the cheeks of the front painting)
+    skin = np.median(cF[(q < 0.6) & (n[:, 2] > 0.5) & (head > 0.5)], 0) if ((q < 0.6) & (n[:, 2] > 0.5) & (head > 0.5)).sum() > 50 else None
+    if skin is not None:
+        nb *= 1 - ss(cfg.get('neckTol', 45), cfg.get('neckTol', 45) + 35, np.linalg.norm(col - skin, axis=1))      # and only over what is already skin (not a collar)
+        col = col + nb[:, None] * (skin * 0.93 - col)
 if os.environ.get('BAKEDBG'): col = np.stack([wG, wA + wS, wF], 1) * 255     # debug: blue = ground, green = sides, red = front
 out = np.zeros((T, T, 3), np.float32); out[ys, xs] = np.clip(col, 0, 255)
 # spread colours past each island's edge (no dark seams when the texture is filtered or halved)

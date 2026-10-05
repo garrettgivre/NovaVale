@@ -10,10 +10,20 @@ from scipy.spatial import cKDTree
 D = os.path.dirname(os.path.abspath(__file__)); name = sys.argv[1]
 cfg = json.load(open(os.path.join(D, name + '.json'))); h2 = cfg['head2']
 img = cv2.imread(os.path.join(D, h2['sheet']))[..., :3]; H, W = img.shape[:2]
-bg = np.median(np.concatenate([img[:8].reshape(-1, 3), img[-8:].reshape(-1, 3)]), 0)
+bg = np.median(img[:8].reshape(-1, 3), 0)      # (the top edge: busts often run off the bottom)
 fg = np.linalg.norm(img.astype(np.float32) - bg, axis=2) > h2.get('tol', 24)
 fg = ndimage.binary_fill_holes(cv2.morphologyEx(fg.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8)) > 0)
-lab, nl = ndimage.label(fg); sizes = ndimage.sum(fg, lab, range(1, nl + 1)); keep = 1 + np.argsort(-sizes)[:6]
+# busts that touch are cut apart: the sheet is rows of views (3+3, or 4+3 for seven), and between neighbours the cut goes
+# down the emptiest column near the even split
+nv_ = len(h2['yaw']); rows_ = h2.get('rows') or ([3, 3] if nv_ == 6 else [4, 3] if nv_ == 7 else [nv_])
+ry = np.linspace(0, H, len(rows_) + 1).astype(int)
+for r_ in range(1, len(rows_)):
+    band = fg[ry[r_] - H // 12: ry[r_] + H // 12].sum(1); fg[ry[r_] - H // 12 + int(np.argmin(band))] = False
+for r_, nc in enumerate(rows_):
+    for c_ in range(1, nc):
+        xm = int(W * c_ / nc); wdt = W // (nc * 5); col = fg[ry[r_]:ry[r_ + 1], xm - wdt: xm + wdt].sum(0)
+        fg[ry[r_]:ry[r_ + 1], xm - wdt + int(np.argmin(col))] = False
+lab, nl = ndimage.label(fg); sizes = ndimage.sum(fg, lab, range(1, nl + 1)); keep = 1 + np.argsort(-sizes)[:len(h2['yaw'])]      # (a sheet may have more or fewer than six views)
 cells = []
 for k in keep:
     ys, xs = np.nonzero(lab == k); cells.append((ys.mean(), xs.mean(), int(k), (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)))
@@ -73,6 +83,25 @@ for o in out:
         x0, y0, x1, y1 = o['cell']; m = lab[y0:y1, x0:x1] == o['lab']; a = proj(P[hv], np.radians(o['yaw'])) * sMed
         rows = int((a[:, 1].max() - a[:, 1].min()) * 0.8); xs = np.nonzero(m[:rows].any(0))[0]
         o['s'] = sMed; o['t'] = [float((xs.min() + xs.max()) / 2 + x0 - (a[:, 0].max() + a[:, 0].min()) / 2), float(y0 - a[:, 1].min())]
+        # then slide and scale it a little until the model's outline lies on the painted one (above the chin)
+        pr = proj(P[hv], np.radians(o['yaw'])); best = None
+        labP = np.pad(lab, 120); PD = 120
+        for sc in np.linspace(0.9, 1.1, 11):
+            a = pr * sMed * sc; a = a - [(a[:, 0].max() + a[:, 0].min()) / 2, a[:, 1].min()]
+            wM, hM = int(a[:, 0].max() - a[:, 0].min()) + 60, int(a[:, 1].max()) + 60
+            sil = np.zeros((hM, wM), np.uint8); sil[(a[:, 1] + 30).astype(int), (a[:, 0] + wM / 2).astype(int)] = 1
+            sil = ndimage.binary_fill_holes(cv2.morphologyEx(sil, cv2.MORPH_CLOSE, np.ones((11, 11), np.uint8)) > 0)
+            cxm = (xs.min() + xs.max()) / 2 + x0
+            for dy in range(-16, 17, 4):
+                for dxx in range(-24, 25, 4):
+                    X0, Y0 = int(cxm - wM / 2 + dxx), int(y0 - 30 + dy)
+                    if X0 < -PD or Y0 < -PD or X0 + wM > W + PD or Y0 + hM > H + PD: continue
+                    tgt = (labP[Y0 + PD:Y0 + PD + hM, X0 + PD:X0 + PD + wM] == o['lab'])
+                    hh_ = int(hM * 0.85); v_ = (sil[:hh_] & tgt[:hh_]).sum() / max((sil[:hh_] | tgt[:hh_]).sum(), 1)
+                    if best is None or v_ > best[0]: best = (v_, sc, X0 + wM / 2, Y0 + 30)
+        if best:
+            a = pr * sMed * best[1]
+            o['s'] = float(sMed * best[1]); o['t'] = [float(best[2] - (a[:, 0].max() + a[:, 0].min()) / 2), float(best[3] - a[:, 1].min())]; o['err'] = round(float(best[0]), 2)
     a = proj(P[hv], np.radians(o['yaw'])) * o['s'] + o['t']
     for pt in a[::7].astype(int): cv2.circle(chk, (int(pt[0]), int(pt[1])), 0, (0, 255, 0), -1)
     cv2.putText(chk, f"{o['yaw']:.0f} {o['by']}", (o['cell'][0], o['cell'][1] + 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
