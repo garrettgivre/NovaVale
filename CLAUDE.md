@@ -219,10 +219,17 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   you're within ~2.8 m (Garrett found everyone always facing the player eerie).
 - Painted art (Oct 2026, ChatGPT paint-overs of bases rendered from the game, `tools/art/bases/` + `BASES.md`): title screen
   `assets/title.webp`, postcards `assets/postcards/pc1-8.webp` (notebook and the cards lying in the rooms), lobby paintings
-  `assets/paintings/lake1-4.webp`, the clipping's photo `assets/docs/opening.webp`. Still to paint: the crew photo and the four
-  ending illustrations (bases exist). Originals are kept out of git in `tools/art/painted/src/`.
+  `assets/paintings/lake1-4.webp`, the clipping's photo `assets/docs/opening.webp`. The crew photo and the four ending pictures were
+  painted on 7 Oct 2026. Originals are kept out of git in `tools/art/painted/src/`.
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`
   opens from the notebook's People page.
+- All the painted art is done (7 Oct 2026): the crew photo `assets/docs/crewphoto.webp` and the four ending pictures
+  `assets/endings/*.webp` (behind the ending screens, `#screen:has(.end.<k>)` in style.css). Garrett's Chrome is signed in to
+  ChatGPT, so with the Claude in Chrome extension connected the images can be generated from here: start each one from
+  chatgpt.com's home page (attaching to an existing chat failed), upload the base through the hidden "Attach files" input,
+  click the visible box by position before typing (the ref sometimes points at a hidden one), send, wait ~90 s, then
+  fetch the `img[alt="Generated image 1"]` blob and trigger a download. Anaconda is gone from this PC, so
+  `tools/figures/venv` (built on it) no longer runs; the system Python has PIL.
 
 ## Testing
 - Look: figures are mostly self-lit (`emissiveIntensity` .52, diffuse grey .61) so rooms light them alike; bloom only
@@ -266,7 +273,7 @@ fonts bundled, and a phone performance pass first). Not now.
 `tools/voice/voice.py`), played by `voice()` in audio.js from `ui.say` and `cine()`. **After adding or editing dialogue,
 run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or the new lines stay silent. Menu: Voices On/Off.
 **Recommended next (Oct 2026):**
-1. The last art when Garrett has image credits: crew photo, four ending illustrations (bases in `tools/art/bases/BASES.md`).
+1. Blinking for the figures (eyes-closed crops per character; could be generated from the head sheets in ChatGPT).
 2. The boathouse mini-case (sequel hook already planted), only if Garrett wants the game bigger before release.
 3. A fresh-eyes playthrough by Garrett or Beau, then a round of fixes; then ElevenLabs voices (Garrett: only once the
    game is finished; Chatterbox was only marginally better than Kokoro, don't redo voices with it) and the Play Store.

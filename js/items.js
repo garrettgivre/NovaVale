@@ -119,9 +119,7 @@ export const DOCS = {
 // ---------- Lore: the crew photo, a newspaper clipping, and the postcards ----------
 DOCS.crewphoto = {
   t: 'Photograph: the build crew',
-  html: `<div class="paper photo"><div class="cat"><svg viewBox="0 0 320 200"><rect width="320" height="200" fill="#b8a888"/><rect x="8" y="8" width="304" height="184" fill="#a8987a"/>
-    <path d="M40 170 A120 120 0 0 1 280 170" fill="none" stroke="#4a3e2e" stroke-width="3"/>${[0, 1, 2, 3, 4, 5].map(i => `<line x1="160" y1="50" x2="${60 + i * 40}" y2="170" stroke="#4a3e2e" stroke-width="2"/>`).join('')}
-    ${[0, 1, 2, 3].map(i => `<g><circle cx="${70 + i * 60}" cy="112" r="12" fill="#3a2e22"/><rect x="${56 + i * 60}" y="124" width="28" height="56" fill="#3a2e22"/><circle cx="${63 + i * 60}" cy="134" r="3.5" fill="#e0c070"/></g>`).join('')}</svg></div>
+  html: `<div class="paper photo"><div class="cat"><img src="assets/docs/crewphoto.webp" alt="Four people on the Aquadome steps, June 2003"></div>
     <p class="hand">Aquadome build crew, 21 June 2003.</p><p>Left to right: M. Okafor, R. Dunn, T. Beale and O. Finch (lead designer). Every one of them wears the same small brass star pin on the lapel.</p></div>`,
 };
 DOCS.clipping = {

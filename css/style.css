@@ -132,7 +132,7 @@ body.talking #hud *, body.paneled #hud * { pointer-events: none; }
 .paper.lined { background: repeating-linear-gradient(transparent 0 31px, rgba(90,110,140,.35) 31px 32px), var(--paper); }
 .paper.lined p { margin: 0; line-height: 32px; }
 .paper.sticky { background: var(--noise), linear-gradient(180deg, #f0e070, #e2cc50); transform: rotate(-1.5deg); }
-.paper.photo { text-align: center; } .paper .cat { width: 60%; margin: 0 auto 10px; border: 10px solid #f4f0e4; box-shadow: 0 3px 10px rgba(0,0,0,.4); filter: sepia(.3); }
+.paper.photo { text-align: center; } .paper .cat { width: 72%; margin: 0 auto 10px; border: 10px solid #f4f0e4; box-shadow: 0 3px 10px rgba(0,0,0,.4); filter: sepia(.3); } .paper .cat img { display: block; width: 100%; }
 .paper.card ul { margin: 6px 0 10px; padding-left: 22px; line-height: 1.6; }
 .paper.mono { font-family: 'Courier New', Courier, monospace; font-size: 15px; background: var(--noise), #f2eee2; }
 .paper.blue { background: var(--noise), #23466e; color: #dfe8f0; font-family: 'Courier New', monospace; font-size: 15px; }
@@ -298,6 +298,15 @@ body.talking #hud *, body.paneled #hud * { pointer-events: none; }
 .end .paper { text-align: left; }
 .end .sub { font-style: italic; color: var(--cream2); }
 .end .row { margin-top: 26px; }
+/* the painted ending pictures (tools/art/bases/BASES.md) */
+#screen.sky, #screen.dark { background-size: cover; background-position: center; }
+#screen.dark:has(.end.blackout) { background-image: linear-gradient(180deg, rgba(6,6,12,.5), rgba(6,6,12,.85) 60%), url(../assets/endings/lights_out.webp); }
+#screen.dark:has(.end.locked) { background-image: linear-gradient(180deg, rgba(10,6,2,.45), rgba(10,6,2,.85) 60%), url(../assets/endings/locked_in.webp); }
+#screen.dark:has(.end.kenji) { background-image: linear-gradient(180deg, rgba(12,12,14,.45), rgba(12,12,14,.85) 60%), url(../assets/endings/wrong_call.webp); }
+#screen.sky:has(.end.good) { background-image: linear-gradient(180deg, rgba(8,6,14,.2), rgba(8,6,14,.75) 55%), url(../assets/endings/good.webp); }
+.end.bad h1 { margin-top: 36vh; }
+.end.good .pic { height: 34vh; }
+@media (max-width: 600px) { .end.bad h1 { margin-top: 30vh; } .end.good .pic { height: 26vh; } }
 
 /* corner buttons: reveal hotspots, music on/off */
 #corner { position: absolute; top: calc(10px + var(--st)); right: 10px; display: flex; gap: 8px; }

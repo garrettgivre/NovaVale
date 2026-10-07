@@ -672,7 +672,7 @@ const BAD = {
 export function badEnding(k) {
   ghostVoice(false); sfx('bad');
   const [t, ...p] = BAD[k];
-  const s = screen(`<div class="end bad"><h1>${t}</h1>${p.map(x => `<p>${x}</p>`).join('')}<div class="row"><button class="btn big" id="sc">Second Chance</button><button class="btn ghost" id="tt">Title screen</button></div></div>`, 'dark');
+  const s = screen(`<div class="end bad ${k}"><h1>${t}</h1>${p.map(x => `<p>${x}</p>`).join('')}<div class="row"><button class="btn big" id="sc">Second Chance</button><button class="btn ghost" id="tt">Title screen</button></div></div>`, 'dark');
   s.querySelector('#sc').onclick = () => { closeScreen(); if (secondChance()) E.resume(); };
   s.querySelector('#tt').onclick = () => location.reload();
 }
@@ -690,7 +690,7 @@ async function galaNight() {
 function ending() {
   S.phase = 'end'; save(); ambience('day');
   const mins = Math.max(1, Math.round((Date.now() - S.t0) / 60000)), pc = pcCount();
-  const s = screen(`<div class="end good"><div class="paper letter">
+  const s = screen(`<div class="end good"><div class="pic"></div><div class="paper letter">
     <p class="lh">THE AQUADOME · Lakeshore Spa &amp; Planetarium</p>
     <p>Dear Nova,</p>
     <p>The gala was the most beautiful night this building has seen in nine years, and it happened because of you (as you reminded me, twice).</p>
