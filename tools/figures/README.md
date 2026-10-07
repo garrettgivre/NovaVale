@@ -39,7 +39,7 @@ venv\Scripts\python -c "from huggingface_hub import hf_hub_download; hf_hub_down
 - `onnxruntime==1.19.2` on purpose: newer builds failed to load (DLL init error) on Garrett's PC.
 - rembg downloads its `birefnet-general` model (~1 GB) on first use.
 - Blender 4.5 is installed at `C:\Program Files\Blender Foundation\Blender 4.5\blender.exe`.
-- Garrett's Anaconda Python is `~/anaconda3/python.exe`; use it to create the venv.
+- Anaconda was removed in Oct 2026; create the venv from the system Python (`python -m venv venv`, Python 3.10).
 - Everything except scripts, configs and `refs/` is git-ignored here (venv, da, intermediate PNG/NPZ/blend files).
 
 ## Building characters

@@ -228,8 +228,9 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   ChatGPT, so with the Claude in Chrome extension connected the images can be generated from here: start each one from
   chatgpt.com's home page (attaching to an existing chat failed), upload the base through the hidden "Attach files" input,
   click the visible box by position before typing (the ref sometimes points at a hidden one), send, wait ~90 s, then
-  fetch the `img[alt="Generated image 1"]` blob and trigger a download. Anaconda is gone from this PC, so
-  `tools/figures/venv` (built on it) no longer runs; the system Python has PIL.
+  fetch the `img[alt="Generated image 1"]` blob and trigger a download. Garrett removed Anaconda (disk space; nothing in the game
+  needs it). `tools/figures/venv` was built on it, so to build a figure again recreate the venv from the system Python
+  (`python -m venv venv`, then the README's setup). The system Python has PIL.
 
 ## Testing
 - Look: figures are mostly self-lit (`emissiveIntensity` .52, diffuse grey .61) so rooms light them alike; bloom only
