@@ -3,3 +3,5 @@ tools/test/out/
 
 # Chatterbox scratch take
 tools/voice/refs/_t*.wav
+tools/art/blink/*.png
+tools/art/blink/*.jpg

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import { MeshoptDecoder } from '../vendor/meshopt_decoder.module.js';
 import { HEADMAP } from './figheads.js';
+import { BLINK } from './figblink.js';
 import { LOWMEM, halfCanvas } from './tex.js';
 
 // who -> { head: model-space height of the head centre, talk: which arm gestures ('R' | 'L') }
@@ -29,7 +30,7 @@ export const FIG = {
   jojo: { head: 1.658, talk: 'R', relax: 0.3 },
 };
 // bumped by tools/bump.py so a new deploy's models aren't served from the browser cache
-export const ASSET_V = '202610071824';
+export const ASSET_V = '202610071927';
 const loaded = {}, loading = {};
 export const figReady = who => !!loaded[who];
 // people in the room you're in load now; everyone else queues up and loads one at a time (each model is a few MB)
@@ -66,7 +67,7 @@ const vtmp = new THREE.Vector3();
 const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), va = new THREE.Vector3(), vb = new THREE.Vector3();
 
 export function buildFigure(who, HIT) {
-  const f = FIG[who], g = new THREE.Group(), root = loaded[who];
+  const f = FIG[who], g = new THREE.Group(), root = loaded[who], u = g.userData;
   g.userData.who = who; g.userData.figure = true; g.userData.yOff = 0;
   g.add(root);
   const bones = {};
@@ -95,11 +96,18 @@ export function buildFigure(who, HIT) {
       o.material.customProgramCacheKey = () => 'fig:' + who;
       if (o.geometry.attributes.uv3) o.material.onBeforeCompile = sh => {
         let hd = 'vec4 hd(vec2 uv) { return texture2D(map, uv); }';
+        // blinking: the eye band of the head sheet's front view, painted with the eyes closed (assets/blink), laid over
+        // the front-view lookup by uBlink. The band is given in that view's own pixels plus where the view sits in the atlas.
+        const BK = BLINK[who];
+        if (HM && BK) {
+          const tex = new THREE.TextureLoader().load(`assets/blink/${who}.webp?v=${ASSET_V}`); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false;
+          u.blinkTex = tex; u.blinkRect = BK;
+        }
         if (HM) {
           const v = HM.v, f = n => n.toFixed(4);
           sh.uniforms.hV = { value: v.map(r => new THREE.Vector4(r[0], r[1], r[2], r[3])) };
           sh.uniforms.hT = { value: v.map(r => new THREE.Vector4(r[4], r[5], r[6], r[7])) };
-          hd = `uniform vec4 hV[${v.length}]; uniform vec4 hT[${v.length}];
+          hd = `uniform vec4 hV[${v.length}]; uniform vec4 hT[${v.length}]; uniform sampler2D uBlinkMap; uniform vec4 uBlinkRect; uniform float uBlink;
 vec4 hd(vec2 uv) {
   vec4 base = texture2D(map, uv);
   vec2 A = vec2(${f(HM.A[0] - 1)}, ${f(HM.A[1] - 1)}), p = uv * A;
@@ -107,8 +115,13 @@ vec4 hd(vec2 uv) {
     vec4 r = hV[i];
     if (p.x > r.x && p.x < r.y && p.y < r.w) {
       float w = (1.0 - smoothstep(r.z, r.w, p.y)) * smoothstep(r.x, r.x + 5.0, p.x) * (1.0 - smoothstep(r.y - 5.0, r.y, p.x));
-      vec4 t = hT[i];
-      return mix(base, texture2D(map, vec2(t.x * p.x + t.z, t.y * p.y + t.w) / A), w);
+      vec4 t = hT[i]; vec2 q = vec2(t.x * p.x + t.z, t.y * p.y + t.w);
+      vec4 hc = texture2D(map, q / A);
+      if (i == 0) {   // the front view: the eye band, eyes closed, by uBlink
+        vec2 e = (q - uBlinkRect.xy) / uBlinkRect.zw;
+        if (e.x > 0.0 && e.x < 1.0 && e.y > 0.0 && e.y < 1.0) hc = mix(hc, texture2D(uBlinkMap, e), uBlink);
+      }
+      return mix(base, hc, w);
     }
   }
   return base;
@@ -127,6 +140,9 @@ float viewSide(vec3 d, vec3 n) {
 }`;
         }
         sh.uniforms.headZ = { value: headZ };
+        // (the band's origin in the atlas: the view's first column and the body sheet's height, from figblink.js)
+        sh.uniforms.uBlinkMap = { value: u.blinkTex || null }; sh.uniforms.uBlinkRect = { value: u.blinkRect ? new THREE.Vector4(u.blinkRect[4] + u.blinkRect[0], u.blinkRect[5] + u.blinkRect[1], u.blinkRect[2] - u.blinkRect[0], u.blinkRect[3] - u.blinkRect[1]) : new THREE.Vector4(-9, -9, 1, 1) };
+        sh.uniforms.uBlink = u.blinkU = { value: 0 };
         sh.vertexShader = sh.vertexShader
           .replace('#include <common>', `#include <common>
 attribute vec2 uv1;
@@ -280,6 +296,12 @@ export function animateFigure(g, dt, cam, speech) {
   const talking = (speech.who === u.who && speech.typing) || !!u.forceG, focused = speech.focus === u.who;   // forceG: a held gesture (testing)
   const listening = focused && !talking && speech.who === 'nova';
   u.talk = ease(u.talk, talking ? 1 : 0, 3, dt);
+  if (u.blinkU) {   // blinks: shut in 60 ms, open in 120, every 2-6 s (sooner when talking), sometimes twice
+    u.bkNext ??= 1 + Math.random() * 4;
+    if ((u.bkNext -= dt) < 0) { u.bk = 0.2; u.bkNext = (2 + Math.random() * 4) * (talking ? .6 : 1) * (Math.random() < .12 ? .08 : 1); }
+    if (u.bk > 0) { u.bk -= dt; const k = 0.2 - u.bk; u.blinkU.value = k < 0.06 ? k / 0.06 : Math.max(0, 1 - (k - 0.06) / 0.12); } else u.blinkU.value = 0;
+    if (u.blinkHold != null) u.blinkU.value = u.blinkHold;   // (testing: hold the eyes shut)
+  }
   u.sp ??= { yaw: { x: 0, v: 0 }, pitch: { x: 0, v: 0 } };
   // ---- the current line: questions tilt the head, exclamations get bigger beats, laughter shakes the shoulders
   if (talking && speech.n !== u.lineN) {

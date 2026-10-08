@@ -221,6 +221,9 @@ new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celes
   `assets/title.webp`, postcards `assets/postcards/pc1-8.webp` (notebook and the cards lying in the rooms), lobby paintings
   `assets/paintings/lake1-4.webp`, the clipping's photo `assets/docs/opening.webp`. The crew photo and the four ending pictures were
   painted on 7 Oct 2026. Originals are kept out of git in `tools/art/painted/src/`.
+- Blinking (7 Oct 2026): every figure but Vesper (sunglasses) blinks; `tools/art/blink/README.md` says how a band is
+  made (ChatGPT edits the head sheet's front view with the eyes closed; `eyes.py` aligns and cuts it; `js/figblink.js`,
+  `assets/blink/<who>.webp`; `uBlink` in figures.js, timing in `animateFigure`, `u.blinkHold` for tests).
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`
   opens from the notebook's People page.
 - All the painted art is done (7 Oct 2026): the crew photo `assets/docs/crewphoto.webp` and the four ending pictures
@@ -274,7 +277,8 @@ fonts bundled, and a phone performance pass first). Not now.
 `tools/voice/voice.py`), played by `voice()` in audio.js from `ui.say` and `cine()`. **After adding or editing dialogue,
 run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or the new lines stay silent. Menu: Voices On/Off.
 **Recommended next (Oct 2026):**
-1. Blinking for the figures (eyes-closed crops per character; could be generated from the head sheets in ChatGPT).
+1. Lip-sync for the figures: the same method as blinking (an eyes-closed band swapped in by a uniform), with a
+   mouth-open band from ChatGPT and `uBlink`-style timing driven by the voice line.
 2. The boathouse mini-case (sequel hook already planted), only if Garrett wants the game bigger before release.
 3. A fresh-eyes playthrough by Garrett or Beau, then a round of fixes; then ElevenLabs voices (Garrett: only once the
    game is finished; Chatterbox was only marginally better than Kokoro, don't redo voices with it) and the Play Store.
@@ -291,8 +295,7 @@ loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted 
 Open items:
 - Not yet checked: the thumb stick on a real phone.
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
-  hand in Act 3, placing Celeste in the world on Day 2, lip-sync/blinking for figures (needs eyes-closed and mouth-open
-  face crops from Garrett).
+  hand in Act 3, placing Celeste in the world on Day 2, lip-sync for figures (mouth-open bands, the same way as the blink).
 
 ## A note from the last session
 You're picking up a game made as a gift, by someone who playtests every change on his phone and notices everything. What
