@@ -37,11 +37,13 @@ Vale**; Beau is not in the game, and nods to his tastes stay as nods (Vesper Vox
   flags or dialogue gating changed broadly, or when he asks. Send him the screenshots as proof.
 - He often says "claude rc" (switch on Remote Control so he can follow from his phone) and "Continue" (carry on).
 - When he says "stop all testing", stop at once; don't restart test runs or kill his processes without asking.
-- His C: drive is nearly full (under 6 GB free); big installs and model files go on D: (`D:/NovaVoice` holds the
-  Chatterbox venv and Hugging Face cache).
+- Big installs and model files go on D: (`D:/NovaVoice` holds the Chatterbox venv and Hugging Face cache; `D:/NovaFig`
+  the abandoned 3D-figure pipeline, about 25 GB, safe to delete). C: has room again since Anaconda went (Oct 2026).
 - Answers: when he asks "what next?", give a recommendation and a short ranked list, not an essay.
-- Art: Garrett generates images in ChatGPT from prompts you write (he has a daily image limit). Character turnaround
-  prompt is in `tools/figures/README.md`; other wishes in `tools/art/WISHLIST.md`.
+- Art: images come from ChatGPT (Garrett's Plus account, a daily image limit). You can generate them yourself through
+  Claude in Chrome (see "Generating images in ChatGPT" below); he can also paste prompts by hand. Character turnaround
+  prompt is in `tools/figures/README.md`; other wishes in `tools/art/WISHLIST.md`. In his ChatGPT, a project called
+  **Nova Vale** holds the chats made from here (crew photo, endings, blinks); move new ones in.
 
 ## The look
 Classic early-2000s Nancy Drew: realistic pre-rendered feel, a faded grand resort (marble, mahogany, brass, damask), serif
@@ -184,56 +186,71 @@ Dialogue topics: `{ id, q, lines, when, hot (starred new lead), after, catch/fin
 `build<Place>()`, nodes in `NODES`, door handlers in `HOT`, an entry in `PLACES` and the map SVG, optionally `FIRST_VISIT`.
 
 ## Characters in 3D (painted figures)
-**The shipped figures are the original painted-relief build (commit ca0a862).** On 3-5 Oct 2026 two days went into
-replacing them with generated full-3D shapes (Hunyuan3D-2mv on D:/NovaFig), baked textures and extra head sheets
-(`tools/figures/README.md` describes all of it: gen3d.py, gen_build.py, uv_blend.py, textex.py, bake.py, head2.py,
-hull.py; `refs/<who>_head2.png` are the extra six-view head sheets). Garrett's verdict: "they all look worse than when we
-started", so `assets/figures/*.glb`, `js/figures.js` and `js/figheads.js` were put back to ca0a862. Don't rebuild the
-figures with the new pipeline unless he asks; `heads_js.py` would overwrite figheads.js with the new-pipeline head
-maps, so don't run it either. The 3D pipeline's one real finding: the art is the limit; a clean result needs a paid
-image-to-3D service or hand-made models. `heads_js.py`/`bump.py` sometimes fail with "Invalid argument" while the
-local server holds a file; run them again.
-All characters with turnaround art are 3D models built from that art by the pipeline in `tools/figures/` (read its
-README: setup, sheet prompt, commands, how it works, what to check). All 15 are built (Oct 2026) from
-new body sheets plus head sheets (`refs/<who>.png`, `refs/<who>_head.png`; Celeste is built but only a phone contact).
-`people.js` (the old sculpted models) is no longer used by anyone. Rebuild everyone: `./build_all.sh <names>` in
-`tools/figures`, then `python heads_js.py` and `python tools/bump.py`.
+All 15 characters are 3D models built from turnaround art by the pipeline in `tools/figures/` (read its README). Each is
+a painted relief: the front painting's depth is estimated and fitted to the side outline, the face is modelled from the
+head sheet, and the shader mixes the front, side and back paintings by facing (`refs/<who>.png` body sheets,
+`refs/<who>_head.png` head sheets; Celeste is built but only a phone contact). `people.js` (the old sculpted models) is
+unused. **The shipped figures are the original build (commit ca0a862)**, with two later shader changes kept: the profile
+painting stays on the front half of the head (`headZ`), and `PERS.stand` resting poses.
+- **Don't rebuild the figures with the full-3D pipeline.** On 3-5 Oct 2026 two days went into generated full-3D shapes
+  (Hunyuan3D-2mv on `D:/NovaFig`), baked textures and extra six-view head sheets (`refs/<who>_head2.png`; scripts
+  gen3d.py, gen_build.py, uv_blend.py, textex.py, bake.py, head2.py, hull.py, all described in the README). Garrett's
+  verdict: "they all look worse than when we started". The finding: the art is the limit; a clean result needs a paid
+  image-to-3D service or hand-made models. `heads_js.py` would overwrite figheads.js with that pipeline's head maps, so
+  don't run it either. `tools/figures/venv` was built on Anaconda, which is gone; recreate it from the system Python
+  (`python -m venv venv` in that folder, then the README's setup) if a figure ever needs rebuilding with `build_all.sh`.
 - Head sheets: the shader (`figures.js`, `hd()`) reads heads from the head sheet in the texture atlas via `js/figheads.js`;
   each figure has its own shader program (`customProgramCacheKey`), or three.js reuses the first figure's.
-- Side views: the build carves each head's front from the head sheet's depth (cheeks and jaw recede) and scales the face
-  so its front-most point sits on the profile outline; the shader (`viewSide`) switches the sides of the face to the profile
-  painting when seen from the side or behind. Remaining: a slight smear under the jaw at exact profile (Jojo most).
+- Side views: the shader (`viewSide`) switches the sides of the face to the profile painting when seen from the side or
+  behind, on the front half of the head only. Remaining: a slight smear under the jaw at exact profile (Jojo most).
 - Keep figure animation mostly in the picture plane: big turns towards or away from the camera show a painting-based
   mesh edge-on. Head turns are clamped (0.35 yaw / 0.18 pitch), gestures small.
 - Animation (`animateFigure`): per-character personality `PERS` (tempo, sway, gesture size, resting chin, how often
-  they look about, weighted idle habits) and habits `ACTS` (hand on hip, chin up, sigh, shrug, neck roll, look around/up/down,
-  fidget, bounce), springy head look, head and chest lead body turns, talking reacts to the line (`speech.line`: questions
-  tilt and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
-  while Nova talks.  is a resting pose kept all the time (hip: weight on one side, tilt: head); Celeste has one. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
+  they look about, weighted idle habits, and `stand`: a resting pose kept all the time, hip = weight on one side, tilt =
+  head; Celeste has one) and habits `ACTS` (hand on hip, chin up, sigh, shrug, neck roll, look around/up/down, fidget,
+  bounce), springy head look, head and chest lead body turns, talking reacts to the line (`speech.line`: questions tilt
+  and open the hands, exclamations go bigger, laughter shakes the shoulders), thinking glances mid-speech, listeners nod
+  while Nova talks. Keep new moves in the picture plane and small: elbows bent sideways fold the painted arm across the
   body, arms raised far look like a scarecrow, forearms brought forward show their edge.
-- Arms in the build: triangles bridging an arm and the body across background in the painting (a hand hanging a
-  pixel from the hip; never where the arm overlaps the body, which left holes and bands) are cut and closed (`armCut`), and each hand is found from the painting (pieces outside the legs below the wrist) and bound wholly to the
-  arm. Before this, moving an arm stretched a strip of hand colour to the hip and left fingertips behind.
-  Debug: `userData.dbgRest` / `dbgOnly` ('upper'|'fore'|'hand') / `dbgAx` ('z'|'x') / `forceG` (a held gesture).
+- Blinking (Oct 2026): everyone but Vesper (sunglasses) blinks. `tools/art/blink/README.md` says how a band is made
+  (ChatGPT edits the head sheet's front view with the eyes closed; `eyes.py` aligns it by face landmarks and cuts a
+  feathered band; `js/figblink.js`, `assets/blink/<who>.webp`). In figures.js: `uBlink` in `hd()`, timing in
+  `animateFigure` (shut 60 ms, open 120, every 2-6 s, sooner when talking), `u.blinkHold` for tests. Lip-sync could use
+  the same mechanism with a mouth-open band driven by the voice line.
+- Arms in the build: triangles bridging an arm and the body across background in the painting are cut and closed
+  (`armCut`), and each hand is found from the painting and bound wholly to the arm. Debug: `userData.dbgRest` /
+  `dbgOnly` ('upper'|'fore'|'hand') / `dbgAx` ('z'|'x') / `forceG` (a held gesture).
 - People keep their own facing (towards the room's middle, offset per person) and only turn to you when talking or when
-  you're within ~2.8 m (Garrett found everyone always facing the player eerie).
-- Painted art (Oct 2026, ChatGPT paint-overs of bases rendered from the game, `tools/art/bases/` + `BASES.md`): title screen
-  `assets/title.webp`, postcards `assets/postcards/pc1-8.webp` (notebook and the cards lying in the rooms), lobby paintings
-  `assets/paintings/lake1-4.webp`, the clipping's photo `assets/docs/opening.webp`. The crew photo and the four ending pictures were
-  painted on 7 Oct 2026. Originals are kept out of git in `tools/art/painted/src/`.
-- Blinking (7 Oct 2026): every figure but Vesper (sunglasses) blinks; `tools/art/blink/README.md` says how a band is
-  made (ChatGPT edits the head sheet's front view with the eyes closed; `eyes.py` aligns and cuts it; `js/figblink.js`,
-  `assets/blink/<who>.webp`; `uBlink` in figures.js, timing in `animateFigure`, `u.blinkHold` for tests).
+  you're within ~2.8 m (Garrett found everyone always facing the player eerie; he does not want that as a workaround).
+- Judge figures in the game at its own settings (`tools/test/face.js` with `RETRO=1`, `shot.js`), not in long-lens test
+  renders, which exaggerate every flaw.
+- Painted art (ChatGPT paint-overs of bases rendered from the game, `tools/art/bases/` + `BASES.md`): title screen
+  `assets/title.webp`, postcards `assets/postcards/pc1-8.webp`, lobby paintings `assets/paintings/lake1-4.webp`, the
+  clipping's photo `assets/docs/opening.webp`, the crew photo `assets/docs/crewphoto.webp`, the four ending pictures
+  `assets/endings/*.webp` (behind the ending screens, `#screen:has(.end.<k>)` in style.css). All of it is done.
+  Originals are kept out of git in `tools/art/painted/src/`.
 - Portrait crops `assets/portraits/<id>.webp` (400x480) appear in conversations; full-body art `assets/art/<id>.webp`
   opens from the notebook's People page.
-- All the painted art is done (7 Oct 2026): the crew photo `assets/docs/crewphoto.webp` and the four ending pictures
-  `assets/endings/*.webp` (behind the ending screens, `#screen:has(.end.<k>)` in style.css). Garrett's Chrome is signed in to
-  ChatGPT, so with the Claude in Chrome extension connected the images can be generated from here: start each one from
-  chatgpt.com's home page (attaching to an existing chat failed), upload the base through the hidden "Attach files" input,
-  click the visible box by position before typing (the ref sometimes points at a hidden one), send, wait ~90 s, then
-  fetch the `img[alt="Generated image 1"]` blob and trigger a download. Garrett removed Anaconda (disk space; nothing in the game
-  needs it). `tools/figures/venv` was built on it, so to build a figure again recreate the venv from the system Python
-  (`python -m venv venv`, then the README's setup). The system Python has PIL.
+
+## Generating images in ChatGPT (Claude in Chrome)
+Garrett's Chrome is signed in to ChatGPT. With the Claude in Chrome extension connected (`mcp__claude-in-chrome__*`; if
+it reports not connected, ask him to open the Claude side panel in Chrome), each image is one chat:
+1. `navigate` to `https://chatgpt.com/` (always the home page: attaching to an existing chat failed), wait 4 s, `find`
+   the "Attach files" file input, `file_upload` the source image to its ref.
+2. Wait 5 s, then put the text in and send **by script** (typing into the box by click dropped the text about half the
+   time): `javascript_tool` with `const ed = document.querySelector('#prompt-textarea'); ed.focus();
+   document.execCommand('selectAll'); document.execCommand('delete'); document.execCommand('insertText', false, PROMPT);`
+   then after 500 ms click `document.querySelector('button[data-testid="send-button"]')`. Check
+   `!!document.querySelector('form img')` says the attachment is there.
+3. Wait about 90 s (eight 10 s waits in one `browser_batch`), then fetch the result:
+   `const im = [...document.querySelectorAll('img[alt="Generated image 1"]')].pop();` fetch its blob and trigger an `<a
+   download>`; it lands in `C:\Users\Garrett\Downloads`. "NOIMG" means it is still generating or the text was lost.
+4. Move the chat into the Nova Vale project and give it a title: `PATCH /backend-api/conversation/<id>` with
+   `{ gizmo_id: 'g-p-6ac6e8b90ae88191aba2ce5d1bca8015', title }` and a bearer token from `/api/auth/session`
+   (`accessToken`); `/backend-api/conversations?limit=40` lists chats with their first attachment's file name.
+Screenshots of that tab often time out while ChatGPT animates; `get_page_text` and `find` keep working. Close the tab
+when done. Generation of an edited image takes 40-90 s; failed generations show "Image generation failed" with a Try
+again button.
 
 ## Testing
 - Look: figures are mostly self-lit (`emissiveIntensity` .52, diffuse grey .61) so rooms light them alike; bloom only
@@ -276,14 +293,16 @@ fonts bundled, and a phone performance pass first). Not now.
 **Voices (Oct 2026)**: every spoken line is voiced with Kokoro TTS, each person with their own voice (`CAST` in
 `tools/voice/voice.py`), played by `voice()` in audio.js from `ui.say` and `cine()`. **After adding or editing dialogue,
 run `tools/voice/extract.py` then `voice.py`** (see `tools/voice/README.md`), or the new lines stay silent. Menu: Voices On/Off.
-**Recommended next (Oct 2026):**
-1. Lip-sync for the figures: the same method as blinking (an eyes-closed band swapped in by a uniform), with a
-   mouth-open band from ChatGPT and `uBlink`-style timing driven by the voice line.
-2. The boathouse mini-case (sequel hook already planted), only if Garrett wants the game bigger before release.
-3. A fresh-eyes playthrough by Garrett or Beau, then a round of fixes; then ElevenLabs voices (Garrett: only once the
-   game is finished; Chatterbox was only marginally better than Kokoro, don't redo voices with it) and the Play Store.
-4. Blinking/lip-sync (needs eyes-closed and mouth-open face crops from Garrett).
-Recently done (newest first): Celeste's introduction rewritten and she faces the lobby entrance (`DAY.celeste` facing
+**Recommended next (8 Oct 2026):**
+1. A fresh-eyes playthrough by Garrett or Beau on a phone, then a round of fixes. The content is complete: every room,
+   puzzle, voice and picture is in.
+2. Lip-sync for the figures: the blink mechanism with a mouth-open band from ChatGPT, driven by the voice line's timing.
+3. More ChatGPT props if wanted: the 2003 brochure, the gala invitation, the Revue programme, Harper's podcast flyer,
+   period posters for the rooms (one image each; wire them in as documents or textures).
+4. Then ElevenLabs voices (Garrett: only once the game is finished; Chatterbox was only marginally better than Kokoro,
+   don't redo voices with it) and the Play Store. The boathouse mini-case only if he wants the game bigger first.
+Recently done (newest first): blinking for all figures; the crew photo and four ending pictures; Celeste's resting
+pose; the profile painting kept to the front half of the head; the full-3D figure experiment (reverted); Celeste's introduction rewritten and she faces the lobby entrance (`DAY.celeste` facing
 0.67); the display case rebuilt to match Nova's first look (velvet with the crown's ring dent, hood knocked a hair
 crooked on its brass rail, lock plate, lit keypad; velvet reads a little maroon, could go redder); Celeste's topics after Day 1 (the singing, Dex's ghost, the relaunch memo, the fake
 star pointing to the appraisal, Kenji, Opal; greetings by progress); phone performance pass (see Testing); voices; door fidelity (moulded surrounds, sills, hinges, sizes per room); two-tap doors everywhere
@@ -294,15 +313,20 @@ clipping); environment pass on every room (lobby dome/medallion/seating, bathhou
 loading; Act 3 (Gala Day, Kenji, two new puzzles); many figure passes (sculpted faces, blended texturing, clean elbows).
 Open items:
 - Not yet checked: the thumb stick on a real phone.
+- Garrett's open note: the display case velvet could be redder.
+- Blink timing was set by eye in held frames, not watched at speed on a phone; Dex's eyes-closed band redrew his glasses
+  a shade thinner (may flicker up close).
 - Ideas Garrett hasn't picked yet: the boathouse sequel case, a puzzle around Silas's tape, giving Harper/Rashad/Priya a
-  hand in Act 3, placing Celeste in the world on Day 2, lip-sync for figures (mouth-open bands, the same way as the blink).
+  hand in Act 3, placing Celeste in the world on Day 2, lip-sync.
 
 ## A note from the last session
 You're picking up a game made as a gift, by someone who playtests every change on his phone and notices everything. What
 worked best: make the change, look at it yourself in a screenshot before he does, fix what's off, then show him. Small
-careful passes beat big rewrites here; when something already works (the figures, the doors, the opening), refine it.
+careful passes beat big rewrites here; when something already works, refine it. The hard lesson of this session: two
+days went into replacing the character models with generated full-3D ones, and he found them worse than the originals.
+Show him one character at the game's own settings before touching the rest, and stop at the first "worse".
 Before writing any line for Nova, ask what she knows at that moment and gate it on a flag. Read a few existing
 conversations in `story.js` first to get her voice; she's sharp and funny and never mean. Every new line needs a voice
-(`tools/voice`), so run the two scripts before you commit dialogue. Garrett's open note when we stopped: the case velvet could be redder. (Celeste now has a
-resting pose, PERS.stand in figures.js: weight on one hip and a head tilt kept all the time; any person can have one.) Keep his usage in
-mind, keep the writing plain, and have fun with it.
+(`tools/voice`), so run the two scripts before you commit dialogue. The image route through his ChatGPT (above) works
+well and costs him nothing but image credits; use it for props and faces, and check each result before wiring it in.
+Keep his usage in mind, keep the writing plain, and have fun with it.
